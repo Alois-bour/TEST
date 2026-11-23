@@ -252,12 +252,12 @@ function etr_quantites_reservees( $debut, $fin, $exclure = 0 ) {
  * @return int|null Quantité disponible, ou null si l'article est illimité.
  */
 function etr_disponibilite( $article_id, $reservees = null ) {
-	$stock = get_post_meta( $article_id, '_etr_stock', true );
-	if ( '' === $stock ) {
+	$stock = etr_stock_total( $article_id );
+	if ( null === $stock ) {
 		return null;
 	}
 	$deja = is_array( $reservees ) && isset( $reservees[ $article_id ] ) ? (int) $reservees[ $article_id ] : 0;
-	return max( 0, (int) $stock - $deja );
+	return max( 0, $stock - $deja );
 }
 
 /**
@@ -272,7 +272,7 @@ function etr_texte_disponibilite( $article_id, $dispo ) {
 		return '';
 	}
 	if ( 0 === $dispo ) {
-		return 0 === (int) get_post_meta( $article_id, '_etr_stock', true )
+		return 0 === etr_stock_total( $article_id )
 			? __( 'Indisponible', 'espace-traiteur' )
 			: __( 'Indisponible sur ces dates', 'espace-traiteur' );
 	}
@@ -309,7 +309,8 @@ function etr_lignes_html( $demande_id, $avec_dispo = false ) {
 	}
 	$html .= '</tr></thead><tbody>';
 	foreach ( $lignes as $ligne ) {
-		$reference = get_post_meta( $ligne['article_id'], '_etr_reference', true );
+		$article   = etr_get_article( $ligne['article_id'] );
+		$reference = $article ? $article['reference'] : '';
 		$quantite  = number_format_i18n( $ligne['quantite'] ) . ( ! empty( $ligne['unite'] ) ? ' ' . $ligne['unite'] : '' );
 		$html     .= '<tr><td>' . esc_html( $ligne['titre'] ) . '</td><td>' . esc_html( $reference ? $reference : '—' ) . '</td><td>' . esc_html( $quantite ) . '</td>';
 		if ( $avec_dispo ) {

@@ -17,6 +17,11 @@ class ETR_Admin {
 	 */
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
+		add_action( 'admin_init', array( __CLASS__, 'enregistrer_reglages' ) );
+
+		// Champs « Espace traiteur » sur les produits WooCommerce.
+		add_action( 'woocommerce_product_options_inventory_product_data', array( __CLASS__, 'champs_produit' ) );
+		add_action( 'woocommerce_admin_process_product_object', array( __CLASS__, 'enregistrer_produit' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'add_meta_boxes_etr_demande', array( __CLASS__, 'metaboxes_demande' ) );
 		add_action( 'add_meta_boxes_etr_article', array( __CLASS__, 'metaboxes_article' ) );
@@ -37,13 +42,199 @@ class ETR_Admin {
 	 * Sous-menu « Catégories » (la taxonomie n'apparaît pas seule quand le CPT est en sous-menu).
 	 */
 	public static function menu() {
+		if ( ! etr_source_woocommerce() ) {
+			add_submenu_page(
+				'edit.php?post_type=etr_demande',
+				__( 'Catégories', 'espace-traiteur' ),
+				__( 'Catégories', 'espace-traiteur' ),
+				'gerer_espace_traiteur',
+				'edit-tags.php?taxonomy=etr_categorie&post_type=etr_article'
+			);
+		}
 		add_submenu_page(
 			'edit.php?post_type=etr_demande',
-			__( 'Catégories', 'espace-traiteur' ),
-			__( 'Catégories', 'espace-traiteur' ),
+			__( 'Réglages de l’espace traiteur', 'espace-traiteur' ),
+			__( 'Réglages', 'espace-traiteur' ),
 			'gerer_espace_traiteur',
-			'edit-tags.php?taxonomy=etr_categorie&post_type=etr_article'
+			'etr-reglages',
+			array( __CLASS__, 'page_reglages' )
 		);
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Réglages                                                           */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Déclare les options.
+	 */
+	public static function enregistrer_reglages() {
+		register_setting(
+			'etr_reglages',
+			'etr_categories',
+			array(
+				'type'              => 'array',
+				'default'           => array(),
+				'sanitize_callback' => function ( $valeur ) {
+					return is_array( $valeur ) ? array_values( array_filter( array_map( 'absint', $valeur ) ) ) : array();
+				},
+			)
+		);
+		register_setting(
+			'etr_reglages',
+			'etr_afficher_prix',
+			array(
+				'type'              => 'string',
+				'default'           => '',
+				'sanitize_callback' => function ( $valeur ) {
+					return $valeur ? '1' : '';
+				},
+			)
+		);
+		register_setting(
+			'etr_reglages',
+			'etr_email_equipe',
+			array(
+				'type'              => 'string',
+				'default'           => '',
+				'sanitize_callback' => 'sanitize_email',
+			)
+		);
+	}
+
+	/**
+	 * Page « Réglages ».
+	 */
+	public static function page_reglages() {
+		if ( ! current_user_can( 'gerer_espace_traiteur' ) ) {
+			return;
+		}
+		$taxonomie = etr_taxonomie_categories();
+		$retenues  = etr_categories_retenues();
+		$termes    = get_terms(
+			array(
+				'taxonomy'   => $taxonomie,
+				'hide_empty' => false,
+				'orderby'    => 'name',
+			)
+		);
+		$termes    = is_wp_error( $termes ) ? array() : $termes;
+
+		echo '<div class="wrap"><h1>' . esc_html__( 'Réglages de l’espace traiteur', 'espace-traiteur' ) . '</h1>';
+		echo '<form method="post" action="options.php">';
+		settings_fields( 'etr_reglages' );
+		echo '<table class="form-table" role="presentation"><tbody>';
+
+		echo '<tr><th scope="row">' . esc_html__( 'Catalogue', 'espace-traiteur' ) . '</th><td>';
+		if ( etr_source_woocommerce() ) {
+			echo '<p>' . esc_html__( 'Les articles proposés aux traiteurs sont les produits WooCommerce publiés du site.', 'espace-traiteur' ) . '</p>';
+			echo '<p class="description">' . esc_html__( 'Sur chaque produit (onglet « Inventaire »), vous pouvez indiquer la quantité possédée, l’unité, ou masquer le produit de l’espace traiteur.', 'espace-traiteur' ) . '</p>';
+		} else {
+			echo '<p>' . esc_html__( 'WooCommerce n’est pas actif : le catalogue interne du plugin est utilisé (menu « Catalogue »).', 'espace-traiteur' ) . '</p>';
+		}
+		echo '</td></tr>';
+
+		echo '<tr><th scope="row">' . esc_html__( 'Catégories proposées', 'espace-traiteur' ) . '</th><td><fieldset>';
+		echo '<p class="description">' . esc_html__( 'Aucune case cochée = toutes les catégories. Cocher une catégorie inclut ses sous-catégories.', 'espace-traiteur' ) . '</p>';
+		self::cases_categories( $termes, 0, $retenues, 0 );
+		echo '</fieldset></td></tr>';
+
+		echo '<tr><th scope="row">' . esc_html__( 'Prix', 'espace-traiteur' ) . '</th><td><label><input type="checkbox" name="etr_afficher_prix" value="1"' . checked( get_option( 'etr_afficher_prix' ), '1', false ) . '> ' . esc_html__( 'Afficher les prix du site dans l’espace traiteur', 'espace-traiteur' ) . '</label></td></tr>';
+
+		echo '<tr><th scope="row"><label for="etr_email_equipe">' . esc_html__( 'E-mail de l’équipe', 'espace-traiteur' ) . '</label></th><td>';
+		echo '<input type="email" class="regular-text" id="etr_email_equipe" name="etr_email_equipe" value="' . esc_attr( get_option( 'etr_email_equipe' ) ) . '" placeholder="' . esc_attr( get_option( 'admin_email' ) ) . '">';
+		echo '<p class="description">' . esc_html__( 'Reçoit les nouvelles demandes et les annulations. Vide = e-mail d’administration du site.', 'espace-traiteur' ) . '</p></td></tr>';
+
+		echo '</tbody></table>';
+		submit_button();
+		echo '</form></div>';
+	}
+
+	/**
+	 * Cases à cocher des catégories, en arbre.
+	 *
+	 * @param WP_Term[] $termes   Tous les termes.
+	 * @param int       $parent   Parent courant.
+	 * @param int[]     $retenues Termes cochés.
+	 * @param int       $niveau   Profondeur.
+	 */
+	private static function cases_categories( $termes, $parent, $retenues, $niveau ) {
+		foreach ( $termes as $terme ) {
+			if ( (int) $terme->parent !== (int) $parent ) {
+				continue;
+			}
+			printf(
+				'<label style="display:block;margin-left:%1$dpx"><input type="checkbox" name="etr_categories[]" value="%2$d"%3$s> %4$s <span class="description">(%5$d)</span></label>',
+				(int) $niveau * 20,
+				(int) $terme->term_id,
+				checked( in_array( (int) $terme->term_id, $retenues, true ), true, false ),
+				esc_html( $terme->name ),
+				(int) $terme->count
+			);
+			self::cases_categories( $termes, $terme->term_id, $retenues, $niveau + 1 );
+		}
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Produits WooCommerce                                               */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Champs de l'onglet « Inventaire » d'un produit.
+	 */
+	public static function champs_produit() {
+		if ( ! current_user_can( 'gerer_espace_traiteur' ) || ! function_exists( 'woocommerce_wp_text_input' ) ) {
+			return;
+		}
+		echo '<div class="options_group etr-produit">';
+		echo '<p class="form-field"><strong>' . esc_html__( 'Espace traiteur', 'espace-traiteur' ) . '</strong></p>';
+		wp_nonce_field( 'etr_produit', 'etr_produit_nonce' );
+		woocommerce_wp_text_input(
+			array(
+				'id'                => '_etr_stock',
+				'label'             => __( 'Quantité possédée', 'espace-traiteur' ),
+				'type'              => 'number',
+				'custom_attributes' => array(
+					'min'  => '0',
+					'step' => '1',
+				),
+				'desc_tip'          => true,
+				'description'       => __( 'Nombre total de pièces que les traiteurs peuvent réserver (les réservations sur les mêmes dates sont déduites). Vide : stock WooCommerce s’il est géré, sinon illimité.', 'espace-traiteur' ),
+			)
+		);
+		woocommerce_wp_text_input(
+			array(
+				'id'          => '_etr_unite',
+				'label'       => __( 'Unité', 'espace-traiteur' ),
+				'placeholder' => __( 'pièce(s), lot(s) de 10…', 'espace-traiteur' ),
+			)
+		);
+		woocommerce_wp_checkbox(
+			array(
+				'id'          => '_etr_masquer',
+				'label'       => __( 'Masquer', 'espace-traiteur' ),
+				'description' => __( 'Ne pas proposer ce produit dans l’espace traiteur', 'espace-traiteur' ),
+			)
+		);
+		echo '</div>';
+	}
+
+	/**
+	 * Enregistre les champs « Espace traiteur » d'un produit.
+	 *
+	 * @param WC_Product $produit Produit.
+	 */
+	public static function enregistrer_produit( $produit ) {
+		if ( ! isset( $_POST['etr_produit_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['etr_produit_nonce'] ) ), 'etr_produit' ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'gerer_espace_traiteur' ) ) {
+			return;
+		}
+		$stock = isset( $_POST['_etr_stock'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['_etr_stock'] ) ) ) : '';
+		$produit->update_meta_data( '_etr_stock', '' === $stock ? '' : (string) absint( $stock ) );
+		$produit->update_meta_data( '_etr_unite', isset( $_POST['_etr_unite'] ) ? sanitize_text_field( wp_unslash( $_POST['_etr_unite'] ) ) : '' );
+		$produit->update_meta_data( '_etr_masquer', isset( $_POST['_etr_masquer'] ) ? 'yes' : 'no' );
 	}
 
 	/**

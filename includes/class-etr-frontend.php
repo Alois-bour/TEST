@@ -91,14 +91,7 @@ class ETR_Frontend {
 	 */
 	private static function disponibilites_catalogue( $reservees ) {
 		$resultat = array();
-		$ids      = get_posts(
-			array(
-				'post_type'   => 'etr_article',
-				'post_status' => 'publish',
-				'numberposts' => -1,
-				'fields'      => 'ids',
-			)
-		);
+		$ids      = wp_list_pluck( etr_catalogue(), 'id' );
 		foreach ( $ids as $id ) {
 			$dispo           = etr_disponibilite( $id, $reservees );
 			$resultat[ $id ] = array(
@@ -195,27 +188,27 @@ class ETR_Frontend {
 			if ( ! $article_id || ! $quantite ) {
 				continue;
 			}
-			$article = get_post( $article_id );
-			if ( ! $article || 'etr_article' !== $article->post_type || 'publish' !== $article->post_status ) {
+			$article = etr_get_article( $article_id );
+			if ( ! $article ) {
 				continue;
 			}
 			$dispo = etr_disponibilite( $article_id, $reservees );
 			if ( 0 === $dispo ) {
 				/* translators: %s : article. */
-				self::$erreurs[] = sprintf( __( '« %s » n’est plus disponible sur ces dates.', 'espace-traiteur' ), $article->post_title );
+				self::$erreurs[] = sprintf( __( '« %s » n’est plus disponible sur ces dates.', 'espace-traiteur' ), $article['titre'] );
 			} elseif ( null !== $dispo && $quantite > $dispo ) {
 				self::$erreurs[] = sprintf(
 					/* translators: 1 : article, 2 : quantité disponible. */
 					__( 'La quantité demandée pour « %1$s » dépasse la quantité disponible sur ces dates (%2$s).', 'espace-traiteur' ),
-					$article->post_title,
+					$article['titre'],
 					number_format_i18n( $dispo )
 				);
 			}
 			$lignes[] = array(
 				'article_id' => $article_id,
 				'quantite'   => $quantite,
-				'titre'      => $article->post_title,
-				'unite'      => (string) get_post_meta( $article_id, '_etr_unite', true ),
+				'titre'      => $article['titre'],
+				'unite'      => $article['unite'],
 			);
 		}
 
@@ -566,93 +559,111 @@ class ETR_Frontend {
 	}
 
 	/**
-	 * Catalogue groupé par catégorie, avec champ quantité.
+	 * Catalogue groupé par famille puis sous-catégorie, avec champ quantité.
 	 */
 	private static function catalogue() {
-		$articles = get_posts(
-			array(
-				'post_type'   => 'etr_article',
-				'post_status' => 'publish',
-				'numberposts' => -1,
-				'orderby'     => 'title',
-				'order'       => 'ASC',
-			)
-		);
+		$articles = etr_catalogue();
 
 		// Après une erreur, les dates sont connues : on affiche directement les disponibilités.
 		list( $debut, $fin ) = etr_periode( self::ancienne_valeur( 'date_evenement' ), self::ancienne_valeur( 'date_livraison' ), self::ancienne_valeur( 'date_reprise' ) );
 		$reservees           = $debut ? etr_quantites_reservees( $debut, $fin ) : null;
 
-		echo '<fieldset class="etr-fieldset etr-catalogue"><legend>' . esc_html__( 'Mobilier, vaisselle et matériel', 'espace-traiteur' ) . '</legend>';
+		echo '<fieldset class="etr-fieldset etr-catalogue"><legend>' . esc_html__( 'Mobilier, art de la table et décoration', 'espace-traiteur' ) . '</legend>';
 
 		if ( ! $articles ) {
 			echo '<p>' . esc_html__( 'Le catalogue est vide pour le moment : décrivez vos besoins dans « Autres besoins ».', 'espace-traiteur' ) . '</p></fieldset>';
 			return;
 		}
 
-		$groupes = array();
+		// Famille (1er niveau) => sous-catégorie => articles. etr_catalogue() est déjà trié.
+		$familles = array();
 		foreach ( $articles as $article ) {
-			$termes    = get_the_terms( $article, 'etr_categorie' );
-			$categorie = ( $termes && ! is_wp_error( $termes ) ) ? $termes[0]->name : __( 'Divers', 'espace-traiteur' );
-			$groupes[ $categorie ][] = $article;
+			$niveaux = explode( ' › ', $article['categorie'], 2 );
+			$famille = $niveaux[0];
+			$sous    = isset( $niveaux[1] ) ? $niveaux[1] : '';
+			$familles[ $famille ][ $sous ][] = $article;
 		}
-		ksort( $groupes );
 
 		echo '<p class="etr-dispo-info" aria-live="polite">' . esc_html( $debut ? self::texte_periode( $debut, $fin ) : __( 'Choisissez la date de l’événement pour voir les quantités disponibles.', 'espace-traiteur' ) ) . '</p>';
 
-		foreach ( $groupes as $categorie => $liste ) {
+		foreach ( $familles as $famille => $sous_categories ) {
+			$total  = 0;
 			$ouvert = false;
-			foreach ( $liste as $article ) {
-				if ( '' !== self::ancienne_quantite( $article->ID ) ) {
-					$ouvert = true;
-					break;
+			foreach ( $sous_categories as $liste ) {
+				$total += count( $liste );
+				foreach ( $liste as $article ) {
+					if ( '' !== self::ancienne_quantite( $article['id'] ) ) {
+						$ouvert = true;
+					}
 				}
 			}
-			echo '<details class="etr-categorie"' . ( $ouvert ? ' open' : '' ) . '><summary>' . esc_html( $categorie ) . ' <span class="etr-muted">(' . count( $liste ) . ')</span></summary><ul class="etr-articles">';
-			foreach ( $liste as $article ) {
-				$stock = get_post_meta( $article->ID, '_etr_stock', true );
-				$unite = get_post_meta( $article->ID, '_etr_unite', true );
-				$ref   = get_post_meta( $article->ID, '_etr_reference', true );
-				$id    = 'etr-qte-' . $article->ID;
-
-				$dispo   = etr_disponibilite( $article->ID, $reservees );
-				$indispo = 0 === $dispo;
-
-				echo '<li class="etr-article' . ( $indispo ? ' etr-article--indispo' : '' ) . '" data-article="' . (int) $article->ID . '">';
-				if ( has_post_thumbnail( $article ) ) {
-					echo get_the_post_thumbnail( $article, 'thumbnail', array( 'class' => 'etr-article__img' ) );
+			echo '<details class="etr-categorie"' . ( $ouvert ? ' open' : '' ) . '><summary>' . esc_html( $famille ) . ' <span class="etr-muted">(' . (int) $total . ')</span></summary>';
+			foreach ( $sous_categories as $sous => $liste ) {
+				if ( '' !== $sous ) {
+					echo '<h4 class="etr-sous-categorie">' . esc_html( $sous ) . '</h4>';
 				}
-				echo '<div class="etr-article__infos"><label for="' . esc_attr( $id ) . '"><strong>' . esc_html( get_the_title( $article ) ) . '</strong></label>';
-				if ( $ref ) {
-					echo ' <span class="etr-muted">' . esc_html( $ref ) . '</span>';
+				echo '<ul class="etr-articles">';
+				foreach ( $liste as $article ) {
+					self::ligne_article( $article, $reservees );
 				}
-				$description = wp_trim_words( wp_strip_all_tags( $article->post_content ), 25 );
-				if ( $description ) {
-					echo '<p class="etr-article__desc">' . esc_html( $description ) . '</p>';
-				}
-				if ( null !== $reservees || $indispo ) {
-					$texte_dispo = etr_texte_disponibilite( $article->ID, $dispo );
-				} elseif ( '' !== $stock ) {
-					/* translators: %s : stock total. */
-					$texte_dispo = sprintf( __( 'Stock total : %s', 'espace-traiteur' ), number_format_i18n( (int) $stock ) . ( $unite ? ' ' . $unite : '' ) );
-				} else {
-					$texte_dispo = '';
-				}
-				echo '<p class="etr-muted etr-dispo">' . esc_html( $texte_dispo ) . '</p>';
-				echo '</div>';
-				printf(
-					'<input type="number" class="etr-article__qte" id="%1$s" name="quantites[%2$d]" min="0" step="1"%3$s value="%4$s" placeholder="0" aria-label="%5$s">',
-					esc_attr( $id ),
-					(int) $article->ID,
-					( null !== $dispo ? ' max="' . (int) $dispo . '"' : '' ) . ( $indispo ? ' disabled' : '' ),
-					esc_attr( $indispo ? '' : self::ancienne_quantite( $article->ID ) ),
-					/* translators: %s : article. */
-					esc_attr( sprintf( __( 'Quantité pour %s', 'espace-traiteur' ), get_the_title( $article ) ) )
-				);
-				echo '</li>';
+				echo '</ul>';
 			}
-			echo '</ul></details>';
+			echo '</details>';
 		}
 		echo '</fieldset>';
+	}
+
+	/**
+	 * Une ligne du catalogue.
+	 *
+	 * @param array      $article   Article normalisé.
+	 * @param array|null $reservees Quantités réservées (null = dates inconnues).
+	 */
+	private static function ligne_article( $article, $reservees ) {
+		$id      = 'etr-qte-' . $article['id'];
+		$stock   = etr_stock_total( $article['id'] );
+		$dispo   = etr_disponibilite( $article['id'], $reservees );
+		$indispo = 0 === $dispo;
+
+		if ( null !== $reservees || $indispo ) {
+			$texte_dispo = etr_texte_disponibilite( $article['id'], $dispo );
+		} elseif ( null !== $stock ) {
+			/* translators: %s : stock total. */
+			$texte_dispo = sprintf( __( 'Stock total : %s', 'espace-traiteur' ), number_format_i18n( $stock ) . ( $article['unite'] ? ' ' . $article['unite'] : '' ) );
+		} else {
+			$texte_dispo = '';
+		}
+
+		echo '<li class="etr-article' . ( $indispo ? ' etr-article--indispo' : '' ) . '" data-article="' . (int) $article['id'] . '">';
+		echo wp_kses_post( $article['image'] );
+		echo '<div class="etr-article__infos"><label for="' . esc_attr( $id ) . '"><strong>' . esc_html( $article['titre'] ) . '</strong></label>';
+		if ( $article['reference'] ) {
+			echo ' <span class="etr-muted">' . esc_html( $article['reference'] ) . '</span>';
+		}
+		if ( $article['description'] ) {
+			echo '<p class="etr-article__desc">' . esc_html( $article['description'] ) . '</p>';
+		}
+		if ( $article['prix_html'] || $article['url'] ) {
+			echo '<p class="etr-article__meta">';
+			if ( $article['prix_html'] ) {
+				echo '<span class="etr-article__prix">' . wp_kses_post( $article['prix_html'] ) . '</span> ';
+			}
+			if ( $article['url'] ) {
+				echo '<a href="' . esc_url( $article['url'] ) . '" target="_blank" rel="noopener">' . esc_html__( 'Voir la fiche', 'espace-traiteur' ) . '</a>';
+			}
+			echo '</p>';
+		}
+		echo '<p class="etr-muted etr-dispo">' . esc_html( $texte_dispo ) . '</p>';
+		echo '</div>';
+		printf(
+			'<input type="number" class="etr-article__qte" id="%1$s" name="quantites[%2$d]" min="0" step="1"%3$s value="%4$s" placeholder="0" aria-label="%5$s">',
+			esc_attr( $id ),
+			(int) $article['id'],
+			( null !== $dispo ? ' max="' . (int) $dispo . '"' : '' ) . ( $indispo ? ' disabled' : '' ), // phpcs:ignore WordPress.Security.EscapeOutput -- entiers.
+			esc_attr( $indispo ? '' : self::ancienne_quantite( $article['id'] ) ),
+			/* translators: %s : article. */
+			esc_attr( sprintf( __( 'Quantité pour %s', 'espace-traiteur' ), $article['titre'] ) )
+		);
+		echo '</li>';
 	}
 }

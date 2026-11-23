@@ -1,6 +1,21 @@
 # Espace Traiteur — plugin WordPress
 
-Un espace privé pour les traiteurs partenaires. Chaque traiteur se connecte à **son** espace et demande du mobilier, de la vaisselle, du linge ou du matériel pour ses événements. L'équipe traite les demandes depuis l'administration WordPress.
+Un espace privé pour les traiteurs partenaires de [Maison Anamé](https://maisonaname.com). Chaque traiteur se connecte à **son** espace et demande du mobilier, de l'art de la table, du textile ou de la décoration pour ses événements. L'équipe traite les demandes depuis l'administration WordPress.
+
+## Catalogue : les produits WooCommerce du site
+
+Quand WooCommerce est actif (cas de maisonaname.com), le plugin **reprend directement les produits du site** : pas de double saisie.
+
+- Sont proposés les produits **publiés** et visibles dans le catalogue, regroupés par famille et sous-catégorie (ex. *Mobilier › Tables*, *Art de la table › Verrerie*).
+- *Espace traiteur › Réglages* : choisir les catégories proposées (toutes par défaut), afficher ou non les prix du site, e-mail de l'équipe.
+- Sur chaque produit, onglet **Inventaire**, bloc « Espace traiteur » :
+  - **Quantité possédée** : nombre de pièces réservables par les traiteurs ;
+  - **Unité** (pièce(s), lot(s) de 10…) ;
+  - **Masquer** : ne pas proposer ce produit aux traiteurs.
+- Si « Quantité possédée » est vide : le stock WooCommerce est utilisé s'il est géré ; un produit « en rupture » est indisponible ; sinon la quantité est illimitée.
+- Chaque article affiche sa photo, sa description, un lien « Voir la fiche » vers la page produit, et le prix si l'option est cochée.
+
+Sans WooCommerce, le plugin utilise son propre catalogue (menu *Espace traiteur › Catalogue*).
 
 ## Installation
 
@@ -11,14 +26,15 @@ Un espace privé pour les traiteurs partenaires. Chaque traiteur se connecte à 
 
 - crée le rôle **Traiteur** ;
 - crée la page **Espace traiteur** (`/espace-traiteur/`) avec le shortcode `[espace_traiteur]` ;
-- crée les catégories par défaut : Mobilier, Vaisselle, Verrerie, Couverts, Linge de table, Matériel de cuisine.
+- sans WooCommerce seulement : crée les catégories par défaut de son catalogue interne.
 
 ## Utilisation
 
 ### Côté équipe (administrateurs)
 
 - **Utilisateurs › Ajouter** : créer un compte par traiteur avec le rôle **Traiteur**.
-- **Espace traiteur › Catalogue** : ajouter les articles (nom, description, photo, catégorie, référence, quantité disponible, unité).
+- **Produits WooCommerce** : renseigner la « Quantité possédée » des articles à limiter (voir ci-dessus).
+- **Espace traiteur › Réglages** : catégories proposées, prix, e-mail de l'équipe.
 - **Espace traiteur › Demandes** : voir les demandes, filtrer par statut, changer le statut et écrire un message au traiteur.
 
 Statuts : En attente, Validée, Refusée, Livrée, Clôturée, Annulée.
@@ -38,7 +54,7 @@ Les traiteurs n'ont pas accès à l'administration WordPress : ils sont renvoyé
 
 ## Disponibilités
 
-- La **quantité disponible** saisie sur un article est son stock total. Vide = illimité, 0 = indisponible (ex. : en réparation).
+- Le **stock total** d'un article est sa « Quantité possédée » (voir plus haut). 0 = indisponible (ex. : en réparation).
 - Le matériel est bloqué de la **date de livraison** (ou du jour J) jusqu'à la **date de reprise** (ou au jour J).
 - Les demandes **En attente**, **Validée** et **Livrée** bloquent le matériel. Une demande **Refusée**, **Annulée** ou **Clôturée** le libère.
 - Le contrôle est fait deux fois : à l'affichage (mise à jour dès le choix des dates) et à l'envoi (le serveur refuse toute quantité supérieure à ce qui reste).
@@ -49,7 +65,7 @@ Les traiteurs n'ont pas accès à l'administration WordPress : ils sont renvoyé
 
 | Événement | Destinataire |
 |---|---|
-| Nouvelle demande | Équipe (e-mail d'administration du site) |
+| Nouvelle demande | Équipe (e-mail des réglages, sinon e-mail d'administration du site) |
 | Demande annulée par le traiteur | Équipe |
 | Changement de statut | Traiteur concerné |
 
@@ -65,13 +81,16 @@ add_filter( 'etr_email_equipe', fn() => 'logistique@exemple.fr' );
 - `etr_champs_demande` : ajouter ou retirer des champs du formulaire.
 - `etr_email_equipe` : destinataire(s) des e-mails côté équipe.
 - `etr_statuts_reservant` : statuts qui bloquent le matériel.
+- `etr_source_woocommerce` : forcer ou désactiver l'utilisation des produits WooCommerce.
+- `etr_catalogue` : filtrer la liste des articles proposés.
 - Actions : `etr_demande_creee`, `etr_demande_annulee`, `etr_statut_change` (`$id, $ancien, $nouveau`).
 
 ## Structure
 
 ```
 espace-traiteur.php                 Fichier principal
-includes/functions.php              Fonctions utilitaires
+includes/functions.php              Fonctions utilitaires, disponibilités
+includes/catalogue.php              Catalogue : produits WooCommerce ou catalogue interne
 includes/class-etr-installer.php    Activation, rôle, page, catégories
 includes/class-etr-post-types.php   Types de contenus (demandes, catalogue, catégories)
 includes/class-etr-access.php       Accès : traiteurs tenus hors de wp-admin

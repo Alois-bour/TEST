@@ -167,3 +167,15 @@
 .etr-article--indispo .etr-article__img { opacity: .5; }
 .etr-article--indispo .etr-dispo { color: #a12622; font-weight: 600; opacity: 1; }
 .etr-alerte { color: #a12622; font-weight: 600; }
+
+/* Sous-catégories et fiche produit */
+.etr-espace .etr-sous-categorie {
+	margin: 8px 0 0;
+	font-size: .8em;
+	font-weight: 600;
+	letter-spacing: .06em;
+	text-transform: uppercase;
+	color: var(--etr-muted);
+}
+.etr-article__meta { font-size: .9em; }
+.etr-article__prix { font-weight: 600; margin-right: 8px; }

@@ -50,6 +50,9 @@ class ETR_Post_Types {
 	 * Enregistre les CPT et la taxonomie.
 	 */
 	public static function register() {
+		// Avec WooCommerce, le catalogue est celui des produits : le catalogue interne est masqué.
+		$catalogue_interne = ! etr_source_woocommerce();
+
 		register_post_type(
 			'etr_demande',
 			array(
@@ -89,7 +92,7 @@ class ETR_Post_Types {
 					'not_found'     => __( 'Aucun article.', 'espace-traiteur' ),
 				),
 				'public'       => false,
-				'show_ui'      => true,
+				'show_ui'      => $catalogue_interne,
 				'show_in_menu' => 'edit.php?post_type=etr_demande',
 				'supports'     => array( 'title', 'editor', 'thumbnail' ),
 				'capabilities' => self::caps(),
@@ -108,7 +111,7 @@ class ETR_Post_Types {
 					'add_new_item'  => __( 'Ajouter une catégorie', 'espace-traiteur' ),
 				),
 				'public'            => false,
-				'show_ui'           => true,
+				'show_ui'           => $catalogue_interne,
 				'hierarchical'      => true,
 				'show_admin_column' => true,
 				'rewrite'           => false,

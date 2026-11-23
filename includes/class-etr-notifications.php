@@ -27,7 +27,8 @@ class ETR_Notifications {
 	 * @return string|string[]
 	 */
 	private static function equipe() {
-		return apply_filters( 'etr_email_equipe', get_option( 'admin_email' ) );
+		$email = get_option( 'etr_email_equipe' );
+		return apply_filters( 'etr_email_equipe', is_email( $email ) ? $email : get_option( 'admin_email' ) );
 	}
 
 	/**

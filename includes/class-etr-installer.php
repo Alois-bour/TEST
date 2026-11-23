@@ -36,7 +36,7 @@ class ETR_Installer {
 			}
 		}
 
-		$categories = array(
+		$categories = etr_source_woocommerce() ? array() : array(
 			__( 'Mobilier', 'espace-traiteur' ),
 			__( 'Vaisselle', 'espace-traiteur' ),
 			__( 'Verrerie', 'espace-traiteur' ),
