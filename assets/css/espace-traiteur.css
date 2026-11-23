@@ -1,0 +1,156 @@
+/* Espace Traiteur */
+
+.etr-espace {
+	--etr-accent: #8a5a2b;
+	--etr-bordure: #e2ddd6;
+	--etr-fond: #faf8f5;
+	--etr-muted: #6b6560;
+	max-width: 960px;
+}
+
+.etr-espace .etr-muted,
+.etr-muted { color: var(--etr-muted, #6b6560); font-size: .9em; }
+
+/* En-tête */
+.etr-entete {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding-bottom: 16px;
+	margin-bottom: 24px;
+	border-bottom: 1px solid var(--etr-bordure);
+}
+.etr-bonjour { margin: 0; font-weight: 600; font-size: 1.1em; }
+.etr-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Boutons */
+.etr-btn {
+	display: inline-block;
+	padding: 10px 18px;
+	border: 1px solid var(--etr-accent);
+	border-radius: 6px;
+	background: var(--etr-accent);
+	color: #fff !important;
+	font-weight: 600;
+	text-decoration: none !important;
+	cursor: pointer;
+	line-height: 1.2;
+	font-size: 1rem;
+	font-family: inherit;
+}
+.etr-btn:hover { filter: brightness(1.1); }
+.etr-btn--secondaire { background: transparent; color: var(--etr-accent) !important; }
+.etr-btn--danger { background: #b32d2e; border-color: #b32d2e; }
+.etr-lien { margin-left: 4px; }
+
+/* Messages */
+.etr-notice { padding: 12px 16px; border-radius: 6px; border-left: 4px solid; margin: 0 0 20px; }
+.etr-notice ul { margin: 0; padding-left: 18px; }
+.etr-notice--succes { background: #edf7ed; border-color: #2e7d32; }
+.etr-notice--erreur { background: #fdecea; border-color: #b32d2e; }
+
+/* Tableaux */
+.etr-table-wrap { overflow-x: auto; }
+.etr-espace .etr-table { width: 100%; border-collapse: collapse; }
+.etr-espace .etr-table th,
+.etr-espace .etr-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--etr-bordure); }
+.etr-espace .etr-table th { background: var(--etr-fond); font-weight: 600; }
+
+/* Statuts */
+.etr-statut {
+	display: inline-block;
+	padding: 2px 10px;
+	border-radius: 999px;
+	font-size: .85em;
+	font-weight: 600;
+	background: #eee;
+	color: #333;
+	white-space: nowrap;
+}
+.etr-statut--en_attente { background: #fff4e0; color: #8a5300; }
+.etr-statut--validee    { background: #e6f4ea; color: #1e6b34; }
+.etr-statut--refusee    { background: #fdecea; color: #a12622; }
+.etr-statut--livree     { background: #e3f0fb; color: #1b5a8a; }
+.etr-statut--cloturee   { background: #eceff1; color: #455a64; }
+.etr-statut--annulee    { background: #f1f1f1; color: #757575; text-decoration: line-through; }
+
+/* Détail */
+.etr-espace .etr-details {
+	display: grid;
+	grid-template-columns: minmax(140px, 240px) 1fr;
+	gap: 8px 16px;
+	margin: 0 0 24px;
+}
+.etr-espace .etr-details dt { font-weight: 600; }
+.etr-espace .etr-details dd { margin: 0; }
+.etr-reponse {
+	background: var(--etr-fond);
+	border-left: 4px solid var(--etr-accent);
+	padding: 12px 16px;
+	margin: 0 0 24px;
+}
+.etr-reponse p { margin: 6px 0 0; }
+.etr-annuler { margin-top: 24px; }
+
+/* Formulaire */
+.etr-fieldset {
+	border: 1px solid var(--etr-bordure);
+	border-radius: 8px;
+	padding: 16px 20px;
+	margin: 0 0 24px;
+}
+.etr-fieldset legend { font-weight: 700; padding: 0 6px; }
+.etr-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
+.etr-champ { margin: 0 0 14px; }
+.etr-champ--large { grid-column: 1 / -1; }
+.etr-champ label { display: block; font-weight: 600; margin-bottom: 4px; }
+.etr-champ abbr { color: #b32d2e; text-decoration: none; }
+.etr-espace input[type="text"],
+.etr-espace input[type="date"],
+.etr-espace input[type="number"],
+.etr-espace textarea {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 8px 10px;
+	border: 1px solid #c9c3bb;
+	border-radius: 6px;
+	font: inherit;
+}
+
+/* Catalogue */
+.etr-categorie { border-top: 1px solid var(--etr-bordure); }
+.etr-categorie:first-of-type { border-top: 0; }
+.etr-categorie summary { cursor: pointer; padding: 12px 0; font-weight: 600; }
+.etr-articles { list-style: none; margin: 0 0 12px; padding: 0; }
+.etr-article {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 10px 0;
+	border-bottom: 1px dashed var(--etr-bordure);
+}
+.etr-article:last-child { border-bottom: 0; }
+.etr-article__img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; flex: none; }
+.etr-article__infos { flex: 1; min-width: 0; }
+.etr-article__infos p { margin: 2px 0 0; }
+.etr-article__desc { font-size: .9em; }
+.etr-espace input.etr-article__qte { width: 90px; flex: none; }
+
+/* Connexion */
+.etr-connexion { max-width: 420px; }
+.etr-connexion input[type="text"],
+.etr-connexion input[type="password"] { width: 100%; box-sizing: border-box; padding: 8px 10px; }
+
+@media (max-width: 600px) {
+	.etr-grille { grid-template-columns: 1fr; }
+	.etr-espace .etr-details { grid-template-columns: 1fr; gap: 2px; }
+	.etr-espace .etr-details dd { margin-bottom: 10px; }
+	.etr-article__img { width: 48px; height: 48px; }
+	.etr-espace input.etr-article__qte { width: 70px; }
+}
+
+/* Admin */
+.etr-details.form-table th { width: 200px; padding: 8px 10px 8px 0; }
+.etr-details.form-table td { padding: 8px 10px; }

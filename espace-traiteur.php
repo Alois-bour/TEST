@@ -1,0 +1,49 @@
+<?php
+/**
+ * Plugin Name:       Espace Traiteur
+ * Description:       Espace privé pour les traiteurs : chaque traiteur se connecte à son espace et fait ses demandes de mobilier, vaisselle, linge et matériel.
+ * Version:           1.0.0
+ * Requires at least: 6.0
+ * Requires PHP:      7.4
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       espace-traiteur
+ * Domain Path:       /languages
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+define( 'ETR_VERSION', '1.0.0' );
+define( 'ETR_FILE', __FILE__ );
+define( 'ETR_DIR', plugin_dir_path( __FILE__ ) );
+define( 'ETR_URL', plugin_dir_url( __FILE__ ) );
+
+require_once ETR_DIR . 'includes/functions.php';
+require_once ETR_DIR . 'includes/class-etr-installer.php';
+require_once ETR_DIR . 'includes/class-etr-post-types.php';
+require_once ETR_DIR . 'includes/class-etr-access.php';
+require_once ETR_DIR . 'includes/class-etr-admin.php';
+require_once ETR_DIR . 'includes/class-etr-frontend.php';
+require_once ETR_DIR . 'includes/class-etr-notifications.php';
+
+register_activation_hook( __FILE__, array( 'ETR_Installer', 'activate' ) );
+register_deactivation_hook( __FILE__, array( 'ETR_Installer', 'deactivate' ) );
+
+add_action(
+	'plugins_loaded',
+	function () {
+		ETR_Installer::maybe_upgrade();
+		ETR_Post_Types::init();
+		ETR_Access::init();
+		ETR_Admin::init();
+		ETR_Frontend::init();
+		ETR_Notifications::init();
+	}
+);
+
+add_action(
+	'init',
+	function () {
+		load_plugin_textdomain( 'espace-traiteur', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+	}
+);
