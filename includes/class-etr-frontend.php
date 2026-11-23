@@ -238,6 +238,9 @@ class ETR_Frontend {
 		$quantites = isset( $_POST['quantites'] ) && is_array( $_POST['quantites'] ) ? wp_unslash( $_POST['quantites'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- converti en entiers ci-dessous.
 		$lignes    = array();
 		foreach ( $quantites as $article_id => $quantite ) {
+			if ( (string) absint( $article_id ) !== (string) $article_id ) {
+				continue;
+			}
 			$article_id = absint( $article_id );
 			$quantite   = is_scalar( $quantite ) ? absint( $quantite ) : 0;
 			if ( ! $article_id || ! $quantite ) {
