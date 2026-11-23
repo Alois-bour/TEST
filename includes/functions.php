@@ -346,6 +346,16 @@ function etr_url( $args = array() ) {
 }
 
 /**
+ * Nom affiché d'un utilisateur, en texte brut (WordPress l'enregistre avec « &amp; »).
+ *
+ * @param WP_User|false|null $user Utilisateur.
+ * @return string
+ */
+function etr_nom( $user ) {
+	return $user instanceof WP_User ? wp_specialchars_decode( $user->display_name, ENT_QUOTES ) : '';
+}
+
+/**
  * L'utilisateur a-t-il accès à l'espace traiteur ?
  *
  * @param int $user_id ID utilisateur (courant par défaut).

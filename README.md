@@ -33,7 +33,7 @@ Sans WooCommerce, le plugin utilise son propre catalogue (menu *Espace traiteur 
 
 ### Côté équipe (administrateurs)
 
-- **Utilisateurs › Ajouter** : créer un compte par traiteur avec le rôle **Traiteur**.
+- **Espace traiteur › Traiteurs** : créer un traiteur (société, contact, e-mail, téléphone). Il reçoit une invitation par e-mail pour choisir son mot de passe. Depuis cette page : renvoyer l'invitation, désactiver ou réactiver un accès, voir ses demandes.
 - **Produits WooCommerce** : renseigner la « Quantité possédée » des articles à limiter (voir ci-dessus).
 - **Espace traiteur › Réglages** : catégories proposées, prix, e-mail de l'équipe.
 - **Espace traiteur › Demandes** : voir les demandes, filtrer par statut, changer le statut et écrire un message au traiteur.
@@ -44,14 +44,22 @@ Statuts : En attente, Validée, Refusée, Livrée, Clôturée, Annulée.
 
 Sur la page **Espace traiteur**, le traiteur :
 
-- se connecte (formulaire intégré à la page) ;
+- se connecte avec son identifiant (ou son e-mail) et son mot de passe, sur la page Espace traiteur uniquement ;
 - voit la liste de **ses** demandes et leur statut (il ne voit jamais celles des autres) ;
 - crée une demande : événement, date, nombre d'invités, lieu, dates de livraison et de reprise, contact sur place, articles du catalogue avec quantités, besoins hors catalogue ;
 - choisit parmi le mobilier et la vaisselle **disponibles à ses dates** : dès qu'il saisit la date, chaque article affiche la quantité encore libre et les articles complets sont grisés ;
 - consulte le détail et la réponse de l'équipe ;
 - peut annuler une demande tant qu'elle est « En attente ».
 
-Les traiteurs n'ont pas accès à l'administration WordPress : ils sont renvoyés vers leur espace et la barre d'admin est masquée.
+## Comptes traiteurs : aucun accès à WordPress
+
+Les traiteurs sont techniquement des utilisateurs WordPress (rôle « Traiteur »), pour profiter de la sécurité de WordPress (mots de passe chiffrés, sessions), mais **ils n'ont accès qu'à leur espace** :
+
+- **Connexion uniquement sur la page Espace traiteur.** Sur `wp-login.php`, le « Mon compte » WooCommerce ou XML-RPC, la connexion d'un traiteur est refusée, avec le même message que le mot de passe soit juste ou faux.
+- **Choix du mot de passe et mot de passe oublié dans l'espace** : les liens envoyés par e-mail mènent à l'espace traiteur, jamais aux écrans WordPress (y compris si la demande part de `wp-login.php`). Liens valables 24 h et utilisables une seule fois.
+- **Tentatives limitées** : après 5 échecs, le couple adresse IP + identifiant est bloqué 15 minutes, sans gêner les autres traiteurs.
+- **Rien d'autre** : pas d'administration (`/wp-admin` renvoie vers l'espace, le rôle n'a même pas le droit « lecture »), pas de barre d'admin, pas de « Mon compte », panier, paiement ni commande WooCommerce, pas d'API WordPress (sauf la Store API publique nécessaire à l'affichage du site), pas de mots de passe d'application.
+- **Désactivation** depuis *Espace traiteur › Traiteurs* : le traiteur est déconnecté immédiatement et ne peut plus se reconnecter ; ses demandes sont conservées.
 
 ## Disponibilités
 
@@ -84,6 +92,7 @@ add_filter( 'etr_email_equipe', fn() => 'logistique@exemple.fr' );
 - `etr_statuts_reservant` : statuts qui bloquent le matériel.
 - `etr_source_woocommerce` : forcer ou désactiver l'utilisation des produits WooCommerce.
 - `etr_catalogue` : filtrer la liste des articles proposés.
+- `etr_routes_api_traiteurs` : routes de l'API REST autorisées aux traiteurs connectés.
 - Actions : `etr_demande_creee`, `etr_demande_annulee`, `etr_statut_change` (`$id, $ancien, $nouveau`).
 
 ## Structure
@@ -94,7 +103,9 @@ includes/functions.php              Fonctions utilitaires, disponibilités
 includes/catalogue.php              Catalogue : produits WooCommerce ou catalogue interne
 includes/class-etr-installer.php    Activation, rôle, page, catégories
 includes/class-etr-post-types.php   Types de contenus (demandes, catalogue, catégories)
-includes/class-etr-access.php       Accès : traiteurs tenus hors de wp-admin
+includes/class-etr-access.php       Accès : traiteurs tenus hors de wp-admin, WooCommerce et API
+includes/class-etr-comptes.php      Connexion, mot de passe oublié, choix du mot de passe
+includes/class-etr-traiteurs.php    Page « Traiteurs » : création, invitation, désactivation
 includes/class-etr-admin.php        Écrans d'administration
 includes/class-etr-frontend.php     Espace traiteur (shortcode)
 includes/class-etr-notifications.php E-mails

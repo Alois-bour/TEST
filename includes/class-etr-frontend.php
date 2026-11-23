@@ -319,7 +319,7 @@ class ETR_Frontend {
 		echo '<div class="etr-espace">';
 
 		if ( ! is_user_logged_in() ) {
-			self::vue_connexion();
+			ETR_Comptes::vue();
 		} elseif ( ! etr_est_traiteur() ) {
 			echo '<p class="etr-notice etr-notice--erreur">' . esc_html__( 'Cet espace est réservé aux traiteurs partenaires.', 'espace-traiteur' ) . '</p>';
 		} else {
@@ -345,30 +345,13 @@ class ETR_Frontend {
 	}
 
 	/**
-	 * Formulaire de connexion.
-	 */
-	private static function vue_connexion() {
-		echo '<div class="etr-connexion">';
-		echo '<h2>' . esc_html__( 'Connexion à votre espace traiteur', 'espace-traiteur' ) . '</h2>';
-		wp_login_form(
-			array(
-				'redirect'       => etr_url(),
-				'label_username' => __( 'Identifiant ou e-mail', 'espace-traiteur' ),
-				'label_log_in'   => __( 'Se connecter', 'espace-traiteur' ),
-			)
-		);
-		echo '<p><a href="' . esc_url( wp_lostpassword_url( etr_url() ) ) . '">' . esc_html__( 'Mot de passe oublié ?', 'espace-traiteur' ) . '</a></p>';
-		echo '</div>';
-	}
-
-	/**
 	 * En-tête de l'espace.
 	 */
 	private static function entete() {
 		$user = wp_get_current_user();
 		echo '<div class="etr-entete">';
 		/* translators: %s : nom du traiteur. */
-		echo '<p class="etr-bonjour">' . esc_html( sprintf( __( 'Bonjour %s', 'espace-traiteur' ), $user->display_name ) ) . '</p>';
+		echo '<p class="etr-bonjour">' . esc_html( sprintf( __( 'Bonjour %s', 'espace-traiteur' ), etr_nom( $user ) ) ) . '</p>';
 		echo '<nav class="etr-nav">';
 		echo '<a class="etr-btn etr-btn--secondaire" href="' . esc_url( etr_url() ) . '">' . esc_html__( 'Mes demandes', 'espace-traiteur' ) . '</a>';
 		echo '<a class="etr-btn" href="' . esc_url( etr_url( array( 'etr_vue' => 'nouvelle' ) ) ) . '">' . esc_html__( 'Nouvelle demande', 'espace-traiteur' ) . '</a>';

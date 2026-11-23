@@ -76,7 +76,7 @@ class ETR_Notifications {
 	 */
 	public static function nouvelle_demande( $demande_id ) {
 		$user  = get_userdata( (int) get_post_field( 'post_author', $demande_id ) );
-		$nom   = $user ? $user->display_name : '';
+		$nom   = etr_nom( $user );
 		/* translators: 1 : site, 2 : numéro, 3 : traiteur. */
 		$objet = sprintf( __( '[%1$s] Nouvelle demande #%2$d de %3$s', 'espace-traiteur' ), self::site(), $demande_id, $nom );
 
@@ -100,7 +100,7 @@ class ETR_Notifications {
 	 */
 	public static function demande_annulee( $demande_id ) {
 		$user = get_userdata( (int) get_post_field( 'post_author', $demande_id ) );
-		$nom  = $user ? $user->display_name : '';
+		$nom  = etr_nom( $user );
 		/* translators: 1 : site, 2 : numéro, 3 : traiteur. */
 		$objet = sprintf( __( '[%1$s] Demande #%2$d annulée par %3$s', 'espace-traiteur' ), self::site(), $demande_id, $nom );
 		$corps = self::resume( $demande_id ) . "\n" . admin_url( 'post.php?post=' . $demande_id . '&action=edit' ) . "\n";
@@ -126,7 +126,7 @@ class ETR_Notifications {
 		$objet = sprintf( __( '[%1$s] Votre demande #%2$d : %3$s', 'espace-traiteur' ), self::site(), $demande_id, $label );
 
 		/* translators: %s : prénom/nom. */
-		$corps  = sprintf( __( 'Bonjour %s,', 'espace-traiteur' ), $user->display_name ) . "\n\n";
+		$corps  = sprintf( __( 'Bonjour %s,', 'espace-traiteur' ), etr_nom( $user ) ) . "\n\n";
 		/* translators: 1 : numéro, 2 : événement, 3 : statut. */
 		$corps .= sprintf( __( 'Votre demande #%1$d (%2$s) est désormais : %3$s.', 'espace-traiteur' ), $demande_id, get_the_title( $demande_id ), $label ) . "\n";
 

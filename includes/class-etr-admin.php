@@ -333,7 +333,7 @@ class ETR_Admin {
 			printf(
 				'<a href="%1$s">%2$s</a> — <a href="mailto:%3$s">%3$s</a>',
 				esc_url( get_edit_user_link( $user->ID ) ),
-				esc_html( $user->display_name ),
+				esc_html( etr_nom( $user ) ),
 				esc_html( $user->user_email )
 			);
 		} else {
@@ -431,7 +431,7 @@ class ETR_Admin {
 		switch ( $colonne ) {
 			case 'etr_traiteur':
 				$user = get_userdata( (int) get_post_field( 'post_author', $post_id ) );
-				echo $user ? esc_html( $user->display_name ) : '—';
+				echo $user ? esc_html( etr_nom( $user ) ) : '—';
 				break;
 			case 'etr_date_evenement':
 				echo esc_html( etr_format_date( get_post_meta( $post_id, '_etr_date_evenement', true ) ) );

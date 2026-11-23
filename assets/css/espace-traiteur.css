@@ -140,8 +140,18 @@
 
 /* Connexion */
 .etr-connexion { max-width: 420px; }
+.etr-connexion label { display: block; font-weight: 600; margin-bottom: 4px; }
+.etr-connexion .etr-se-souvenir label { font-weight: normal; }
 .etr-connexion input[type="text"],
-.etr-connexion input[type="password"] { width: 100%; box-sizing: border-box; padding: 8px 10px; }
+.etr-connexion input[type="email"],
+.etr-connexion input[type="password"] {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 8px 10px;
+	border: 1px solid #c9c3bb;
+	border-radius: 6px;
+	font: inherit;
+}
 
 @media (max-width: 600px) {
 	.etr-grille { grid-template-columns: 1fr; }

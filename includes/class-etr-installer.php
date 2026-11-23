@@ -65,15 +65,14 @@ class ETR_Installer {
 	 * Rôle « Traiteur » et capacités des administrateurs.
 	 */
 	public static function roles() {
-		if ( ! get_role( 'traiteur' ) ) {
-			add_role(
-				'traiteur',
-				__( 'Traiteur', 'espace-traiteur' ),
-				array(
-					'read'                    => true,
-					'acceder_espace_traiteur' => true,
-				)
-			);
+		// Le rôle n'a que l'accès à l'espace traiteur : pas même la lecture de l'administration.
+		$role = get_role( 'traiteur' );
+		if ( ! $role ) {
+			$role = add_role( 'traiteur', __( 'Traiteur', 'espace-traiteur' ), array( 'acceder_espace_traiteur' => true ) );
+		}
+		if ( $role ) {
+			$role->add_cap( 'acceder_espace_traiteur' );
+			$role->remove_cap( 'read' );
 		}
 
 		$admin = get_role( 'administrator' );
