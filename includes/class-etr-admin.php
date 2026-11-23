@@ -175,7 +175,63 @@ class ETR_Admin {
 
 		echo '</tbody></table>';
 		submit_button();
-		echo '</form></div>';
+		echo '</form>';
+		self::mises_a_jour();
+		echo '</div>';
+	}
+
+	/**
+	 * Section « Mises à jour » : versions et journal des migrations.
+	 */
+	private static function mises_a_jour() {
+		// phpcs:ignore WordPress.Security.NonceVerification -- simple message après redirection.
+		$etat = isset( $_GET['etr_migration'] ) ? sanitize_key( wp_unslash( $_GET['etr_migration'] ) ) : '';
+		$messages = array(
+			'ok'         => array( 'success', __( 'Base de données à jour.', 'espace-traiteur' ) ),
+			'erreur'     => array( 'error', __( 'La migration a de nouveau échoué : voir le journal ci-dessous.', 'espace-traiteur' ) ),
+			'a_suivre'   => array( 'info', __( 'Traitement par lots en cours : il se poursuit en arrière-plan.', 'espace-traiteur' ) ),
+			'verrouille' => array( 'warning', __( 'Une migration est déjà en cours. Réessayez dans quelques minutes.', 'espace-traiteur' ) ),
+		);
+
+		echo '<hr><h2 id="etr-mises-a-jour">' . esc_html__( 'Mises à jour du plugin', 'espace-traiteur' ) . '</h2>';
+		if ( isset( $messages[ $etat ] ) ) {
+			echo '<div class="notice notice-' . esc_attr( $messages[ $etat ][0] ) . ' inline"><p>' . esc_html( $messages[ $etat ][1] ) . '</p></div>';
+		}
+
+		$attente = ETR_Migrations::etapes_en_attente();
+		echo '<table class="form-table" role="presentation"><tbody>';
+		echo '<tr><th scope="row">' . esc_html__( 'Version des fichiers', 'espace-traiteur' ) . '</th><td><code>' . esc_html( ETR_VERSION ) . '</code></td></tr>';
+		echo '<tr><th scope="row">' . esc_html__( 'Version des données', 'espace-traiteur' ) . '</th><td><code>' . esc_html( ETR_Migrations::version_bdd() ) . '</code> ';
+		echo ETR_Migrations::a_faire()
+			? '<span class="etr-statut etr-statut--en_attente">' . esc_html__( 'Migration en attente', 'espace-traiteur' ) . '</span>'
+			: '<span class="etr-statut etr-statut--validee">' . esc_html__( 'À jour', 'espace-traiteur' ) . '</span>';
+		echo '</td></tr>';
+		if ( $attente ) {
+			echo '<tr><th scope="row">' . esc_html__( 'Étapes en attente', 'espace-traiteur' ) . '</th><td><ul style="margin:0">';
+			foreach ( $attente as $version => $etape ) {
+				echo '<li><code>' . esc_html( $version ) . '</code> ' . esc_html( $etape['description'] ) . '</li>';
+			}
+			echo '</ul>';
+			$relancer = wp_nonce_url( admin_url( 'admin-post.php?action=etr_relancer_migration' ), 'etr_relancer_migration' );
+			echo '<p><a class="button" href="' . esc_url( $relancer ) . '">' . esc_html__( 'Lancer la migration maintenant', 'espace-traiteur' ) . '</a></p></td></tr>';
+		}
+		echo '</tbody></table>';
+
+		$journal = array_reverse( ETR_Migrations::journal() );
+		if ( $journal ) {
+			$statuts = array(
+				'ok'       => array( 'validee', __( 'Réussie', 'espace-traiteur' ) ),
+				'erreur'   => array( 'refusee', __( 'Échec', 'espace-traiteur' ) ),
+				'en_cours' => array( 'en_attente', __( 'En cours', 'espace-traiteur' ) ),
+			);
+			echo '<h3>' . esc_html__( 'Journal des migrations', 'espace-traiteur' ) . '</h3>';
+			echo '<table class="widefat striped" style="max-width:900px"><thead><tr><th>' . esc_html__( 'Date', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'Étape', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'Résultat', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'Lancée par', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'Détail', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
+			foreach ( array_slice( $journal, 0, 10 ) as $ligne ) {
+				$statut = isset( $statuts[ $ligne['statut'] ] ) ? $statuts[ $ligne['statut'] ] : array( 'cloturee', $ligne['statut'] );
+				echo '<tr><td>' . esc_html( wp_date( get_option( 'date_format' ) . ' H:i', $ligne['date'] ) ) . '</td><td><code>' . esc_html( $ligne['version'] ) . '</code></td><td><span class="etr-statut etr-statut--' . esc_attr( $statut[0] ) . '">' . esc_html( $statut[1] ) . '</span></td><td>' . esc_html( $ligne['source'] ) . '</td><td>' . esc_html( $ligne['message'] ) . '</td></tr>';
+			}
+			echo '</tbody></table>';
+		}
 	}
 
 	/**

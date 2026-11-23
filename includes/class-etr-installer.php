@@ -50,7 +50,13 @@ class ETR_Installer {
 			}
 		}
 
-		update_option( 'etr_version', ETR_VERSION );
+		if ( false === get_option( 'etr_version' ) ) {
+			// Première installation : tout vient d'être créé, aucune migration à rejouer.
+			update_option( 'etr_version', ETR_VERSION );
+		} else {
+			// Réactivation après une mise à jour des fichiers : on rattrape les migrations.
+			ETR_Migrations::executer( 'activation' );
+		}
 		flush_rewrite_rules();
 	}
 
@@ -82,13 +88,4 @@ class ETR_Installer {
 		}
 	}
 
-	/**
-	 * Relance l'installation des rôles après une mise à jour du plugin.
-	 */
-	public static function maybe_upgrade() {
-		if ( get_option( 'etr_version' ) !== ETR_VERSION ) {
-			self::roles();
-			update_option( 'etr_version', ETR_VERSION );
-		}
-	}
 }

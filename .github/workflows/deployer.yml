@@ -1,0 +1,152 @@
+# Déploie le plugin sur maisonaname.com à chaque fusion dans main.
+#
+# Étapes : vérification du code → sauvegarde de la base → envoi des fichiers → migration.
+# Mise en place (clé SSH, secrets) : voir docs/DEPLOIEMENT.md.
+
+name: Déployer le plugin
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # bouton « Run workflow » pour relancer à la main
+
+# Jamais deux déploiements en même temps ; un déploiement en cours n'est pas interrompu.
+concurrency:
+  group: deploiement-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deployer:
+    name: Déploiement
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SSH_HOTE: ${{ secrets.SSH_HOTE }}
+      SSH_PORT: ${{ secrets.SSH_PORT }}
+      SSH_UTILISATEUR: ${{ secrets.SSH_UTILISATEUR }}
+      CHEMIN_WORDPRESS: ${{ secrets.CHEMIN_WORDPRESS }}
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Vérifier la syntaxe PHP
+        run: |
+          find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l > /dev/null
+          echo "Syntaxe PHP correcte."
+
+      - name: Vérifier la configuration
+        id: config
+        env:
+          SSH_CLE_PRIVEE: ${{ secrets.SSH_CLE_PRIVEE }}
+          SSH_EMPREINTE_SERVEUR: ${{ secrets.SSH_EMPREINTE_SERVEUR }}
+        run: |
+          manquants=""
+          for nom in SSH_HOTE SSH_UTILISATEUR CHEMIN_WORDPRESS SSH_CLE_PRIVEE SSH_EMPREINTE_SERVEUR; do
+            [ -n "${!nom}" ] || manquants="$manquants $nom"
+          done
+          if [ -n "$manquants" ]; then
+            echo "::warning::Déploiement non configuré, rien n'a été envoyé. Secrets manquants :$manquants (voir docs/DEPLOIEMENT.md)."
+            echo "pret=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Garde-fou : on ne vise que le dossier du plugin (rsync --delete ne touche à rien d'autre).
+          chemin="${CHEMIN_WORDPRESS%/}"
+          case "$chemin" in
+            /*) ;;
+            *) echo "::error::CHEMIN_WORDPRESS doit être un chemin absolu (ex. /home/compte/www)."; exit 1 ;;
+          esac
+          case "$chemin" in
+            *[!A-Za-z0-9._/-]*) echo "::error::CHEMIN_WORDPRESS ne doit contenir que lettres, chiffres, . _ - et /."; exit 1 ;;
+          esac
+          echo "plugin=$chemin/wp-content/plugins/espace-traiteur" >> "$GITHUB_OUTPUT"
+          echo "wordpress=$chemin" >> "$GITHUB_OUTPUT"
+          echo "pret=true" >> "$GITHUB_OUTPUT"
+
+      - name: Préparer la connexion SSH
+        if: steps.config.outputs.pret == 'true'
+        env:
+          SSH_CLE_PRIVEE: ${{ secrets.SSH_CLE_PRIVEE }}
+          SSH_EMPREINTE_SERVEUR: ${{ secrets.SSH_EMPREINTE_SERVEUR }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_CLE_PRIVEE" > ~/.ssh/deploiement
+          chmod 600 ~/.ssh/deploiement
+          printf '%s\n' "$SSH_EMPREINTE_SERVEUR" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host serveur
+            HostName ${SSH_HOTE}
+            Port ${SSH_PORT:-22}
+            User ${SSH_UTILISATEUR}
+            IdentityFile ~/.ssh/deploiement
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            ServerAliveInterval 30
+          EOF
+          ssh serveur 'echo "Connexion au serveur réussie."'
+
+      - name: Vérifier le site et WP-CLI
+        if: steps.config.outputs.pret == 'true'
+        id: site
+        env:
+          WP: ${{ steps.config.outputs.wordpress }}
+        run: |
+          ssh serveur "test -f $(printf %q "$WP")/wp-config.php" \
+            || { echo "::error::Pas de wp-config.php dans CHEMIN_WORDPRESS ($WP)."; exit 1; }
+          if ssh serveur "command -v wp" > /dev/null; then
+            echo "wpcli=true" >> "$GITHUB_OUTPUT"
+            ssh serveur "wp --path=$(printf %q "$WP") core version" | sed 's/^/WordPress /'
+          else
+            echo "wpcli=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::WP-CLI absent du serveur : pas de sauvegarde automatique ; la migration se fera à la première visite du site."
+          fi
+
+      - name: Sauvegarder la base de données
+        if: steps.config.outputs.pret == 'true' && steps.site.outputs.wpcli == 'true'
+        env:
+          WP: ${{ steps.config.outputs.wordpress }}
+        run: |
+          horodatage=$(date -u +%Y%m%d-%H%M%S)
+          ssh serveur "set -e
+            mkdir -p ~/sauvegardes-espace-traiteur
+            chmod 700 ~/sauvegardes-espace-traiteur
+            wp --path=$(printf %q "$WP") db export - | gzip > ~/sauvegardes-espace-traiteur/base-$horodatage-${GITHUB_SHA::7}.sql.gz
+            # On garde les 10 dernières sauvegardes.
+            ls -1t ~/sauvegardes-espace-traiteur/base-*.sql.gz | tail -n +11 | xargs -r rm --
+            ls -lh ~/sauvegardes-espace-traiteur/base-$horodatage-*.sql.gz"
+
+      - name: Envoyer les fichiers du plugin
+        if: steps.config.outputs.pret == 'true'
+        env:
+          CIBLE: ${{ steps.config.outputs.plugin }}
+        run: |
+          ssh serveur "mkdir -p $(printf %q "$CIBLE")"
+          rsync -rlptz --delete --itemize-changes \
+            --exclude '.git' --exclude '.gitignore' --exclude '.github' \
+            --exclude 'README.md' --exclude 'docs' \
+            ./ "serveur:$CIBLE/"
+
+      - name: Mettre à jour la base de données
+        if: steps.config.outputs.pret == 'true' && steps.site.outputs.wpcli == 'true'
+        env:
+          WP: ${{ steps.config.outputs.wordpress }}
+        run: |
+          chemin=$(printf %q "$WP")
+          if ! ssh serveur "wp --path=$chemin plugin is-active espace-traiteur"; then
+            echo "::warning::Le plugin n'est pas activé sur le site : fichiers envoyés, migration non lancée."
+            exit 0
+          fi
+          ssh serveur "wp --path=$chemin espace-traiteur migrer && wp --path=$chemin espace-traiteur statut"
+
+      - name: Résumé
+        if: always() && steps.config.outputs.pret == 'true'
+        run: |
+          {
+            echo "### Déploiement de l'espace traiteur"
+            echo "- Commit : \`${GITHUB_SHA::7}\`"
+            echo "- Dossier : \`${{ steps.config.outputs.plugin }}\`"
+            echo "- WP-CLI : ${{ steps.site.outputs.wpcli == 'true' && 'oui (sauvegarde + migration faites)' || 'non (migration à la première visite)' }}"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -104,6 +104,7 @@ add_filter( 'etr_email_equipe', fn() => 'logistique@exemple.fr' );
 - `etr_source_woocommerce` : forcer ou désactiver l'utilisation des produits WooCommerce.
 - `etr_catalogue` : filtrer la liste des articles proposés.
 - `etr_routes_api_traiteurs` : routes de l'API REST autorisées aux traiteurs connectés.
+- `etr_migrations` : étapes de migration (par version).
 - Actions : `etr_demande_creee`, `etr_demande_annulee`, `etr_statut_change` (`$id, $ancien, $nouveau`).
 
 ## Structure
@@ -124,9 +125,19 @@ assets/css/espace-traiteur.css      Styles
 assets/js/espace-traiteur.js        Mise à jour des disponibilités selon les dates
 assets/js/connexion.js              Écran de connexion (afficher le mot de passe, envoi)
 assets/js/admin-reglages.js         Choix du logo et de la photo dans la médiathèque
+includes/class-etr-migrations.php   Migrations de la base après mise à jour
+includes/class-etr-cli.php          Commandes WP-CLI (wp espace-traiteur …)
 templates/connexion.php             Gabarit plein écran de la connexion
+.github/workflows/deployer.yml      Déploiement automatique (GitHub Actions)
+docs/DEPLOIEMENT.md                 Mise en place du déploiement, retour arrière
 uninstall.php                       Nettoyage à la désinstallation
 ```
+
+## Déploiement et mises à jour
+
+- **Déploiement automatique** : à chaque fusion dans `main`, GitHub Actions vérifie le code, sauvegarde la base, envoie le plugin par SSH sur le serveur et met à jour la base. Mise en place et retour arrière : [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md).
+- **Migrations de la base** : quand une nouvelle version change des données, les étapes nécessaires s'exécutent une seule fois, dans l'ordre (`wp espace-traiteur migrer` au déploiement, sinon automatiquement à la première visite). Verrou contre les exécutions simultanées, traitement par lots, journal et alerte en cas d'échec dans *Espace traiteur › Réglages › Mises à jour du plugin*.
+- Commandes WP-CLI : `wp espace-traiteur statut`, `wp espace-traiteur migrer`.
 
 ## Limites actuelles / pistes
 
