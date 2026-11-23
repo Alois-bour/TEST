@@ -231,73 +231,96 @@ class ETR_Frontend {
 			self::$erreurs[] = __( 'La date de reprise doit être postérieure à la date de livraison.', 'espace-traiteur' );
 		}
 
-		// Articles du catalogue, contrôlés selon la disponibilité sur la période.
-		list( $debut, $fin ) = etr_periode( $donnees['date_evenement'], $donnees['date_livraison'], $donnees['date_reprise'] );
-		$reservees           = $debut ? etr_quantites_reservees( $debut, $fin ) : array();
-
-		$quantites = isset( $_POST['quantites'] ) && is_array( $_POST['quantites'] ) ? wp_unslash( $_POST['quantites'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- converti en entiers ci-dessous.
-		$lignes    = array();
-		foreach ( $quantites as $article_id => $quantite ) {
-			if ( (string) absint( $article_id ) !== (string) $article_id ) {
-				continue;
-			}
-			$article_id = absint( $article_id );
-			$quantite   = is_scalar( $quantite ) ? absint( $quantite ) : 0;
-			if ( ! $article_id || ! $quantite ) {
-				continue;
-			}
-			$article = etr_get_article( $article_id );
-			if ( ! $article ) {
-				continue;
-			}
-			$dispo = etr_disponibilite( $article_id, $reservees );
-			if ( 0 === $dispo ) {
-				/* translators: %s : article. */
-				self::$erreurs[] = sprintf( __( '« %s » n’est plus disponible sur ces dates.', 'espace-traiteur' ), $article['titre'] );
-			} elseif ( null !== $dispo && $quantite > $dispo ) {
-				self::$erreurs[] = sprintf(
-					/* translators: 1 : article, 2 : quantité disponible. */
-					__( 'La quantité demandée pour « %1$s » dépasse la quantité disponible sur ces dates (%2$s).', 'espace-traiteur' ),
-					$article['titre'],
-					number_format_i18n( $dispo )
-				);
-			}
-			$lignes[] = array(
-				'article_id' => $article_id,
-				'quantite'   => $quantite,
-				'titre'      => $article['titre'],
-				'unite'      => $article['unite'],
-			);
-		}
-
-		if ( empty( $lignes ) && empty( $donnees['autres_besoins'] ) ) {
-			self::$erreurs[] = __( 'Indiquez au moins un article du catalogue ou un besoin hors catalogue.', 'espace-traiteur' );
-		}
-
 		if ( self::$erreurs ) {
 			return;
 		}
 
-		$demande_id = wp_insert_post(
-			array(
-				'post_type'   => 'etr_demande',
-				'post_status' => 'publish',
-				'post_author' => get_current_user_id(),
-				'post_title'  => $donnees['evenement'],
-			),
-			true
-		);
-
-		if ( is_wp_error( $demande_id ) ) {
+		global $wpdb;
+		$lock_name = 'etr_reservations_' . md5( $wpdb->prefix );
+		if ( '1' !== (string) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 10)', $lock_name ) ) ) {
 			self::$erreurs[] = __( 'La demande n’a pas pu être enregistrée. Merci de réessayer.', 'espace-traiteur' );
 			return;
 		}
 
-		foreach ( $donnees as $cle => $valeur ) {
-			update_post_meta( $demande_id, '_etr_' . $cle, $valeur );
+		$demande_id = 0;
+		try {
+			// Recalculer le stock sous verrou, puis conserver le verrou jusqu'à l'enregistrement complet.
+			list( $debut, $fin ) = etr_periode( $donnees['date_evenement'], $donnees['date_livraison'], $donnees['date_reprise'] );
+			$reservees           = $debut ? etr_quantites_reservees( $debut, $fin ) : array();
+			$quantites           = isset( $_POST['quantites'] ) && is_array( $_POST['quantites'] ) ? wp_unslash( $_POST['quantites'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- converti en entiers ci-dessous.
+			$lignes              = array();
+
+			foreach ( $quantites as $article_id => $quantite ) {
+				if ( (string) absint( $article_id ) !== (string) $article_id ) {
+					continue;
+				}
+				$article_id = absint( $article_id );
+				$quantite   = is_scalar( $quantite ) ? absint( $quantite ) : 0;
+				if ( ! $article_id || ! $quantite ) {
+					continue;
+				}
+				$article = etr_get_article( $article_id );
+				if ( ! $article ) {
+					continue;
+				}
+				$dispo = etr_disponibilite( $article_id, $reservees );
+				if ( 0 === $dispo ) {
+					/* translators: %s : article. */
+					self::$erreurs[] = sprintf( __( '« %s » n’est plus disponible sur ces dates.', 'espace-traiteur' ), $article['titre'] );
+				} elseif ( null !== $dispo && $quantite > $dispo ) {
+					self::$erreurs[] = sprintf(
+						/* translators: 1 : article, 2 : quantité disponible. */
+						__( 'La quantité demandée pour « %1$s » dépasse la quantité disponible sur ces dates (%2$s).', 'espace-traiteur' ),
+						$article['titre'],
+						number_format_i18n( $dispo )
+					);
+				}
+				$lignes[] = array(
+					'article_id' => $article_id,
+					'quantite'   => $quantite,
+					'titre'      => $article['titre'],
+					'unite'      => $article['unite'],
+				);
+			}
+
+			if ( empty( $lignes ) && empty( $donnees['autres_besoins'] ) ) {
+				self::$erreurs[] = __( 'Indiquez au moins un article du catalogue ou un besoin hors catalogue.', 'espace-traiteur' );
+			}
+			if ( self::$erreurs ) {
+				return;
+			}
+
+			$demande_id = wp_insert_post(
+				array(
+					'post_type'   => 'etr_demande',
+					'post_status' => 'publish',
+					'post_author' => get_current_user_id(),
+					'post_title'  => $donnees['evenement'],
+				),
+				true
+			);
+			if ( is_wp_error( $demande_id ) ) {
+				self::$erreurs[] = __( 'La demande n’a pas pu être enregistrée. Merci de réessayer.', 'espace-traiteur' );
+				return;
+			}
+
+			foreach ( $donnees as $cle => $valeur ) {
+				if ( false === update_post_meta( $demande_id, '_etr_' . $cle, $valeur ) ) {
+					throw new RuntimeException( 'Impossible d’enregistrer les détails de la demande.' );
+				}
+			}
+			if ( false === update_post_meta( $demande_id, '_etr_lignes', $lignes ) || false === update_post_meta( $demande_id, '_etr_statut', 'en_attente' ) ) {
+				throw new RuntimeException( 'Impossible d’enregistrer les articles de la demande.' );
+			}
+		} catch ( Throwable $e ) {
+			if ( $demande_id && ! is_wp_error( $demande_id ) ) {
+				wp_delete_post( $demande_id, true );
+			}
+			self::$erreurs[] = __( 'La demande n’a pas pu être enregistrée. Merci de réessayer.', 'espace-traiteur' );
+			return;
+		} finally {
+			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
 		}
-		update_post_meta( $demande_id, '_etr_lignes', $lignes );
-		update_post_meta( $demande_id, '_etr_statut', 'en_attente' );
 
 		do_action( 'etr_demande_creee', $demande_id );
 
@@ -442,20 +465,28 @@ class ETR_Frontend {
 	 * Liste des demandes du traiteur connecté.
 	 */
 	private static function vue_tableau_de_bord() {
-		$demandes = get_posts(
-			array(
-				'post_type'      => 'etr_demande',
-				'post_status'    => 'publish',
-				'author'         => get_current_user_id(),
-				'posts_per_page' => 100,
-				'orderby'        => 'date',
-				'order'          => 'DESC',
-			)
+		$page = isset( $_GET['etr_page'] ) ? max( 1, absint( $_GET['etr_page'] ) ) : 1; // phpcs:ignore WordPress.Security.NonceVerification
+		$args = array(
+			'post_type'      => 'etr_demande',
+			'post_status'    => 'publish',
+			'author'         => get_current_user_id(),
+			'posts_per_page' => 20,
+			'paged'          => $page,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
 		);
+		$demandes = new WP_Query(
+			$args
+		);
+		if ( $demandes->max_num_pages && $page > $demandes->max_num_pages ) {
+			$page              = $demandes->max_num_pages;
+			$args['paged']     = $page;
+			$demandes          = new WP_Query( $args );
+		}
 
 		echo '<h2>' . esc_html__( 'Mes demandes', 'espace-traiteur' ) . '</h2>';
 
-		if ( ! $demandes ) {
+		if ( ! $demandes->posts ) {
 			echo '<p>' . esc_html__( 'Vous n’avez encore fait aucune demande.', 'espace-traiteur' ) . '</p>';
 			return;
 		}
@@ -466,7 +497,7 @@ class ETR_Frontend {
 		echo '<th>' . esc_html__( 'Date', 'espace-traiteur' ) . '</th>';
 		echo '<th>' . esc_html__( 'Statut', 'espace-traiteur' ) . '</th>';
 		echo '<th></th></tr></thead><tbody>';
-		foreach ( $demandes as $demande ) {
+		foreach ( $demandes->posts as $demande ) {
 			$url = etr_url(
 				array(
 					'etr_vue' => 'demande',
@@ -482,6 +513,23 @@ class ETR_Frontend {
 			echo '</tr>';
 		}
 		echo '</tbody></table></div>';
+		if ( $demandes->max_num_pages > 1 ) {
+			$grand = 999999999;
+			$liens = paginate_links(
+				array(
+					'base'      => str_replace( $grand, '%#%', esc_url( etr_url( array( 'etr_page' => $grand ) ) ) ),
+					'format'    => '',
+					'current'   => $page,
+					'total'     => $demandes->max_num_pages,
+					'type'      => 'list',
+					'prev_text' => __( '« Précédent', 'espace-traiteur' ),
+					'next_text' => __( 'Suivant »', 'espace-traiteur' ),
+				)
+			);
+			if ( $liens ) {
+				echo '<nav class="etr-pagination" aria-label="' . esc_attr__( 'Navigation des demandes', 'espace-traiteur' ) . '">' . wp_kses_post( $liens ) . '</nav>';
+			}
+		}
 	}
 
 	/**
