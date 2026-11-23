@@ -27,16 +27,54 @@ class ETR_Frontend {
 		add_action( 'template_redirect', array( __CLASS__, 'traiter_formulaires' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'wp_ajax_etr_disponibilites', array( __CLASS__, 'ajax_disponibilites' ) );
+		add_filter( 'body_class', array( __CLASS__, 'classe_body' ) );
+		add_filter( 'hello_elementor_page_title', array( __CLASS__, 'titre_theme' ) );
+	}
+
+	/**
+	 * Sommes-nous sur la page de l'espace traiteur ?
+	 *
+	 * @return bool
+	 */
+	private static function sur_page_espace() {
+		return is_singular() && has_shortcode( (string) get_post_field( 'post_content', get_queried_object_id() ), 'espace_traiteur' );
+	}
+
+	/**
+	 * Classe sur <body> pour l'écran de connexion (permet de masquer le titre du thème).
+	 *
+	 * @param string[] $classes Classes.
+	 * @return string[]
+	 */
+	public static function classe_body( $classes ) {
+		if ( ! is_user_logged_in() && self::sur_page_espace() ) {
+			$classes[] = 'etr-page-connexion';
+		}
+		return $classes;
+	}
+
+	/**
+	 * Thème Hello Elementor : pas de titre de page au-dessus de l'écran de connexion.
+	 *
+	 * @param bool $afficher Valeur par défaut.
+	 * @return bool
+	 */
+	public static function titre_theme( $afficher ) {
+		return ( ! is_user_logged_in() && self::sur_page_espace() ) ? false : $afficher;
 	}
 
 	/**
 	 * Styles et script sur la page contenant le shortcode.
 	 */
 	public static function assets() {
-		if ( ! is_singular() || ! has_shortcode( (string) get_post_field( 'post_content', get_queried_object_id() ), 'espace_traiteur' ) ) {
+		if ( ! self::sur_page_espace() ) {
 			return;
 		}
 		wp_enqueue_style( 'espace-traiteur', ETR_URL . 'assets/css/espace-traiteur.css', array(), ETR_VERSION );
+
+		if ( ! is_user_logged_in() ) {
+			wp_enqueue_script( 'espace-traiteur-connexion', ETR_URL . 'assets/js/connexion.js', array(), ETR_VERSION, true );
+		}
 
 		if ( etr_est_traiteur() ) {
 			wp_enqueue_script( 'espace-traiteur', ETR_URL . 'assets/js/espace-traiteur.js', array(), ETR_VERSION, true );
@@ -316,7 +354,7 @@ class ETR_Frontend {
 	 */
 	public static function shortcode() {
 		ob_start();
-		echo '<div class="etr-espace">';
+		echo '<div class="etr-espace' . ( is_user_logged_in() ? '' : ' etr-espace--auth' ) . '">';
 
 		if ( ! is_user_logged_in() ) {
 			ETR_Comptes::vue();

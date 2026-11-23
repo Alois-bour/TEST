@@ -51,6 +51,15 @@ Sur la page **Espace traiteur**, le traiteur :
 - consulte le détail et la réponse de l'équipe ;
 - peut annuler une demande tant qu'elle est « En attente ».
 
+## Page de connexion
+
+Écran en deux panneaux, dans l'esprit du site : à gauche une grande photo d'ambiance avec une accroche, à droite le logo, un titre en serif italique et un formulaire épuré (bouton « Afficher » le mot de passe, état de chargement, messages clairs). Les écrans « Mot de passe oublié » et « Choisir votre mot de passe » reprennent la même présentation. Adapté au mobile (la photo devient un bandeau).
+
+- *Espace traiteur › Réglages › Page de connexion* : choisir le **logo** et la **photo d'ambiance** dans la médiathèque. Sans logo : logo du thème, sinon nom du site. Sans photo : fond crème uni.
+- Polices : celles du site si elles sont chargées par le thème (Ethic Serif, Cormorant Garamond, Roboto), sinon des polices proches.
+- Le titre de page du thème est masqué sur l'écran de connexion.
+- Filtre `etr_slogan_connexion` pour changer l'accroche.
+
 ## Comptes traiteurs : aucun accès à WordPress
 
 Les traiteurs sont techniquement des utilisateurs WordPress (rôle « Traiteur »), pour profiter de la sécurité de WordPress (mots de passe chiffrés, sessions), mais **ils n'ont accès qu'à leur espace** :
@@ -111,6 +120,8 @@ includes/class-etr-frontend.php     Espace traiteur (shortcode)
 includes/class-etr-notifications.php E-mails
 assets/css/espace-traiteur.css      Styles
 assets/js/espace-traiteur.js        Mise à jour des disponibilités selon les dates
+assets/js/connexion.js              Écran de connexion (afficher le mot de passe, envoi)
+assets/js/admin-reglages.js         Choix du logo et de la photo dans la médiathèque
 uninstall.php                       Nettoyage à la désinstallation
 ```
 

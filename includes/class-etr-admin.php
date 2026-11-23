@@ -91,6 +91,17 @@ class ETR_Admin {
 				},
 			)
 		);
+		foreach ( array( 'etr_logo', 'etr_image_connexion' ) as $option ) {
+			register_setting(
+				'etr_reglages',
+				$option,
+				array(
+					'type'              => 'integer',
+					'default'           => 0,
+					'sanitize_callback' => 'absint',
+				)
+			);
+		}
 		register_setting(
 			'etr_reglages',
 			'etr_email_equipe',
@@ -146,9 +157,32 @@ class ETR_Admin {
 		echo '<input type="email" class="regular-text" id="etr_email_equipe" name="etr_email_equipe" value="' . esc_attr( get_option( 'etr_email_equipe' ) ) . '" placeholder="' . esc_attr( get_option( 'admin_email' ) ) . '">';
 		echo '<p class="description">' . esc_html__( 'Reçoit les nouvelles demandes et les annulations. Vide = e-mail d’administration du site.', 'espace-traiteur' ) . '</p></td></tr>';
 
+		echo '<tr><th scope="row" colspan="2"><h2 style="margin:16px 0 0">' . esc_html__( 'Page de connexion', 'espace-traiteur' ) . '</h2></th></tr>';
+		self::champ_media( 'etr_logo', __( 'Logo', 'espace-traiteur' ), __( 'Affiché au-dessus du formulaire. Par défaut : le logo du thème, sinon le nom du site.', 'espace-traiteur' ) );
+		self::champ_media( 'etr_image_connexion', __( 'Photo d’ambiance', 'espace-traiteur' ), __( 'Grande photo à gauche du formulaire (format portrait ou carré, 1200 px de large conseillé). Sans photo : fond crème uni.', 'espace-traiteur' ) );
+
 		echo '</tbody></table>';
 		submit_button();
 		echo '</form></div>';
+	}
+
+	/**
+	 * Champ « image de la médiathèque ».
+	 *
+	 * @param string $option Nom de l'option (ID de pièce jointe).
+	 * @param string $label  Libellé.
+	 * @param string $aide   Aide.
+	 */
+	private static function champ_media( $option, $label, $aide ) {
+		$id      = (int) get_option( $option );
+		$apercu  = $id ? wp_get_attachment_image( $id, 'medium', false, array( 'style' => 'max-width:240px;height:auto;display:block' ) ) : '';
+		echo '<tr><th scope="row">' . esc_html( $label ) . '</th><td><div class="etr-media" data-titre="' . esc_attr( $label ) . '">';
+		echo '<input type="hidden" name="' . esc_attr( $option ) . '" value="' . (int) $id . '" class="etr-media__id">';
+		echo '<div class="etr-media__apercu" style="margin-bottom:8px">' . $apercu . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput -- HTML de wp_get_attachment_image().
+		echo '<button type="button" class="button etr-media__choisir">' . esc_html__( 'Choisir une image', 'espace-traiteur' ) . '</button> ';
+		echo '<button type="button" class="button-link etr-media__retirer"' . ( $id ? '' : ' hidden' ) . '>' . esc_html__( 'Retirer', 'espace-traiteur' ) . '</button>';
+		echo '<p class="description">' . esc_html( $aide ) . '</p>';
+		echo '</div></td></tr>';
 	}
 
 	/**
@@ -301,6 +335,10 @@ class ETR_Admin {
 	 */
 	public static function assets() {
 		$ecran = get_current_screen();
+		if ( $ecran && 'etr_demande_page_etr-reglages' === $ecran->id ) {
+			wp_enqueue_media();
+			wp_enqueue_script( 'espace-traiteur-reglages', ETR_URL . 'assets/js/admin-reglages.js', array( 'jquery' ), ETR_VERSION, true );
+		}
 		if ( $ecran && in_array( $ecran->post_type, array( 'etr_demande', 'etr_article' ), true ) ) {
 			wp_enqueue_style( 'espace-traiteur', ETR_URL . 'assets/css/espace-traiteur.css', array(), ETR_VERSION );
 		}

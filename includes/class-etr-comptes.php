@@ -388,13 +388,16 @@ class ETR_Comptes {
 	/* ------------------------------------------------------------------ */
 
 	/**
-	 * Vue de l'espace pour un visiteur non connecté.
+	 * Vue de l'espace pour un visiteur non connecté : écran de connexion en deux panneaux.
 	 */
 	public static function vue() {
 		$vue = isset( $_GET['etr_vue'] ) ? sanitize_key( wp_unslash( $_GET['etr_vue'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 
-		echo '<div class="etr-connexion">';
-		self::messages();
+		echo '<div class="etr-auth">';
+		self::panneau_visuel();
+		echo '<div class="etr-auth__panneau"><div class="etr-auth__contenu">';
+		self::logo();
+
 		if ( 'mot-de-passe-oublie' === $vue ) {
 			self::vue_oubli();
 		} elseif ( 'mot-de-passe' === $vue ) {
@@ -402,7 +405,71 @@ class ETR_Comptes {
 		} else {
 			self::vue_connexion();
 		}
-		echo '</div>';
+
+		$contact = get_option( 'etr_email_equipe' );
+		$contact = is_email( $contact ) ? $contact : get_option( 'admin_email' );
+		echo '<p class="etr-auth__pied">' . esc_html__( 'Vous êtes traiteur et souhaitez un accès ?', 'espace-traiteur' ) . ' <a href="mailto:' . esc_attr( antispambot( $contact ) ) . '">' . esc_html__( 'Contactez-nous', 'espace-traiteur' ) . '</a></p>';
+		echo '</div></div></div>';
+	}
+
+	/**
+	 * Panneau de gauche : photo d'ambiance et accroche.
+	 */
+	private static function panneau_visuel() {
+		$image_id = (int) get_option( 'etr_image_connexion' );
+		$classe   = 'etr-auth__visuel' . ( $image_id ? '' : ' etr-auth__visuel--sans-image' );
+
+		echo '<div class="' . esc_attr( $classe ) . '" aria-hidden="true">';
+		if ( $image_id ) {
+			echo wp_get_attachment_image(
+				$image_id,
+				'large',
+				false,
+				array(
+					'class'   => 'etr-auth__image',
+					'alt'     => '',
+					'loading' => 'eager',
+					'sizes'   => '(max-width: 860px) 100vw, 50vw',
+				)
+			);
+		}
+		echo '<div class="etr-auth__accroche">';
+		echo '<p class="etr-auth__surtitre">' . esc_html__( 'Espace professionnel', 'espace-traiteur' ) . '</p>';
+		echo '<p class="etr-auth__slogan">' . esc_html( apply_filters( 'etr_slogan_connexion', __( 'Mobilier, art de la table et décoration pour sublimer vos réceptions.', 'espace-traiteur' ) ) ) . '</p>';
+		echo '</div></div>';
+	}
+
+	/**
+	 * Logo (réglage, sinon logo du thème, sinon nom du site).
+	 */
+	private static function logo() {
+		$logo_id = (int) get_option( 'etr_logo' );
+		if ( ! $logo_id ) {
+			$logo_id = (int) get_theme_mod( 'custom_logo' );
+		}
+		$site = get_bloginfo( 'name' );
+
+		echo '<a class="etr-auth__logo" href="' . esc_url( home_url( '/' ) ) . '">';
+		if ( $logo_id ) {
+			echo wp_get_attachment_image( $logo_id, 'medium', false, array( 'alt' => $site ) );
+		} else {
+			echo '<span class="etr-auth__nom-site">' . esc_html( $site ) . '</span>';
+		}
+		echo '</a>';
+	}
+
+	/**
+	 * En-tête d'un écran : surtitre, titre, introduction.
+	 *
+	 * @param string $titre Titre.
+	 * @param string $intro Introduction.
+	 */
+	private static function entete( $titre, $intro ) {
+		echo '<p class="etr-auth__surtitre">' . esc_html__( 'Espace traiteur', 'espace-traiteur' ) . '</p>';
+		echo '<h1 class="etr-auth__titre">' . esc_html( $titre ) . '</h1>';
+		if ( $intro ) {
+			echo '<p class="etr-auth__intro">' . esc_html( $intro ) . '</p>';
+		}
 	}
 
 	/**
@@ -414,15 +481,60 @@ class ETR_Comptes {
 			self::$succes = __( 'Votre mot de passe est enregistré. Vous pouvez maintenant vous connecter.', 'espace-traiteur' );
 		}
 		if ( self::$succes ) {
-			echo '<p class="etr-notice etr-notice--succes">' . esc_html( self::$succes ) . '</p>';
+			echo '<div class="etr-auth__message etr-auth__message--succes" role="status">' . esc_html( self::$succes ) . '</div>';
 		}
 		if ( self::$erreurs ) {
-			echo '<div class="etr-notice etr-notice--erreur"><ul>';
+			echo '<div class="etr-auth__message etr-auth__message--erreur" role="alert">';
 			foreach ( self::$erreurs as $erreur ) {
-				echo '<li>' . esc_html( $erreur ) . '</li>';
+				echo '<p>' . esc_html( $erreur ) . '</p>';
 			}
-			echo '</ul></div>';
+			echo '</div>';
 		}
+	}
+
+	/**
+	 * Un champ de formulaire.
+	 *
+	 * @param array $args id, name, label, type, value, autocomplete, extra.
+	 */
+	private static function champ( $args ) {
+		$args = wp_parse_args(
+			$args,
+			array(
+				'type'         => 'text',
+				'value'        => '',
+				'autocomplete' => '',
+				'extra'        => '',
+			)
+		);
+		$mdp  = 'password' === $args['type'];
+
+		echo '<div class="etr-auth__champ">';
+		echo '<label for="' . esc_attr( $args['id'] ) . '">' . esc_html( $args['label'] ) . '</label>';
+		echo '<div class="etr-auth__saisie' . ( $mdp ? ' etr-auth__saisie--mdp' : '' ) . '">';
+		printf(
+			'<input type="%1$s" name="%2$s" id="%3$s" value="%4$s" autocomplete="%5$s" required%6$s>',
+			esc_attr( $args['type'] ),
+			esc_attr( $args['name'] ),
+			esc_attr( $args['id'] ),
+			esc_attr( $args['value'] ),
+			esc_attr( $args['autocomplete'] ),
+			$args['extra'] // phpcs:ignore WordPress.Security.EscapeOutput -- attributs fixes écrits dans ce fichier.
+		);
+		if ( $mdp ) {
+			echo '<button type="button" class="etr-auth__oeil" aria-controls="' . esc_attr( $args['id'] ) . '" aria-pressed="false" data-afficher="' . esc_attr__( 'Afficher', 'espace-traiteur' ) . '" data-masquer="' . esc_attr__( 'Masquer', 'espace-traiteur' ) . '">' . esc_html__( 'Afficher', 'espace-traiteur' ) . '</button>';
+		}
+		echo '</div></div>';
+	}
+
+	/**
+	 * Bouton d'envoi.
+	 *
+	 * @param string $libelle Libellé.
+	 * @param string $id      ID HTML.
+	 */
+	private static function bouton( $libelle, $id = '' ) {
+		echo '<button type="submit"' . ( $id ? ' id="' . esc_attr( $id ) . '"' : '' ) . ' class="etr-auth__bouton" data-chargement="' . esc_attr__( 'Un instant…', 'espace-traiteur' ) . '"><span>' . esc_html( $libelle ) . '</span></button>';
 	}
 
 	/**
@@ -430,31 +542,63 @@ class ETR_Comptes {
 	 */
 	private static function vue_connexion() {
 		$login = isset( $_POST['log'] ) ? sanitize_text_field( wp_unslash( $_POST['log'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
-		echo '<h2>' . esc_html__( 'Connexion à votre espace traiteur', 'espace-traiteur' ) . '</h2>';
-		echo '<form method="post" action="' . esc_url( etr_url() ) . '" class="etr-form-connexion">';
+
+		self::entete( __( 'Bienvenue', 'espace-traiteur' ), __( 'Connectez-vous pour préparer vos demandes de mobilier et d’art de la table, et suivre leur traitement.', 'espace-traiteur' ) );
+		self::messages();
+
+		echo '<form method="post" action="' . esc_url( etr_url() ) . '" class="etr-auth__form" novalidate>';
 		echo '<input type="hidden" name="etr_action" value="connexion">';
-		echo '<p><label for="user_login">' . esc_html__( 'Identifiant ou e-mail', 'espace-traiteur' ) . '</label><input type="text" name="log" id="user_login" value="' . esc_attr( $login ) . '" autocomplete="username" required></p>';
-		echo '<p><label for="user_pass">' . esc_html__( 'Mot de passe', 'espace-traiteur' ) . '</label><input type="password" name="pwd" id="user_pass" autocomplete="current-password" required></p>';
-		echo '<p class="etr-se-souvenir"><label><input type="checkbox" name="rememberme" value="1"> ' . esc_html__( 'Rester connecté', 'espace-traiteur' ) . '</label></p>';
-		echo '<p><button type="submit" id="wp-submit" class="etr-btn">' . esc_html__( 'Se connecter', 'espace-traiteur' ) . '</button></p>';
+		self::champ(
+			array(
+				'id'           => 'user_login',
+				'name'         => 'log',
+				'label'        => __( 'Identifiant ou e-mail', 'espace-traiteur' ),
+				'value'        => $login,
+				'autocomplete' => 'username',
+				'extra'        => ' autocapitalize="none" spellcheck="false"' . ( $login ? '' : ' autofocus' ),
+			)
+		);
+		self::champ(
+			array(
+				'id'           => 'user_pass',
+				'name'         => 'pwd',
+				'label'        => __( 'Mot de passe', 'espace-traiteur' ),
+				'type'         => 'password',
+				'autocomplete' => 'current-password',
+				'extra'        => $login ? ' autofocus' : '',
+			)
+		);
+		echo '<div class="etr-auth__ligne">';
+		echo '<label class="etr-auth__case"><input type="checkbox" name="rememberme" value="1"> <span>' . esc_html__( 'Rester connecté', 'espace-traiteur' ) . '</span></label>';
+		echo '<a href="' . esc_url( etr_url( array( 'etr_vue' => 'mot-de-passe-oublie' ) ) ) . '">' . esc_html__( 'Mot de passe oublié ?', 'espace-traiteur' ) . '</a>';
+		echo '</div>';
+		self::bouton( __( 'Se connecter', 'espace-traiteur' ), 'wp-submit' );
 		echo '</form>';
-		echo '<p><a href="' . esc_url( etr_url( array( 'etr_vue' => 'mot-de-passe-oublie' ) ) ) . '">' . esc_html__( 'Mot de passe oublié ?', 'espace-traiteur' ) . '</a></p>';
 	}
 
 	/**
 	 * Formulaire « mot de passe oublié ».
 	 */
 	private static function vue_oubli() {
-		echo '<h2>' . esc_html__( 'Mot de passe oublié', 'espace-traiteur' ) . '</h2>';
+		self::entete( __( 'Mot de passe oublié', 'espace-traiteur' ), self::$succes ? '' : __( 'Indiquez votre identifiant ou votre adresse e-mail : nous vous envoyons un lien pour choisir un nouveau mot de passe.', 'espace-traiteur' ) );
+		self::messages();
+
 		if ( ! self::$succes ) {
-			echo '<p>' . esc_html__( 'Saisissez votre identifiant ou votre adresse e-mail : vous recevrez un lien pour choisir un nouveau mot de passe.', 'espace-traiteur' ) . '</p>';
-			echo '<form method="post" action="' . esc_url( etr_url( array( 'etr_vue' => 'mot-de-passe-oublie' ) ) ) . '" class="etr-form-connexion">';
+			echo '<form method="post" action="' . esc_url( etr_url( array( 'etr_vue' => 'mot-de-passe-oublie' ) ) ) . '" class="etr-auth__form" novalidate>';
 			echo '<input type="hidden" name="etr_action" value="mot_de_passe_oublie">';
-			echo '<p><label for="etr-oubli-login">' . esc_html__( 'Identifiant ou e-mail', 'espace-traiteur' ) . '</label><input type="text" name="user_login" id="etr-oubli-login" autocomplete="username" required></p>';
-			echo '<p><button type="submit" class="etr-btn">' . esc_html__( 'Recevoir le lien', 'espace-traiteur' ) . '</button></p>';
+			self::champ(
+				array(
+					'id'           => 'etr-oubli-login',
+					'name'         => 'user_login',
+					'label'        => __( 'Identifiant ou e-mail', 'espace-traiteur' ),
+					'autocomplete' => 'username',
+					'extra'        => ' autocapitalize="none" spellcheck="false" autofocus',
+				)
+			);
+			self::bouton( __( 'Recevoir le lien', 'espace-traiteur' ) );
 			echo '</form>';
 		}
-		echo '<p><a href="' . esc_url( etr_url() ) . '">' . esc_html__( '← Retour à la connexion', 'espace-traiteur' ) . '</a></p>';
+		echo '<p class="etr-auth__retour"><a href="' . esc_url( etr_url() ) . '">' . esc_html__( '← Retour à la connexion', 'espace-traiteur' ) . '</a></p>';
 	}
 
 	/**
@@ -466,26 +610,46 @@ class ETR_Comptes {
 		$cle   = isset( $_REQUEST['key'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['key'] ) ) : '';
 		// phpcs:enable
 
-		echo '<h2>' . esc_html__( 'Choisir votre mot de passe', 'espace-traiteur' ) . '</h2>';
-
 		$user = check_password_reset_key( $cle, $login );
 		if ( is_wp_error( $user ) || ! ETR_Access::traiteur_seulement( $user->ID ) ) {
-			if ( ! self::$erreurs ) {
-				echo '<p class="etr-notice etr-notice--erreur">' . esc_html__( 'Ce lien n’est plus valable (il expire après 24 heures ou une fois utilisé).', 'espace-traiteur' ) . '</p>';
-			}
-			echo '<p><a class="etr-btn" href="' . esc_url( etr_url( array( 'etr_vue' => 'mot-de-passe-oublie' ) ) ) . '">' . esc_html__( 'Demander un nouveau lien', 'espace-traiteur' ) . '</a></p>';
+			self::entete( __( 'Lien expiré', 'espace-traiteur' ), __( 'Ce lien n’est plus valable : il expire après 24 heures ou une fois utilisé. Demandez-en un nouveau, il arrive en quelques instants.', 'espace-traiteur' ) );
+			self::messages();
+			echo '<a class="etr-auth__bouton" href="' . esc_url( etr_url( array( 'etr_vue' => 'mot-de-passe-oublie' ) ) ) . '"><span>' . esc_html__( 'Demander un nouveau lien', 'espace-traiteur' ) . '</span></a>';
+			echo '<p class="etr-auth__retour"><a href="' . esc_url( etr_url() ) . '">' . esc_html__( '← Retour à la connexion', 'espace-traiteur' ) . '</a></p>';
 			return;
 		}
 
 		/* translators: %s : identifiant. */
-		echo '<p>' . esc_html( sprintf( __( 'Identifiant : %s', 'espace-traiteur' ), $user->user_login ) ) . '</p>';
-		echo '<form method="post" action="' . esc_url( self::url_mot_de_passe( $cle, $login ) ) . '" class="etr-form-connexion">';
+		self::entete( __( 'Choisissez votre mot de passe', 'espace-traiteur' ), sprintf( __( 'Identifiant : %s. Choisissez un mot de passe d’au moins 8 caractères.', 'espace-traiteur' ), $user->user_login ) );
+		self::messages();
+
+		echo '<form method="post" action="' . esc_url( self::url_mot_de_passe( $cle, $login ) ) . '" class="etr-auth__form" novalidate>';
 		echo '<input type="hidden" name="etr_action" value="nouveau_mot_de_passe">';
 		echo '<input type="hidden" name="login" value="' . esc_attr( $login ) . '">';
 		echo '<input type="hidden" name="key" value="' . esc_attr( $cle ) . '">';
-		echo '<p><label for="etr-pass1">' . esc_html__( 'Nouveau mot de passe (8 caractères minimum)', 'espace-traiteur' ) . '</label><input type="password" name="pass1" id="etr-pass1" minlength="8" autocomplete="new-password" required></p>';
-		echo '<p><label for="etr-pass2">' . esc_html__( 'Confirmer le mot de passe', 'espace-traiteur' ) . '</label><input type="password" name="pass2" id="etr-pass2" minlength="8" autocomplete="new-password" required></p>';
-		echo '<p><button type="submit" class="etr-btn">' . esc_html__( 'Enregistrer mon mot de passe', 'espace-traiteur' ) . '</button></p>';
+		// Aide les gestionnaires de mots de passe à associer le mot de passe au bon identifiant.
+		echo '<input type="text" name="etr_identifiant" value="' . esc_attr( $user->user_login ) . '" autocomplete="username" class="etr-auth__cache" tabindex="-1" aria-hidden="true" readonly>';
+		self::champ(
+			array(
+				'id'           => 'etr-pass1',
+				'name'         => 'pass1',
+				'label'        => __( 'Nouveau mot de passe', 'espace-traiteur' ),
+				'type'         => 'password',
+				'autocomplete' => 'new-password',
+				'extra'        => ' minlength="8" autofocus',
+			)
+		);
+		self::champ(
+			array(
+				'id'           => 'etr-pass2',
+				'name'         => 'pass2',
+				'label'        => __( 'Confirmer le mot de passe', 'espace-traiteur' ),
+				'type'         => 'password',
+				'autocomplete' => 'new-password',
+				'extra'        => ' minlength="8"',
+			)
+		);
+		self::bouton( __( 'Enregistrer mon mot de passe', 'espace-traiteur' ) );
 		echo '</form>';
 	}
 }
