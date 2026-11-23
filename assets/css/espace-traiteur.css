@@ -459,3 +459,37 @@
 @media (prefers-reduced-motion: reduce) {
 	.etr-auth *, .etr-auth *::before { transition: none !important; animation-duration: 1.5s !important; }
 }
+
+/* Connexion en plein écran */
+body.etr-plein-ecran { margin: 0; padding: 0; background: #fff; }
+.etr-plein-ecran__main { display: block; margin: 0; padding: 0; }
+.etr-plein-ecran .etr-espace--auth { margin: 0; padding: 0; }
+.etr-plein-ecran .etr-auth {
+	grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+	max-width: none;
+	min-height: 100vh;
+	min-height: 100dvh;
+	margin: 0;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+}
+.etr-plein-ecran .etr-auth__visuel { position: sticky; top: 0; height: 100vh; height: 100dvh; }
+.etr-plein-ecran .etr-auth__accroche { left: 56px; right: 56px; bottom: 56px; }
+.etr-auth__panneau { position: relative; }
+.etr-auth .etr-auth__retour-site {
+	position: absolute;
+	top: 28px;
+	right: 32px;
+	font-size: 13px;
+	color: var(--auth-gris);
+	text-decoration: none;
+}
+.etr-auth .etr-auth__retour-site:hover { color: var(--auth-encre); text-decoration: underline; }
+@media (max-width: 860px) {
+	.etr-plein-ecran .etr-auth { grid-template-columns: 1fr; }
+	.etr-plein-ecran .etr-auth__visuel { position: relative; height: auto; min-height: 30vh; }
+	.etr-plein-ecran .etr-auth__accroche { left: 24px; right: 24px; bottom: 22px; }
+	.etr-auth .etr-auth__retour-site { top: 16px; right: 20px; }
+	.etr-auth__panneau { padding-top: 56px; }
+}

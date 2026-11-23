@@ -91,6 +91,17 @@ class ETR_Admin {
 				},
 			)
 		);
+		register_setting(
+			'etr_reglages',
+			'etr_connexion_plein_ecran',
+			array(
+				'type'              => 'string',
+				'default'           => '1',
+				'sanitize_callback' => function ( $valeur ) {
+					return $valeur ? '1' : '0';
+				},
+			)
+		);
 		foreach ( array( 'etr_logo', 'etr_image_connexion' ) as $option ) {
 			register_setting(
 				'etr_reglages',
@@ -158,8 +169,9 @@ class ETR_Admin {
 		echo '<p class="description">' . esc_html__( 'Reçoit les nouvelles demandes et les annulations. Vide = e-mail d’administration du site.', 'espace-traiteur' ) . '</p></td></tr>';
 
 		echo '<tr><th scope="row" colspan="2"><h2 style="margin:16px 0 0">' . esc_html__( 'Page de connexion', 'espace-traiteur' ) . '</h2></th></tr>';
-		self::champ_media( 'etr_logo', __( 'Logo', 'espace-traiteur' ), __( 'Affiché au-dessus du formulaire. Par défaut : le logo du thème, sinon le nom du site.', 'espace-traiteur' ) );
-		self::champ_media( 'etr_image_connexion', __( 'Photo d’ambiance', 'espace-traiteur' ), __( 'Grande photo à gauche du formulaire (format portrait ou carré, 1200 px de large conseillé). Sans photo : fond crème uni.', 'espace-traiteur' ) );
+		echo '<tr><th scope="row">' . esc_html__( 'Affichage', 'espace-traiteur' ) . '</th><td><input type="hidden" name="etr_connexion_plein_ecran" value="0"><label><input type="checkbox" name="etr_connexion_plein_ecran" value="1"' . checked( get_option( 'etr_connexion_plein_ecran', '1' ), '1', false ) . '> ' . esc_html__( 'Plein écran (sans l’en-tête ni le pied de page du site)', 'espace-traiteur' ) . '</label></td></tr>';
+		self::champ_media( 'etr_logo', __( 'Logo', 'espace-traiteur' ), __( 'Affiché au-dessus du formulaire. Sans choix : le logo du site est utilisé automatiquement.', 'espace-traiteur' ), ETR_Comptes::logo_id( true ) );
+		self::champ_media( 'etr_image_connexion', __( 'Photo d’ambiance', 'espace-traiteur' ), __( 'Grande photo à côté du formulaire (portrait ou carré, 1200 px de large conseillé). Sans choix : une photo d’ambiance du site est utilisée automatiquement.', 'espace-traiteur' ), ETR_Comptes::photo_id( true ) );
 
 		echo '</tbody></table>';
 		submit_button();
@@ -172,10 +184,17 @@ class ETR_Admin {
 	 * @param string $option Nom de l'option (ID de pièce jointe).
 	 * @param string $label  Libellé.
 	 * @param string $aide   Aide.
+	 * @param int    $defaut Image utilisée si rien n'est choisi.
 	 */
-	private static function champ_media( $option, $label, $aide ) {
+	private static function champ_media( $option, $label, $aide, $defaut = 0 ) {
 		$id      = (int) get_option( $option );
-		$apercu  = $id ? wp_get_attachment_image( $id, 'medium', false, array( 'style' => 'max-width:240px;height:auto;display:block' ) ) : '';
+		$style   = array( 'style' => 'max-width:240px;max-height:160px;width:auto;height:auto;display:block' );
+		$apercu  = $id ? wp_get_attachment_image( $id, 'medium', false, $style ) : '';
+		if ( ! $id ) {
+			$apercu = $defaut
+				? wp_get_attachment_image( $defaut, 'medium', false, $style ) . '<p class="description">' . esc_html__( 'Image utilisée par défaut (trouvée sur le site).', 'espace-traiteur' ) . '</p>'
+				: '<p class="description">' . esc_html__( 'Aucune image trouvée sur le site.', 'espace-traiteur' ) . '</p>';
+		}
 		echo '<tr><th scope="row">' . esc_html( $label ) . '</th><td><div class="etr-media" data-titre="' . esc_attr( $label ) . '">';
 		echo '<input type="hidden" name="' . esc_attr( $option ) . '" value="' . (int) $id . '" class="etr-media__id">';
 		echo '<div class="etr-media__apercu" style="margin-bottom:8px">' . $apercu . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput -- HTML de wp_get_attachment_image().

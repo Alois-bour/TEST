@@ -23,3 +23,4 @@ delete_option( 'etr_afficher_prix' );
 delete_option( 'etr_email_equipe' );
 delete_option( 'etr_logo' );
 delete_option( 'etr_image_connexion' );
+delete_option( 'etr_connexion_plein_ecran' );

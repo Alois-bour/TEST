@@ -55,7 +55,9 @@ Sur la page **Espace traiteur**, le traiteur :
 
 Écran en deux panneaux, dans l'esprit du site : à gauche une grande photo d'ambiance avec une accroche, à droite le logo, un titre en serif italique et un formulaire épuré (bouton « Afficher » le mot de passe, état de chargement, messages clairs). Les écrans « Mot de passe oublié » et « Choisir votre mot de passe » reprennent la même présentation. Adapté au mobile (la photo devient un bandeau).
 
-- *Espace traiteur › Réglages › Page de connexion* : choisir le **logo** et la **photo d'ambiance** dans la médiathèque. Sans logo : logo du thème, sinon nom du site. Sans photo : fond crème uni.
+- **Plein écran** par défaut : la page de connexion occupe toute la fenêtre, sans l'en-tête ni le pied de page du site, avec un lien « Retour au site ». Une fois connecté, le traiteur retrouve son espace dans la mise en page habituelle du site. Désactivable dans les réglages.
+- **Logo et photo automatiques** : sans choix dans les réglages, le plugin utilise le logo du site (logo du thème, logo Elementor, ou fichier `maison-aname-logo1` de la médiathèque) et une photo d'ambiance du site (`location-art-de-la-table-mariage-nancy`, puis d'autres photos de la page d'accueil, l'image d'une catégorie de produits ou l'image de la page d'accueil). Filtres `etr_logos_par_defaut` et `etr_photos_par_defaut`.
+- *Espace traiteur › Réglages › Page de connexion* : choisir un autre **logo** ou une autre **photo** dans la médiathèque ; l'image utilisée par défaut y est affichée.
 - Polices : celles du site si elles sont chargées par le thème (Ethic Serif, Cormorant Garamond, Roboto), sinon des polices proches.
 - Le titre de page du thème est masqué sur l'écran de connexion.
 - Filtre `etr_slogan_connexion` pour changer l'accroche.
@@ -122,6 +124,7 @@ assets/css/espace-traiteur.css      Styles
 assets/js/espace-traiteur.js        Mise à jour des disponibilités selon les dates
 assets/js/connexion.js              Écran de connexion (afficher le mot de passe, envoi)
 assets/js/admin-reglages.js         Choix du logo et de la photo dans la médiathèque
+templates/connexion.php             Gabarit plein écran de la connexion
 uninstall.php                       Nettoyage à la désinstallation
 ```
 

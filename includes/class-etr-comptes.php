@@ -58,6 +58,11 @@ class ETR_Comptes {
 		add_action( 'template_redirect', array( __CLASS__, 'traiter_formulaires' ), 5 );
 		add_action( 'init', array( __CLASS__, 'deconnecter_si_desactive' ) );
 		add_action( 'login_init', array( __CLASS__, 'page_connexion_wordpress' ) );
+
+		// Images par défaut : nouvelle recherche après un changement.
+		foreach ( array( 'update_option_etr_logo', 'update_option_etr_image_connexion', 'add_attachment', 'delete_attachment', 'update_option_elementor_active_kit' ) as $hook ) {
+			add_action( $hook, array( __CLASS__, 'oublier_defauts' ) );
+		}
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -395,7 +400,9 @@ class ETR_Comptes {
 
 		echo '<div class="etr-auth">';
 		self::panneau_visuel();
-		echo '<div class="etr-auth__panneau"><div class="etr-auth__contenu">';
+		echo '<div class="etr-auth__panneau">';
+		echo '<a class="etr-auth__retour-site" href="' . esc_url( home_url( '/' ) ) . '">' . esc_html__( '← Retour au site', 'espace-traiteur' ) . '</a>';
+		echo '<div class="etr-auth__contenu">';
 		self::logo();
 
 		if ( 'mot-de-passe-oublie' === $vue ) {
@@ -416,7 +423,7 @@ class ETR_Comptes {
 	 * Panneau de gauche : photo d'ambiance et accroche.
 	 */
 	private static function panneau_visuel() {
-		$image_id = (int) get_option( 'etr_image_connexion' );
+		$image_id = self::photo_id();
 		$classe   = 'etr-auth__visuel' . ( $image_id ? '' : ' etr-auth__visuel--sans-image' );
 
 		echo '<div class="' . esc_attr( $classe ) . '" aria-hidden="true">';
@@ -440,14 +447,152 @@ class ETR_Comptes {
 	}
 
 	/**
-	 * Logo (réglage, sinon logo du thème, sinon nom du site).
+	 * Logo de la page de connexion : réglage, sinon logo du site détecté automatiquement.
+	 *
+	 * @param bool $defaut_seulement Ignorer le réglage (aperçu du choix par défaut).
+	 * @return int ID de pièce jointe, 0 si aucun.
+	 */
+	public static function logo_id( $defaut_seulement = false ) {
+		$id = $defaut_seulement ? 0 : (int) get_option( 'etr_logo' );
+		if ( $id && wp_attachment_is_image( $id ) ) {
+			return $id;
+		}
+		return self::defaut(
+			'logo',
+			function () {
+				// 1. Logo du thème (Apparence › Personnaliser › Identité du site).
+				$id = (int) get_theme_mod( 'custom_logo' );
+				if ( $id ) {
+					return $id;
+				}
+				// 2. Logo des réglages du site Elementor.
+				$kit = (int) get_option( 'elementor_active_kit' );
+				if ( $kit ) {
+					$reglages = get_post_meta( $kit, '_elementor_page_settings', true );
+					if ( ! empty( $reglages['site_logo']['id'] ) ) {
+						return (int) $reglages['site_logo']['id'];
+					}
+				}
+				// 3. Fichier du logo dans la médiathèque.
+				return self::chercher_image( (array) apply_filters( 'etr_logos_par_defaut', array( 'maison-aname-logo1', 'maison-aname-logo', 'logo' ) ) );
+			}
+		);
+	}
+
+	/**
+	 * Photo d'ambiance : réglage, sinon une photo du site détectée automatiquement.
+	 *
+	 * @param bool $defaut_seulement Ignorer le réglage (aperçu du choix par défaut).
+	 * @return int ID de pièce jointe, 0 si aucune.
+	 */
+	public static function photo_id( $defaut_seulement = false ) {
+		$id = $defaut_seulement ? 0 : (int) get_option( 'etr_image_connexion' );
+		if ( $id && wp_attachment_is_image( $id ) ) {
+			return $id;
+		}
+		return self::defaut(
+			'photo',
+			function () {
+				// 1. Photos d'ambiance de la page d'accueil de maisonaname.com.
+				$id = self::chercher_image(
+					(array) apply_filters(
+						'etr_photos_par_defaut',
+						array( 'location-art-de-la-table-mariage-nancy', 'location-vaisselle-mariage', 'location-mobilier-mariage-decoration-maison-anna-nancy' )
+					)
+				);
+				if ( $id ) {
+					return $id;
+				}
+				// 2. Image d'une catégorie de produits WooCommerce.
+				foreach ( array( 'art-de-la-table', 'mobilier', 'decoration' ) as $slug ) {
+					$terme = get_term_by( 'slug', $slug, 'product_cat' );
+					$id    = $terme ? (int) get_term_meta( $terme->term_id, 'thumbnail_id', true ) : 0;
+					if ( $id ) {
+						return $id;
+					}
+				}
+				// 3. Image mise en avant de la page d'accueil.
+				$accueil = (int) get_option( 'page_on_front' );
+				return $accueil ? (int) get_post_thumbnail_id( $accueil ) : 0;
+			}
+		);
+	}
+
+	/**
+	 * Image par défaut, mémorisée 12 h pour ne pas refaire la recherche à chaque visite.
+	 *
+	 * @param string   $type      « logo » ou « photo ».
+	 * @param callable $recherche Recherche à lancer si rien n'est mémorisé.
+	 * @return int
+	 */
+	private static function defaut( $type, $recherche ) {
+		$cle = 'etr_' . $type . '_defaut';
+		$id  = get_transient( $cle );
+		if ( false === $id || ( $id && ! wp_attachment_is_image( (int) $id ) ) ) {
+			$id = (int) call_user_func( $recherche );
+			$id = ( $id && wp_attachment_is_image( $id ) ) ? $id : 0;
+			set_transient( $cle, (string) $id, 12 * HOUR_IN_SECONDS );
+		}
+		return (int) $id;
+	}
+
+	/**
+	 * Oublie les images par défaut mémorisées (après un changement de réglages ou de médiathèque).
+	 */
+	public static function oublier_defauts() {
+		delete_transient( 'etr_logo_defaut' );
+		delete_transient( 'etr_photo_defaut' );
+	}
+
+	/**
+	 * Cherche une image de la médiathèque d'après le nom de son fichier (sans extension).
+	 *
+	 * @param string[] $noms Noms de fichiers, par ordre de préférence.
+	 * @return int
+	 */
+	private static function chercher_image( $noms ) {
+		foreach ( $noms as $nom ) {
+			$nom = sanitize_file_name( $nom );
+			if ( '' === $nom ) {
+				continue;
+			}
+			$ids = get_posts(
+				array(
+					'post_type'      => 'attachment',
+					'post_status'    => 'inherit',
+					'post_mime_type' => 'image',
+					'numberposts'    => 1,
+					'fields'         => 'ids',
+					'orderby'        => 'ID',
+					'order'          => 'ASC',
+					'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+						'relation' => 'OR',
+						array(
+							'key'     => '_wp_attached_file',
+							'value'   => '/' . $nom . '.',
+							'compare' => 'LIKE',
+						),
+						array(
+							'key'     => '_wp_attached_file',
+							'value'   => '/' . $nom . '-scaled.',
+							'compare' => 'LIKE',
+						),
+					),
+				)
+			);
+			if ( $ids ) {
+				return (int) $ids[0];
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * Logo (réglage, sinon logo du site détecté, sinon nom du site).
 	 */
 	private static function logo() {
-		$logo_id = (int) get_option( 'etr_logo' );
-		if ( ! $logo_id ) {
-			$logo_id = (int) get_theme_mod( 'custom_logo' );
-		}
-		$site = get_bloginfo( 'name' );
+		$logo_id = self::logo_id();
+		$site    = get_bloginfo( 'name' );
 
 		echo '<a class="etr-auth__logo" href="' . esc_url( home_url( '/' ) ) . '">';
 		if ( $logo_id ) {

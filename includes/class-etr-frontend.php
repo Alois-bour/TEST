@@ -29,6 +29,20 @@ class ETR_Frontend {
 		add_action( 'wp_ajax_etr_disponibilites', array( __CLASS__, 'ajax_disponibilites' ) );
 		add_filter( 'body_class', array( __CLASS__, 'classe_body' ) );
 		add_filter( 'hello_elementor_page_title', array( __CLASS__, 'titre_theme' ) );
+		add_filter( 'template_include', array( __CLASS__, 'gabarit_plein_ecran' ), 99 );
+	}
+
+	/**
+	 * Connexion en plein écran : page autonome, sans l'en-tête ni le pied de page du thème.
+	 *
+	 * @param string $gabarit Gabarit prévu par le thème.
+	 * @return string
+	 */
+	public static function gabarit_plein_ecran( $gabarit ) {
+		if ( is_user_logged_in() || ! self::sur_page_espace() || ! get_option( 'etr_connexion_plein_ecran', '1' ) ) {
+			return $gabarit;
+		}
+		return ETR_DIR . 'templates/connexion.php';
 	}
 
 	/**
@@ -49,6 +63,9 @@ class ETR_Frontend {
 	public static function classe_body( $classes ) {
 		if ( ! is_user_logged_in() && self::sur_page_espace() ) {
 			$classes[] = 'etr-page-connexion';
+			if ( get_option( 'etr_connexion_plein_ecran', '1' ) ) {
+				$classes[] = 'etr-plein-ecran';
+			}
 		}
 		return $classes;
 	}
