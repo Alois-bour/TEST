@@ -26,15 +26,103 @@ class ETR_Frontend {
 		add_shortcode( 'espace_traiteur', array( __CLASS__, 'shortcode' ) );
 		add_action( 'template_redirect', array( __CLASS__, 'traiter_formulaires' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'assets' ) );
+		add_action( 'wp_ajax_etr_disponibilites', array( __CLASS__, 'ajax_disponibilites' ) );
 	}
 
 	/**
-	 * Feuille de style sur la page contenant le shortcode.
+	 * Styles et script sur la page contenant le shortcode.
 	 */
 	public static function assets() {
-		if ( is_singular() && has_shortcode( (string) get_post_field( 'post_content', get_queried_object_id() ), 'espace_traiteur' ) ) {
-			wp_enqueue_style( 'espace-traiteur', ETR_URL . 'assets/css/espace-traiteur.css', array(), ETR_VERSION );
+		if ( ! is_singular() || ! has_shortcode( (string) get_post_field( 'post_content', get_queried_object_id() ), 'espace_traiteur' ) ) {
+			return;
 		}
+		wp_enqueue_style( 'espace-traiteur', ETR_URL . 'assets/css/espace-traiteur.css', array(), ETR_VERSION );
+
+		if ( etr_est_traiteur() ) {
+			wp_enqueue_script( 'espace-traiteur', ETR_URL . 'assets/js/espace-traiteur.js', array(), ETR_VERSION, true );
+			wp_localize_script(
+				'espace-traiteur',
+				'etrDispo',
+				array(
+					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( 'etr_disponibilites' ),
+					'i18n'    => array(
+						'chargement' => __( 'Calcul des disponibilités…', 'espace-traiteur' ),
+						'erreur'     => __( 'Impossible de calculer les disponibilités pour le moment.', 'espace-traiteur' ),
+						'sansDate'   => __( 'Choisissez la date de l’événement pour voir les quantités disponibles.', 'espace-traiteur' ),
+					),
+				)
+			);
+		}
+	}
+
+	/**
+	 * AJAX : disponibilités de tout le catalogue pour les dates saisies.
+	 */
+	public static function ajax_disponibilites() {
+		check_ajax_referer( 'etr_disponibilites', 'nonce' );
+		if ( ! etr_est_traiteur() ) {
+			wp_send_json_error( array( 'message' => __( 'Accès refusé.', 'espace-traiteur' ) ), 403 );
+		}
+
+		$dates = array();
+		foreach ( array( 'date_evenement', 'date_livraison', 'date_reprise' ) as $cle ) {
+			$valeur        = isset( $_POST[ $cle ] ) ? sanitize_text_field( wp_unslash( $_POST[ $cle ] ) ) : '';
+			$dates[ $cle ] = etr_date_valide( $valeur ) ? $valeur : '';
+		}
+		list( $debut, $fin ) = etr_periode( $dates['date_evenement'], $dates['date_livraison'], $dates['date_reprise'] );
+		if ( ! $debut ) {
+			wp_send_json_error( array( 'message' => __( 'Choisissez la date de l’événement pour voir les quantités disponibles.', 'espace-traiteur' ) ) );
+		}
+
+		wp_send_json_success(
+			array(
+				'periode'  => self::texte_periode( $debut, $fin ),
+				'articles' => self::disponibilites_catalogue( etr_quantites_reservees( $debut, $fin ) ),
+			)
+		);
+	}
+
+	/**
+	 * Disponibilité de chaque article publié.
+	 *
+	 * @param array $reservees Quantités réservées par article.
+	 * @return array<int,array{dispo:int|null,texte:string}>
+	 */
+	private static function disponibilites_catalogue( $reservees ) {
+		$resultat = array();
+		$ids      = get_posts(
+			array(
+				'post_type'   => 'etr_article',
+				'post_status' => 'publish',
+				'numberposts' => -1,
+				'fields'      => 'ids',
+			)
+		);
+		foreach ( $ids as $id ) {
+			$dispo           = etr_disponibilite( $id, $reservees );
+			$resultat[ $id ] = array(
+				'dispo' => $dispo,
+				'texte' => etr_texte_disponibilite( $id, $dispo ),
+			);
+		}
+		return $resultat;
+	}
+
+	/**
+	 * Phrase décrivant la période de calcul.
+	 *
+	 * @param string $debut Début.
+	 * @param string $fin   Fin.
+	 * @return string
+	 */
+	private static function texte_periode( $debut, $fin ) {
+		if ( $debut === $fin ) {
+			/* translators: %s : date. */
+			return sprintf( __( 'Disponibilités pour le %s.', 'espace-traiteur' ), etr_format_date( $debut ) );
+		}
+		/* translators: 1 : date de début, 2 : date de fin. */
+		return sprintf( __( 'Disponibilités du %1$s au %2$s (livraison → reprise).', 'espace-traiteur' ), etr_format_date( $debut ), etr_format_date( $fin ) );
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -75,7 +163,7 @@ class ETR_Frontend {
 			if ( 'number' === $champ['type'] && '' !== $valeur ) {
 				$valeur = (string) absint( $valeur );
 			}
-			if ( 'date' === $champ['type'] && '' !== $valeur && ! self::date_valide( $valeur ) ) {
+			if ( 'date' === $champ['type'] && '' !== $valeur && ! etr_date_valide( $valeur ) ) {
 				/* translators: %s : libellé du champ. */
 				self::$erreurs[] = sprintf( __( 'La date « %s » est invalide.', 'espace-traiteur' ), $champ['label'] );
 				$valeur          = '';
@@ -95,7 +183,10 @@ class ETR_Frontend {
 			self::$erreurs[] = __( 'La date de reprise doit être postérieure à la date de livraison.', 'espace-traiteur' );
 		}
 
-		// Articles du catalogue.
+		// Articles du catalogue, contrôlés selon la disponibilité sur la période.
+		list( $debut, $fin ) = etr_periode( $donnees['date_evenement'], $donnees['date_livraison'], $donnees['date_reprise'] );
+		$reservees           = $debut ? etr_quantites_reservees( $debut, $fin ) : array();
+
 		$quantites = isset( $_POST['quantites'] ) && is_array( $_POST['quantites'] ) ? wp_unslash( $_POST['quantites'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- converti en entiers ci-dessous.
 		$lignes    = array();
 		foreach ( $quantites as $article_id => $quantite ) {
@@ -108,13 +199,16 @@ class ETR_Frontend {
 			if ( ! $article || 'etr_article' !== $article->post_type || 'publish' !== $article->post_status ) {
 				continue;
 			}
-			$stock = get_post_meta( $article_id, '_etr_stock', true );
-			if ( '' !== $stock && $quantite > (int) $stock ) {
+			$dispo = etr_disponibilite( $article_id, $reservees );
+			if ( 0 === $dispo ) {
+				/* translators: %s : article. */
+				self::$erreurs[] = sprintf( __( '« %s » n’est plus disponible sur ces dates.', 'espace-traiteur' ), $article->post_title );
+			} elseif ( null !== $dispo && $quantite > $dispo ) {
 				self::$erreurs[] = sprintf(
 					/* translators: 1 : article, 2 : quantité disponible. */
-					__( 'La quantité demandée pour « %1$s » dépasse la quantité disponible (%2$s).', 'espace-traiteur' ),
+					__( 'La quantité demandée pour « %1$s » dépasse la quantité disponible sur ces dates (%2$s).', 'espace-traiteur' ),
 					$article->post_title,
-					number_format_i18n( (int) $stock )
+					number_format_i18n( $dispo )
 				);
 			}
 			$lignes[] = array(
@@ -189,17 +283,6 @@ class ETR_Frontend {
 
 		wp_safe_redirect( etr_url( array( 'etr_msg' => 'annulee' ) ) );
 		exit;
-	}
-
-	/**
-	 * Vérifie une date au format AAAA-MM-JJ.
-	 *
-	 * @param string $date Date.
-	 * @return bool
-	 */
-	private static function date_valide( $date ) {
-		$d = DateTime::createFromFormat( 'Y-m-d', $date );
-		return $d && $d->format( 'Y-m-d' ) === $date;
 	}
 
 	/**
@@ -496,7 +579,11 @@ class ETR_Frontend {
 			)
 		);
 
-		echo '<fieldset class="etr-fieldset"><legend>' . esc_html__( 'Mobilier, vaisselle et matériel', 'espace-traiteur' ) . '</legend>';
+		// Après une erreur, les dates sont connues : on affiche directement les disponibilités.
+		list( $debut, $fin ) = etr_periode( self::ancienne_valeur( 'date_evenement' ), self::ancienne_valeur( 'date_livraison' ), self::ancienne_valeur( 'date_reprise' ) );
+		$reservees           = $debut ? etr_quantites_reservees( $debut, $fin ) : null;
+
+		echo '<fieldset class="etr-fieldset etr-catalogue"><legend>' . esc_html__( 'Mobilier, vaisselle et matériel', 'espace-traiteur' ) . '</legend>';
 
 		if ( ! $articles ) {
 			echo '<p>' . esc_html__( 'Le catalogue est vide pour le moment : décrivez vos besoins dans « Autres besoins ».', 'espace-traiteur' ) . '</p></fieldset>';
@@ -510,6 +597,8 @@ class ETR_Frontend {
 			$groupes[ $categorie ][] = $article;
 		}
 		ksort( $groupes );
+
+		echo '<p class="etr-dispo-info" aria-live="polite">' . esc_html( $debut ? self::texte_periode( $debut, $fin ) : __( 'Choisissez la date de l’événement pour voir les quantités disponibles.', 'espace-traiteur' ) ) . '</p>';
 
 		foreach ( $groupes as $categorie => $liste ) {
 			$ouvert = false;
@@ -526,7 +615,10 @@ class ETR_Frontend {
 				$ref   = get_post_meta( $article->ID, '_etr_reference', true );
 				$id    = 'etr-qte-' . $article->ID;
 
-				echo '<li class="etr-article">';
+				$dispo   = etr_disponibilite( $article->ID, $reservees );
+				$indispo = 0 === $dispo;
+
+				echo '<li class="etr-article' . ( $indispo ? ' etr-article--indispo' : '' ) . '" data-article="' . (int) $article->ID . '">';
 				if ( has_post_thumbnail( $article ) ) {
 					echo get_the_post_thumbnail( $article, 'thumbnail', array( 'class' => 'etr-article__img' ) );
 				}
@@ -538,17 +630,22 @@ class ETR_Frontend {
 				if ( $description ) {
 					echo '<p class="etr-article__desc">' . esc_html( $description ) . '</p>';
 				}
-				if ( '' !== $stock ) {
-					/* translators: %s : quantité disponible. */
-					echo '<p class="etr-muted">' . esc_html( sprintf( __( 'Disponible : %s', 'espace-traiteur' ), number_format_i18n( (int) $stock ) . ( $unite ? ' ' . $unite : '' ) ) ) . '</p>';
+				if ( null !== $reservees || $indispo ) {
+					$texte_dispo = etr_texte_disponibilite( $article->ID, $dispo );
+				} elseif ( '' !== $stock ) {
+					/* translators: %s : stock total. */
+					$texte_dispo = sprintf( __( 'Stock total : %s', 'espace-traiteur' ), number_format_i18n( (int) $stock ) . ( $unite ? ' ' . $unite : '' ) );
+				} else {
+					$texte_dispo = '';
 				}
+				echo '<p class="etr-muted etr-dispo">' . esc_html( $texte_dispo ) . '</p>';
 				echo '</div>';
 				printf(
 					'<input type="number" class="etr-article__qte" id="%1$s" name="quantites[%2$d]" min="0" step="1"%3$s value="%4$s" placeholder="0" aria-label="%5$s">',
 					esc_attr( $id ),
 					(int) $article->ID,
-					'' !== $stock ? ' max="' . (int) $stock . '"' : '',
-					esc_attr( self::ancienne_quantite( $article->ID ) ),
+					( null !== $dispo ? ' max="' . (int) $dispo . '"' : '' ) . ( $indispo ? ' disabled' : '' ),
+					esc_attr( $indispo ? '' : self::ancienne_quantite( $article->ID ) ),
 					/* translators: %s : article. */
 					esc_attr( sprintf( __( 'Quantité pour %s', 'espace-traiteur' ), get_the_title( $article ) ) )
 				);

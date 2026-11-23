@@ -154,3 +154,16 @@
 /* Admin */
 .etr-details.form-table th { width: 200px; padding: 8px 10px 8px 0; }
 .etr-details.form-table td { padding: 8px 10px; }
+
+/* Disponibilités */
+.etr-dispo-info {
+	margin: 0 0 8px;
+	padding: 8px 12px;
+	background: var(--etr-fond);
+	border-radius: 6px;
+	font-size: .95em;
+}
+.etr-article--indispo .etr-article__infos,
+.etr-article--indispo .etr-article__img { opacity: .5; }
+.etr-article--indispo .etr-dispo { color: #a12622; font-weight: 600; opacity: 1; }
+.etr-alerte { color: #a12622; font-weight: 600; }

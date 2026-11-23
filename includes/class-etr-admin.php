@@ -103,7 +103,7 @@ class ETR_Admin {
 	 * @param WP_Post $post Demande.
 	 */
 	public static function mb_lignes( $post ) {
-		echo etr_lignes_html( $post->ID ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans etr_lignes_html().
+		echo etr_lignes_html( $post->ID, true ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans etr_lignes_html().
 	}
 
 	/**

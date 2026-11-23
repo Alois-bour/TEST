@@ -30,10 +30,20 @@ Sur la page **Espace traiteur**, le traiteur :
 - se connecte (formulaire intégré à la page) ;
 - voit la liste de **ses** demandes et leur statut (il ne voit jamais celles des autres) ;
 - crée une demande : événement, date, nombre d'invités, lieu, dates de livraison et de reprise, contact sur place, articles du catalogue avec quantités, besoins hors catalogue ;
+- choisit parmi le mobilier et la vaisselle **disponibles à ses dates** : dès qu'il saisit la date, chaque article affiche la quantité encore libre et les articles complets sont grisés ;
 - consulte le détail et la réponse de l'équipe ;
 - peut annuler une demande tant qu'elle est « En attente ».
 
 Les traiteurs n'ont pas accès à l'administration WordPress : ils sont renvoyés vers leur espace et la barre d'admin est masquée.
+
+## Disponibilités
+
+- La **quantité disponible** saisie sur un article est son stock total. Vide = illimité, 0 = indisponible (ex. : en réparation).
+- Le matériel est bloqué de la **date de livraison** (ou du jour J) jusqu'à la **date de reprise** (ou au jour J).
+- Les demandes **En attente**, **Validée** et **Livrée** bloquent le matériel. Une demande **Refusée**, **Annulée** ou **Clôturée** le libère.
+- Le contrôle est fait deux fois : à l'affichage (mise à jour dès le choix des dates) et à l'envoi (le serveur refuse toute quantité supérieure à ce qui reste).
+- Dans l'admin, la fiche d'une demande indique pour chaque article ce qui reste disponible sur la période, hors cette demande, et signale en rouge un manque.
+- Calcul prudent : toute demande dont la période chevauche celle demandée est déduite, même si elles ne se chevauchent pas entre elles.
 
 ## Notifications e-mail
 
@@ -54,6 +64,7 @@ add_filter( 'etr_email_equipe', fn() => 'logistique@exemple.fr' );
 - `etr_statuts` : modifier la liste des statuts.
 - `etr_champs_demande` : ajouter ou retirer des champs du formulaire.
 - `etr_email_equipe` : destinataire(s) des e-mails côté équipe.
+- `etr_statuts_reservant` : statuts qui bloquent le matériel.
 - Actions : `etr_demande_creee`, `etr_demande_annulee`, `etr_statut_change` (`$id, $ancien, $nouveau`).
 
 ## Structure
@@ -68,11 +79,11 @@ includes/class-etr-admin.php        Écrans d'administration
 includes/class-etr-frontend.php     Espace traiteur (shortcode)
 includes/class-etr-notifications.php E-mails
 assets/css/espace-traiteur.css      Styles
+assets/js/espace-traiteur.js        Mise à jour des disponibilités selon les dates
 uninstall.php                       Nettoyage à la désinstallation
 ```
 
 ## Limites actuelles / pistes
 
-- Le stock est une quantité maximale par demande : il n'est pas encore décompté selon les dates (pas de réservation sur un calendrier).
 - L'équipe ne peut pas encore modifier les quantités d'une demande depuis l'admin (elle répond via le message).
 - Pas encore d'export (PDF / CSV) des demandes.
