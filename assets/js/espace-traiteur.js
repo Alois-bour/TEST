@@ -41,12 +41,7 @@
 
 			var indispo = donnee.dispo === 0;
 			input.max = donnee.dispo;
-			input.disabled = indispo;
-			if ( indispo ) {
-				input.value = '';
-			} else if ( input.value && parseInt( input.value, 10 ) > donnee.dispo ) {
-				input.value = donnee.dispo;
-			}
+			input.disabled = indispo && ! input.value;
 			ligne.classList.toggle( 'etr-article--indispo', indispo );
 		} );
 	}
