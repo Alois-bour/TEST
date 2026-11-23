@@ -179,3 +179,10 @@
 }
 .etr-article__meta { font-size: .9em; }
 .etr-article__prix { font-weight: 600; margin-right: 8px; }
+
+/* Admin : récapitulatif du catalogue */
+.etr-recap { max-width: 900px; }
+.etr-recap__chiffres { font-size: 1.15em; }
+.etr-recap__table { margin-bottom: 16px; }
+.etr-recap__illimites summary { cursor: pointer; font-weight: 600; margin: 8px 0; }
+.etr-recap__illimites ul { columns: 2; margin-left: 20px; list-style: disc; }

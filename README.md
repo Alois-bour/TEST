@@ -8,6 +8,7 @@ Quand WooCommerce est actif (cas de maisonaname.com), le plugin **reprend direct
 
 - Sont proposés les produits **publiés** et visibles dans le catalogue, regroupés par famille et sous-catégorie (ex. *Mobilier › Tables*, *Art de la table › Verrerie*).
 - *Espace traiteur › Réglages* : choisir les catégories proposées (toutes par défaut), afficher ou non les prix du site, e-mail de l'équipe.
+- En haut de cette page, un **récapitulatif** indique le nombre de produits publiés, proposés et écartés, la liste des produits écartés avec la raison (non publié, visibilité « Masqué », case « Masquer » cochée, hors des catégories proposées), et les produits proposés sans quantité possédée.
 - Sur chaque produit, onglet **Inventaire**, bloc « Espace traiteur » :
   - **Quantité possédée** : nombre de pièces réservables par les traiteurs ;
   - **Unité** (pièce(s), lot(s) de 10…) ;

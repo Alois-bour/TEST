@@ -121,6 +121,7 @@ class ETR_Admin {
 		$termes    = is_wp_error( $termes ) ? array() : $termes;
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Réglages de l’espace traiteur', 'espace-traiteur' ) . '</h1>';
+		self::recapitulatif();
 		echo '<form method="post" action="options.php">';
 		settings_fields( 'etr_reglages' );
 		echo '<table class="form-table" role="presentation"><tbody>';
@@ -151,6 +152,64 @@ class ETR_Admin {
 	}
 
 	/**
+	 * Récapitulatif du catalogue proposé aux traiteurs.
+	 */
+	private static function recapitulatif() {
+		$recap = etr_recapitulatif_catalogue();
+
+		echo '<div class="etr-recap">';
+		echo '<h2>' . esc_html__( 'Récapitulatif du catalogue', 'espace-traiteur' ) . '</h2>';
+		echo '<p class="etr-recap__chiffres">';
+		printf(
+			/* translators: 1 : produits publiés, 2 : produits proposés, 3 : produits écartés. */
+			esc_html__( '%1$s publiés · %2$s proposés aux traiteurs · %3$s écartés', 'espace-traiteur' ),
+			'<strong>' . esc_html( number_format_i18n( $recap['publies'] ) ) . '</strong>',
+			'<strong>' . esc_html( number_format_i18n( $recap['proposes'] ) ) . '</strong>',
+			'<strong>' . esc_html( number_format_i18n( count( $recap['ecartes'] ) ) ) . '</strong>'
+		);
+		echo '</p>';
+
+		if ( $recap['ecartes'] ) {
+			echo '<h3>' . esc_html__( 'Produits écartés', 'espace-traiteur' ) . '</h3>';
+			echo '<table class="widefat striped etr-recap__table"><thead><tr><th>' . esc_html__( 'Produit', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'Raison', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
+			foreach ( $recap['ecartes'] as $ligne ) {
+				echo '<tr><td>' . self::lien_produit( $ligne ) . '</td><td>' . esc_html( $ligne['raison'] ) . '</td></tr>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans lien_produit().
+			}
+			echo '</tbody></table>';
+		} else {
+			echo '<p>' . esc_html__( 'Aucun produit écarté : tous les produits publiés sont proposés.', 'espace-traiteur' ) . '</p>';
+		}
+
+		if ( $recap['illimites'] ) {
+			echo '<details class="etr-recap__illimites"><summary>';
+			$nombre = count( $recap['illimites'] );
+			printf(
+				/* translators: %s : nombre de produits. */
+				esc_html( _n( '%s produit proposé sans quantité possédée (réservable sans limite)', '%s produits proposés sans quantité possédée (réservables sans limite)', $nombre, 'espace-traiteur' ) ),
+				esc_html( number_format_i18n( $nombre ) )
+			);
+			echo '</summary><p class="description">' . esc_html__( 'Renseignez la « Quantité possédée » (onglet Inventaire du produit) pour que les réservations soient limitées.', 'espace-traiteur' ) . '</p><ul>';
+			foreach ( $recap['illimites'] as $ligne ) {
+				echo '<li>' . self::lien_produit( $ligne ) . '</li>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans lien_produit().
+			}
+			echo '</ul></details>';
+		}
+		echo '</div><hr>';
+	}
+
+	/**
+	 * Lien vers la fiche d'édition d'un produit.
+	 *
+	 * @param array $ligne Ligne du récapitulatif.
+	 * @return string
+	 */
+	private static function lien_produit( $ligne ) {
+		return $ligne['lien']
+			? '<a href="' . esc_url( $ligne['lien'] ) . '">' . esc_html( $ligne['titre'] ) . '</a>'
+			: esc_html( $ligne['titre'] );
+	}
+
+	/**
 	 * Cases à cocher des catégories, en arbre.
 	 *
 	 * @param WP_Term[] $termes   Tous les termes.
@@ -164,7 +223,7 @@ class ETR_Admin {
 				continue;
 			}
 			printf(
-				'<label style="display:block;margin-left:%1$dpx"><input type="checkbox" name="etr_categories[]" value="%2$d"%3$s> %4$s <span class="description">(%5$d)</span></label>',
+				'<label style="display:block;padding-left:%1$dpx"><input type="checkbox" name="etr_categories[]" value="%2$d"%3$s> %4$s <span class="description">(%5$d)</span></label>',
 				(int) $niveau * 20,
 				(int) $terme->term_id,
 				checked( in_array( (int) $terme->term_id, $retenues, true ), true, false ),

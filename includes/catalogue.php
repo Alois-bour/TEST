@@ -122,19 +122,108 @@ function etr_dans_categories_retenues( $post_id ) {
 }
 
 /**
+ * Pourquoi un produit WooCommerce n'est pas proposé aux traiteurs.
+ *
+ * @param WC_Product $produit Produit.
+ * @return string Raison, ou chaîne vide si le produit est proposé.
+ */
+function etr_raison_exclusion_produit( $produit ) {
+	if ( 'publish' !== $produit->get_status() ) {
+		return __( 'Produit non publié', 'espace-traiteur' );
+	}
+	if ( $produit->is_type( 'variation' ) ) {
+		return __( 'Variation d’un produit', 'espace-traiteur' );
+	}
+	if ( 'hidden' === $produit->get_catalog_visibility() ) {
+		return __( 'Visibilité du catalogue WooCommerce : « Masqué »', 'espace-traiteur' );
+	}
+	if ( 'yes' === $produit->get_meta( '_etr_masquer' ) ) {
+		return __( 'Case « Masquer » de l’espace traiteur cochée sur le produit', 'espace-traiteur' );
+	}
+	if ( ! etr_dans_categories_retenues( $produit->get_id() ) ) {
+		return __( 'Hors des catégories proposées (Réglages)', 'espace-traiteur' );
+	}
+	return '';
+}
+
+/**
+ * Récapitulatif du catalogue : ce qui est proposé, ce qui est écarté et pourquoi.
+ *
+ * @return array{publies:int,proposes:int,ecartes:array,illimites:array}
+ */
+function etr_recapitulatif_catalogue() {
+	$recap = array(
+		'publies'   => 0,
+		'proposes'  => 0,
+		'ecartes'   => array(),
+		'illimites' => array(),
+	);
+
+	if ( etr_source_woocommerce() ) {
+		$elements = wc_get_products(
+			array(
+				'status'  => 'publish',
+				'limit'   => -1,
+				'orderby' => 'title',
+				'order'   => 'ASC',
+			)
+		);
+		foreach ( $elements as $produit ) {
+			++$recap['publies'];
+			$raison = etr_raison_exclusion_produit( $produit );
+			$ligne  = array(
+				'id'    => $produit->get_id(),
+				'titre' => wp_strip_all_tags( $produit->get_name() ),
+				'lien'  => get_edit_post_link( $produit->get_id(), 'raw' ),
+			);
+			if ( '' !== $raison ) {
+				$recap['ecartes'][] = $ligne + array( 'raison' => $raison );
+				continue;
+			}
+			++$recap['proposes'];
+			if ( null === etr_stock_total( $produit->get_id() ) ) {
+				$recap['illimites'][] = $ligne;
+			}
+		}
+	} else {
+		$posts = get_posts(
+			array(
+				'post_type'   => 'etr_article',
+				'post_status' => 'publish',
+				'numberposts' => -1,
+				'orderby'     => 'title',
+				'order'       => 'ASC',
+			)
+		);
+		foreach ( $posts as $post ) {
+			++$recap['publies'];
+			$ligne = array(
+				'id'    => $post->ID,
+				'titre' => get_the_title( $post ),
+				'lien'  => get_edit_post_link( $post->ID, 'raw' ),
+			);
+			if ( ! etr_dans_categories_retenues( $post->ID ) ) {
+				$recap['ecartes'][] = $ligne + array( 'raison' => __( 'Hors des catégories proposées (Réglages)', 'espace-traiteur' ) );
+				continue;
+			}
+			++$recap['proposes'];
+			if ( null === etr_stock_total( $post->ID ) ) {
+				$recap['illimites'][] = $ligne;
+			}
+		}
+	}
+
+	return $recap;
+}
+
+/**
  * Article normalisé à partir d'un produit WooCommerce.
  *
  * @param WC_Product $produit Produit.
  * @return array|null
  */
 function etr_article_depuis_produit( $produit ) {
-	if ( ! $produit || 'publish' !== $produit->get_status() || $produit->is_type( 'variation' ) ) {
-		return null;
-	}
-	if ( 'hidden' === $produit->get_catalog_visibility() || 'yes' === $produit->get_meta( '_etr_masquer' ) ) {
-		return null;
-	}
-	if ( ! etr_dans_categories_retenues( $produit->get_id() ) ) {
+	if ( ! $produit || '' !== etr_raison_exclusion_produit( $produit ) ) {
 		return null;
 	}
 
