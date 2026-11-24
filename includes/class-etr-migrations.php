@@ -57,8 +57,25 @@ class ETR_Migrations {
 				'description' => __( 'Rôle Traiteur : accès limité à l’espace traiteur (retrait du droit « read »).', 'espace-traiteur' ),
 				'callback'    => array( 'ETR_Installer', 'roles' ),
 			),
+			'1.5.0' => array(
+				'description' => __( 'Espace de gestion : adresse /gestion-traiteur/ et disposition par défaut de l’écran des demandes.', 'espace-traiteur' ),
+				'callback'    => array( __CLASS__, 'migrer_1_5_0' ),
+			),
 		);
 		return (array) apply_filters( 'etr_migrations', $etapes );
+	}
+
+	/**
+	 * 1.5.0 : enregistre l'adresse de l'espace de gestion et rétablit la disposition
+	 * des boîtes de l'écran « Traiter la demande » (boîtes déplacées dans la colonne latérale).
+	 *
+	 * @return true
+	 */
+	public static function migrer_1_5_0() {
+		ETR_Gestion::regle_reecriture();
+		flush_rewrite_rules( false );
+		delete_metadata( 'user', 0, 'meta-box-order_etr_demande', '', true );
+		return true;
 	}
 
 	/**

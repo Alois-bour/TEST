@@ -423,7 +423,7 @@ class ETR_Frontend {
 	 * @param string $nom Nom de l'icône.
 	 * @return string
 	 */
-	private static function icone( $nom ) {
+	public static function icone( $nom ) {
 		$traces = array(
 			'demandes'    => '<path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
 			'plus'        => '<path d="M12 5v14M5 12h14"/>',
@@ -439,6 +439,15 @@ class ETR_Frontend {
 			'message'     => '<path d="M4 5h16v11H8l-4 4z"/>',
 			'coche'       => '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
 			'image'       => '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5.5-5.5L5 20"/>',
+			'accueil'     => '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+			'catalogue'   => '<path d="M3 7.5L12 3l9 4.5-9 4.5z"/><path d="M3 7.5V16.5L12 21l9-4.5V7.5M12 12v9"/>',
+			'reglages'    => '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+			'alerte'      => '<path d="M12 3.5L2.5 20h19z"/><path d="M12 10v4.5M12 17.5h.01"/>',
+			'courriel'    => '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5L12 13l8.5-6.5"/>',
+			'telephone'   => '<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2z"/>',
+			'externe'     => '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+			'reprise'     => '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
+			'fete'        => '<path d="M8 21h8M12 15v6M6 3h12l-1 7a5 5 0 0 1-10 0z"/>',
 		);
 		if ( ! isset( $traces[ $nom ] ) ) {
 			return '';
@@ -596,7 +605,7 @@ class ETR_Frontend {
 	 * @param string $classe Classe supplémentaire.
 	 * @return string
 	 */
-	private static function bloc_date( $date, $classe = '' ) {
+	public static function bloc_date( $date, $classe = '' ) {
 		$ts = etr_date_valide( $date ) ? strtotime( $date ) : false;
 		if ( ! $ts ) {
 			return '<span class="etr-date ' . esc_attr( $classe ) . '" aria-hidden="true"><span class="etr-date__jour">–</span></span>';
@@ -615,7 +624,7 @@ class ETR_Frontend {
 	 * @param string $date Date AAAA-MM-JJ.
 	 * @return string
 	 */
-	private static function texte_delai( $date ) {
+	public static function texte_delai( $date ) {
 		$jours = (int) round( ( strtotime( $date ) - strtotime( current_time( 'Y-m-d' ) ) ) / DAY_IN_SECONDS );
 		if ( 0 === $jours ) {
 			return __( 'Aujourd’hui', 'espace-traiteur' );
@@ -633,7 +642,7 @@ class ETR_Frontend {
 	 * @param int $demande_id ID.
 	 * @return string
 	 */
-	private static function lieu_court( $demande_id ) {
+	public static function lieu_court( $demande_id ) {
 		$lignes = preg_split( '/\R/', trim( (string) get_post_meta( $demande_id, '_etr_lieu', true ) ) );
 		return $lignes ? $lignes[0] : '';
 	}
@@ -644,7 +653,7 @@ class ETR_Frontend {
 	 * @param int $demande_id ID.
 	 * @return string
 	 */
-	private static function texte_articles( $demande_id ) {
+	public static function texte_articles( $demande_id ) {
 		$nb = count( etr_get_lignes( $demande_id ) );
 		if ( ! $nb ) {
 			return __( 'Hors catalogue', 'espace-traiteur' );

@@ -514,19 +514,32 @@ class ETR_Admin {
 			return;
 		}
 
-		$ancien  = etr_get_statut( $post_id );
-		$nouveau = isset( $_POST['etr_statut'] ) ? sanitize_key( wp_unslash( $_POST['etr_statut'] ) ) : $ancien;
-		if ( ! array_key_exists( $nouveau, etr_statuts() ) ) {
-			$nouveau = $ancien;
-		}
-
+		$statut  = isset( $_POST['etr_statut'] ) ? sanitize_key( wp_unslash( $_POST['etr_statut'] ) ) : '';
 		$reponse = isset( $_POST['etr_reponse'] ) ? sanitize_textarea_field( wp_unslash( $_POST['etr_reponse'] ) ) : '';
+		self::appliquer_decision( $post_id, $statut, $reponse );
+	}
+
+	/**
+	 * Enregistre le statut et le message au traiteur (administration WordPress et espace de gestion).
+	 * Le traiteur est prévenu par e-mail si le statut change.
+	 *
+	 * @param int    $post_id ID de la demande.
+	 * @param string $statut  Nouveau statut (ignoré s'il est inconnu).
+	 * @param string $reponse Message au traiteur (déjà nettoyé).
+	 * @return bool Le statut a-t-il changé ?
+	 */
+	public static function appliquer_decision( $post_id, $statut, $reponse ) {
+		$ancien  = etr_get_statut( $post_id );
+		$nouveau = array_key_exists( $statut, etr_statuts() ) ? $statut : $ancien;
+
 		update_post_meta( $post_id, '_etr_reponse', $reponse );
 		update_post_meta( $post_id, '_etr_statut', $nouveau );
 
 		if ( $ancien !== $nouveau ) {
 			do_action( 'etr_statut_change', $post_id, $ancien, $nouveau );
+			return true;
 		}
+		return false;
 	}
 
 	/**

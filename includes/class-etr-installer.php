@@ -57,6 +57,7 @@ class ETR_Installer {
 			// Réactivation après une mise à jour des fichiers : on rattrape les migrations.
 			ETR_Migrations::executer( 'activation' );
 		}
+		ETR_Gestion::regle_reecriture();
 		flush_rewrite_rules();
 	}
 

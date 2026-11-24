@@ -33,6 +33,19 @@ Sans WooCommerce, le plugin utilise son propre catalogue (menu *Espace traiteur 
 
 ### Côté équipe (administrateurs)
 
+**Espace de gestion** (`/gestion-traiteur/`, lien « Espace de gestion » dans le menu *Espace traiteur* et « Gestion traiteurs » dans la barre d'admin) : un back-office plein écran, dans l'identité de l'espace traiteur, réservé à l'équipe (droit `gerer_espace_traiteur`). Les écrans WordPress restent disponibles.
+
+- **Tableau de bord** : compteurs (demandes à traiter, événements validés, livraisons et reprises des 7 jours), agenda des 7 prochains jours, file « À traiter » avec alerte sur le matériel insuffisant.
+- **Demandes** : liste classée par date d'événement, filtres par statut et par traiteur, recherche.
+- **Fiche d'une demande** : matériel et disponibilités sur la période, informations de l'événement, coordonnées du traiteur ; choix du statut et message au traiteur (e-mail envoyé si le statut change).
+- **Planning** : calendrier du mois avec livraisons, événements et reprises (en pointillés : demandes encore en attente).
+- **Traiteurs** : liste, nombre de demandes, ajout d'un traiteur, renvoi d'invitation, désactivation et réactivation.
+- **Catalogue** : stock, quantités sorties et disponibles aujourd'hui, lien vers la fiche produit.
+
+Sans permaliens, l'adresse est `/?etr_gestion=1`. Filtre `etr_gestion_slug` pour changer `gestion-traiteur`.
+
+Écrans WordPress :
+
 - **Espace traiteur › Traiteurs** : créer un traiteur (société, contact, e-mail, téléphone). Il reçoit une invitation par e-mail pour choisir son mot de passe. Depuis cette page : renvoyer l'invitation, désactiver ou réactiver un accès, voir ses demandes.
 - **Produits WooCommerce** : renseigner la « Quantité possédée » des articles à limiter (voir ci-dessus).
 - **Espace traiteur › Réglages** : catégories proposées, prix, e-mail de l'équipe, affichage de l'espace des traiteurs (application plein écran ou intégrée au site).
@@ -113,6 +126,7 @@ add_filter( 'etr_email_equipe', fn() => 'logistique@exemple.fr' );
 - `etr_catalogue` : filtrer la liste des articles proposés.
 - `etr_routes_api_traiteurs` : routes de l'API REST autorisées aux traiteurs connectés.
 - `etr_migrations` : étapes de migration (par version).
+- `etr_gestion_slug` : adresse de l'espace de gestion (`gestion-traiteur` par défaut).
 - Actions : `etr_demande_creee`, `etr_demande_annulee`, `etr_statut_change` (`$id, $ancien, $nouveau`).
 
 ## Structure
@@ -128,14 +142,17 @@ includes/class-etr-comptes.php      Connexion, mot de passe oublié, choix du mo
 includes/class-etr-traiteurs.php    Page « Traiteurs » : création, invitation, désactivation
 includes/class-etr-admin.php        Écrans d'administration
 includes/class-etr-frontend.php     Espace traiteur (shortcode)
+includes/class-etr-gestion.php      Espace de gestion de l'équipe (/gestion-traiteur/)
 includes/class-etr-notifications.php E-mails
 assets/css/espace-traiteur.css      Styles
+assets/css/gestion.css              Styles de l'espace de gestion
 assets/js/espace-traiteur.js        Mise à jour des disponibilités selon les dates
 assets/js/connexion.js              Écran de connexion (afficher le mot de passe, envoi)
 assets/js/admin-reglages.js         Choix du logo et de la photo dans la médiathèque
 includes/class-etr-migrations.php   Migrations de la base après mise à jour
 includes/class-etr-cli.php          Commandes WP-CLI (wp espace-traiteur …)
 templates/connexion.php             Gabarit plein écran (connexion et espace connecté)
+templates/gestion.php               Gabarit plein écran de l'espace de gestion
 .github/workflows/deployer.yml      Déploiement automatique (GitHub Actions)
 docs/DEPLOIEMENT.md                 Mise en place du déploiement, retour arrière
 uninstall.php                       Nettoyage à la désinstallation

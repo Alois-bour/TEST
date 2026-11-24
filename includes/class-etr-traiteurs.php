@@ -84,11 +84,37 @@ class ETR_Traiteurs {
 			wp_die( esc_html__( 'Vous n’avez pas le droit de créer des comptes.', 'espace-traiteur' ) );
 		}
 
-		$societe   = isset( $_POST['societe'] ) ? sanitize_text_field( wp_unslash( $_POST['societe'] ) ) : '';
-		$contact   = isset( $_POST['contact'] ) ? sanitize_text_field( wp_unslash( $_POST['contact'] ) ) : '';
-		$email     = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
-		$telephone = isset( $_POST['telephone'] ) ? sanitize_text_field( wp_unslash( $_POST['telephone'] ) ) : '';
-		$login     = isset( $_POST['identifiant'] ) ? sanitize_user( wp_unslash( $_POST['identifiant'] ), true ) : '';
+		$resultat = self::creer_compte(
+			array(
+				'societe'     => isset( $_POST['societe'] ) ? wp_unslash( $_POST['societe'] ) : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- nettoyé par creer_compte().
+				'contact'     => isset( $_POST['contact'] ) ? wp_unslash( $_POST['contact'] ) : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+				'email'       => isset( $_POST['email'] ) ? wp_unslash( $_POST['email'] ) : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+				'telephone'   => isset( $_POST['telephone'] ) ? wp_unslash( $_POST['telephone'] ) : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+				'identifiant' => isset( $_POST['identifiant'] ) ? wp_unslash( $_POST['identifiant'] ) : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+			)
+		);
+		if ( is_wp_error( $resultat ) ) {
+			wp_safe_redirect( self::url( array( 'etr_erreur' => $resultat->get_error_code() ) ) );
+			exit;
+		}
+		wp_safe_redirect( self::url( array( 'etr_notice' => $resultat['invitation'] ? 'cree' : 'cree_sans_mail' ) ) );
+		exit;
+	}
+
+	/**
+	 * Crée un compte traiteur et lui envoie son invitation.
+	 *
+	 * Codes d'erreur : societe, email, email_existe, identifiant_existe, creation.
+	 *
+	 * @param array $donnees societe, contact, email, telephone, identifiant (bruts).
+	 * @return array|WP_Error { user_id, invitation (bool) }
+	 */
+	public static function creer_compte( $donnees ) {
+		$societe   = sanitize_text_field( isset( $donnees['societe'] ) ? $donnees['societe'] : '' );
+		$contact   = sanitize_text_field( isset( $donnees['contact'] ) ? $donnees['contact'] : '' );
+		$email     = sanitize_email( isset( $donnees['email'] ) ? $donnees['email'] : '' );
+		$telephone = sanitize_text_field( isset( $donnees['telephone'] ) ? $donnees['telephone'] : '' );
+		$login     = sanitize_user( isset( $donnees['identifiant'] ) ? $donnees['identifiant'] : '', true );
 
 		$erreur = '';
 		if ( '' === $societe ) {
@@ -113,8 +139,7 @@ class ETR_Traiteurs {
 		}
 
 		if ( $erreur ) {
-			wp_safe_redirect( self::url( array( 'etr_erreur' => $erreur ) ) );
-			exit;
+			return new WP_Error( $erreur );
 		}
 
 		$user_id = wp_insert_user(
@@ -128,15 +153,31 @@ class ETR_Traiteurs {
 			)
 		);
 		if ( is_wp_error( $user_id ) ) {
-			wp_safe_redirect( self::url( array( 'etr_erreur' => 'creation' ) ) );
-			exit;
+			return new WP_Error( 'creation' );
 		}
 		update_user_meta( $user_id, 'etr_contact', $contact );
 		update_user_meta( $user_id, 'etr_telephone', $telephone );
 
-		$envoye = self::envoyer_invitation( get_userdata( $user_id ) );
-		wp_safe_redirect( self::url( array( 'etr_notice' => $envoye ? 'cree' : 'cree_sans_mail' ) ) );
-		exit;
+		return array(
+			'user_id'    => $user_id,
+			'invitation' => self::envoyer_invitation( get_userdata( $user_id ) ),
+		);
+	}
+
+	/**
+	 * Désactive (et déconnecte) ou réactive un traiteur.
+	 *
+	 * @param int $user_id Traiteur.
+	 * @return string « desactive » ou « reactive ».
+	 */
+	public static function basculer_acces( $user_id ) {
+		if ( ETR_Comptes::est_desactive( $user_id ) ) {
+			delete_user_meta( $user_id, '_etr_desactive' );
+			return 'reactive';
+		}
+		update_user_meta( $user_id, '_etr_desactive', '1' );
+		WP_Session_Tokens::get_instance( $user_id )->destroy_all(); // Déconnexion immédiate.
+		return 'desactive';
 	}
 
 	/**
@@ -171,14 +212,7 @@ class ETR_Traiteurs {
 			wp_die( esc_html__( 'Traiteur introuvable.', 'espace-traiteur' ) );
 		}
 
-		if ( ETR_Comptes::est_desactive( $user_id ) ) {
-			delete_user_meta( $user_id, '_etr_desactive' );
-			$notice = 'reactive';
-		} else {
-			update_user_meta( $user_id, '_etr_desactive', '1' );
-			WP_Session_Tokens::get_instance( $user_id )->destroy_all(); // Déconnexion immédiate.
-			$notice = 'desactive';
-		}
+		$notice = self::basculer_acces( $user_id );
 		wp_safe_redirect( self::url( array( 'etr_notice' => $notice ) ) );
 		exit;
 	}

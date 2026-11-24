@@ -1,0 +1,386 @@
+/* Espace de gestion (équipe)
+ *
+ * S'appuie sur le système de l'application traiteur (.etr-app, espace-traiteur.css).
+ * Différence d'identité : barre latérale olive foncé, pages plus denses (tableaux, planning).
+ */
+
+.etr-gestion {
+	--etr-nuit: #2c3424;
+	--etr-nuit-trait: rgba(239, 235, 228, .14);
+	--etr-nuit-texte: #d9d4c9;
+	--etr-ambre: #9a6a12;
+	--etr-ambre-clair: #f8eedb;
+	--etr-bleu: #3a6f96;
+	--etr-sauge: #8a9d68;
+
+	background: linear-gradient(to right, var(--etr-nuit) 264px, var(--etr-voile) 264px);
+}
+.etr-gestion .etr-app__principal { max-width: 1360px; }
+
+/* Barre latérale de nuit */
+.etr-gestion .etr-app__barre { background: var(--etr-nuit); border-right: 0; color: var(--etr-nuit-texte); }
+.etr-gestion .etr-app__logo { display: flex; flex-direction: column; gap: 10px; margin-bottom: 36px; }
+.etr-gestion .etr-app__logo img { filter: brightness(0) invert(1); opacity: .92; }
+.etr-gestion .etr-app__nom-site { color: #fff; }
+.etr-gestion__marque { font-size: 13px; color: rgba(239, 235, 228, .62); }
+.etr-gestion .etr-app__nav a,
+.etr-gestion .etr-app__liens a { color: var(--etr-nuit-texte); }
+.etr-gestion .etr-app__nav a:hover,
+.etr-gestion .etr-app__liens a:hover { background: rgba(255, 255, 255, .07); color: #fff; }
+.etr-gestion .etr-app__nav a[aria-current="page"] { background: var(--etr-lin); color: var(--etr-encre); box-shadow: none; }
+.etr-gestion .etr-app__nav a[aria-current="page"] .etr-icone { color: var(--etr-olive); }
+.etr-gestion__pastille {
+	min-width: 22px;
+	margin-left: auto;
+	padding: 2px 7px;
+	border-radius: 999px;
+	background: var(--etr-ambre-clair);
+	color: #6b4706;
+	font: 600 12px/1.4 var(--etr-sans);
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+}
+.etr-gestion .etr-app__compte { border-top-color: var(--etr-nuit-trait); }
+.etr-gestion .etr-app__societe { color: #fff; }
+.etr-gestion .etr-app__societe span,
+.etr-gestion .etr-app__liens a { color: rgba(239, 235, 228, .66); }
+.etr-gestion :focus-visible { outline-color: var(--etr-olive); }
+.etr-gestion .etr-app__barre :focus-visible { outline-color: var(--etr-lin); }
+
+/* Titres de section */
+.etr-section-entete {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px 24px;
+	margin: 0 0 16px;
+}
+.etr-app .etr-section-titre { display: flex; align-items: center; gap: 10px; font: italic 400 26px/1.2 var(--etr-serif); }
+.etr-section-titre .etr-compteur { font-style: normal; }
+.etr-gestion .etr-lien { font-size: 14px; }
+
+/* Chiffres du moment : une bande, pas des cartes */
+.etr-chiffres {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	margin: 0 0 48px;
+	border-top: 1px solid var(--etr-trait);
+	border-bottom: 1px solid var(--etr-trait);
+}
+.etr-chiffres li + li { border-left: 1px solid var(--etr-trait); }
+.etr-app .etr-chiffres a {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	height: 100%;
+	padding: 20px 24px;
+	transition: background-color .15s ease;
+}
+.etr-app .etr-chiffres li:first-child a { padding-left: 0; }
+.etr-app .etr-chiffres a:hover { background: #fff; }
+.etr-chiffres strong { font: 400 44px/1 var(--etr-serif); color: var(--etr-encre); font-variant-numeric: lining-nums tabular-nums; }
+.etr-chiffres span { font-size: 14px; color: var(--etr-gris); }
+.etr-chiffres--accent strong { color: var(--etr-ambre); }
+
+/* Les 7 prochains jours : l'élément fort du tableau de bord */
+.etr-semaine { margin: 0 0 56px; }
+.etr-semaine__jours {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	border: 1px solid var(--etr-trait);
+	border-radius: 14px;
+	background: #fff;
+	overflow: hidden;
+}
+.etr-semaine__jour { display: flex; flex-direction: column; gap: 10px; min-height: 220px; padding: 16px 12px; }
+.etr-semaine__jour + .etr-semaine__jour { border-left: 1px solid var(--etr-trait-doux); }
+.etr-semaine__jour--we { background: var(--etr-voile); }
+.etr-semaine__jour--aujourdhui { background: var(--etr-lin); }
+.etr-app .etr-semaine__date { display: flex; flex-direction: column; gap: 2px; padding: 0 4px 10px; border-bottom: 1px solid var(--etr-trait-doux); }
+.etr-semaine__date span { font-size: 13px; color: var(--etr-gris); }
+.etr-semaine__date time { font: 400 30px/1 var(--etr-serif); color: var(--etr-encre); font-variant-numeric: lining-nums; }
+.etr-semaine__jour--aujourdhui .etr-semaine__date span { color: var(--etr-olive); font-weight: 500; }
+.etr-semaine__jour ul { display: flex; flex-direction: column; gap: 6px; }
+.etr-app .etr-semaine__rien { padding: 0 4px; font-size: 13px; color: #a29a8f; }
+
+/* Mouvement logistique (semaine et planning) */
+.etr-app .etr-mvt {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	padding: 7px 9px 7px 10px;
+	border-left: 3px solid var(--etr-encre);
+	border-radius: 2px 8px 8px 2px;
+	background: var(--etr-voile);
+	font-size: 13px;
+	line-height: 1.3;
+	transition: background-color .15s ease;
+}
+.etr-app .etr-mvt:hover { background: #f1ede6; }
+.etr-mvt__type { font-size: 12px; color: var(--etr-gris); }
+.etr-mvt__type em { font-style: normal; color: var(--etr-ambre); }
+.etr-mvt__titre { font-weight: 500; color: var(--etr-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.etr-mvt__sous { color: var(--etr-gris); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.etr-app .etr-mvt--livraison { border-left-color: var(--etr-sauge); }
+.etr-app .etr-mvt--reprise { border-left-color: var(--etr-bleu); }
+.etr-app .etr-mvt--evenement { border-left-color: var(--etr-encre); background: var(--etr-olive-clair); }
+.etr-app .etr-mvt--evenement:hover { background: #e3e8db; }
+.etr-app .etr-mvt--attente { border-left-style: dashed; }
+.etr-semaine__jour--aujourdhui .etr-mvt:not(.etr-mvt--evenement),
+.etr-semaine__jour--we .etr-mvt:not(.etr-mvt--evenement) { background: #fff; }
+
+/* Tableaux */
+.etr-table-cadre { overflow-x: auto; border: 1px solid var(--etr-trait); border-radius: 12px; background: #fff; }
+.etr-app .etr-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.etr-app .etr-table th,
+.etr-app .etr-table td { padding: 14px 16px; border-bottom: 1px solid var(--etr-trait-doux); text-align: left; vertical-align: middle; }
+.etr-app .etr-table thead th { padding-top: 12px; padding-bottom: 12px; background: var(--etr-voile); font-size: 13px; font-weight: 500; color: var(--etr-gris); white-space: nowrap; }
+.etr-app .etr-table tbody tr:last-child > * { border-bottom: 0; }
+.etr-app .etr-table tbody tr:hover > td { background: #fcfbf9; }
+.etr-app .etr-table td { color: var(--etr-encre); }
+.etr-table td > small,
+.etr-table td strong + small,
+.etr-table__principal small,
+.etr-table__article small { display: block; margin-top: 2px; font-size: 13px; color: var(--etr-gris); }
+.etr-table strong { font-weight: 500; }
+.etr-app .etr-table__principal { display: flex; align-items: center; gap: 14px; min-width: 240px; }
+.etr-table__principal .etr-date { width: 48px; }
+.etr-table__principal .etr-date__jour { font-size: 26px; }
+.etr-table__principal .etr-date__mois { margin-top: 4px; font-size: 12px; }
+.etr-app .etr-table__principal:hover strong { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.etr-table__logistique { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.etr-table__fleche { display: inline-block; width: 14px; height: 1px; margin: 0 8px; vertical-align: middle; background: #b8afa2; }
+.etr-table__passee td { color: var(--etr-gris); }
+.etr-table__passee .etr-date__jour { color: var(--etr-gris); }
+.etr-table__nombre { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.etr-app .etr-table__actions { text-align: right; white-space: nowrap; }
+.etr-table__actions form { display: inline-block; margin-left: 12px; }
+.etr-app .etr-table__groupe th { padding-top: 22px; background: #fff; font: italic 400 19px/1.2 var(--etr-serif); color: var(--etr-encre); }
+.etr-app .etr-table__article { display: flex; align-items: center; gap: 14px; }
+.etr-app .etr-table__article .etr-article__img { width: 44px; height: 44px; }
+
+/* Alerte de stock */
+.etr-app .etr-manque { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 13px; color: var(--etr-rouge); }
+.etr-manque .etr-icone { width: 15px; height: 15px; }
+td.etr-table__nombre .etr-manque { margin: 0; font-size: inherit; font-weight: 500; }
+
+/* Boutons secondaires */
+.etr-app .etr-btn--discret { background: #fff; border-color: var(--etr-trait); color: var(--etr-encre); padding: 8px 16px; min-height: 40px; font-size: 14px; }
+.etr-app .etr-btn--discret:hover,
+.etr-app .etr-btn--discret:focus { background: var(--etr-voile); border-color: #c9c0b2; color: var(--etr-encre); }
+.etr-app .etr-btn--icone { width: 40px; min-height: 40px; padding: 0; background: #fff; border-color: var(--etr-trait); color: var(--etr-encre); }
+.etr-app .etr-btn--icone:hover,
+.etr-app .etr-btn--icone:focus { background: var(--etr-voile); border-color: #c9c0b2; color: var(--etr-encre); }
+.etr-app .etr-btn-texte {
+	white-space: nowrap;
+	margin: 0;
+	padding: 4px 2px;
+	border: 0;
+	background: none;
+	font: 500 14px/1.4 var(--etr-sans);
+	color: var(--etr-olive);
+	cursor: pointer;
+	text-decoration: underline;
+	text-decoration-color: transparent;
+	text-underline-offset: 3px;
+	transition: text-decoration-color .15s ease;
+}
+.etr-app .etr-btn-texte:hover { text-decoration-color: currentColor; }
+
+/* Barre d'outils : filtres + recherche */
+.etr-barre-outils { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; margin: 0 0 20px; }
+.etr-recherche-gestion { display: flex; flex-wrap: wrap; gap: 8px; }
+.etr-recherche-gestion__champ { position: relative; display: block; }
+.etr-recherche-gestion__champ .etr-icone { position: absolute; top: 50%; left: 12px; width: 18px; height: 18px; color: var(--etr-gris); transform: translateY(-50%); pointer-events: none; }
+.etr-app .etr-recherche-gestion input[type="search"] { width: 260px; min-height: 40px; padding: 8px 12px 8px 38px; font-size: 14px; }
+.etr-app select {
+	min-height: 40px;
+	margin: 0;
+	padding: 8px 36px 8px 12px;
+	border: 1px solid var(--etr-trait);
+	border-radius: 8px;
+	background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b655f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;
+	font: 400 14px/1.4 var(--etr-sans);
+	color: var(--etr-encre);
+	-webkit-appearance: none;
+	appearance: none;
+	cursor: pointer;
+}
+.etr-app select:focus { outline: none; border-color: var(--etr-olive); box-shadow: 0 0 0 3px rgba(77, 91, 62, .16); }
+
+/* Pagination */
+.etr-gestion .etr-pagination { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: 24px; font-size: 14px; color: var(--etr-gris); }
+.etr-gestion .etr-pagination a { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 8px; color: var(--etr-encre); }
+.etr-gestion .etr-pagination a:hover { background: #fff; }
+.etr-gestion .etr-pagination .etr-icone { width: 16px; height: 16px; }
+
+/* Dossier d'une demande */
+.etr-dossier { display: grid; grid-template-columns: minmax(0, 1fr) 360px; align-items: start; gap: 24px; }
+.etr-dossier__principal,
+.etr-dossier__infos,
+.etr-dossier__cote { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.etr-dossier__infos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.etr-dossier__infos > :first-child { grid-row: span 2; }
+.etr-dossier__cote { position: sticky; top: 24px; }
+.etr-app .etr-dossier__wp { padding: 0 4px; }
+.etr-app .etr-materiel__periode { margin: -4px 0 8px; }
+.etr-ligne--gestion .etr-ligne__nom > span:not(.etr-manque) { font-size: 13px; }
+.etr-ligne--manque .etr-ligne__qte { color: var(--etr-rouge); }
+.etr-app .etr-materiel__bilan {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-top: 16px;
+	padding: 12px 14px;
+	border-radius: 10px;
+	background: var(--etr-olive-clair);
+	color: var(--etr-olive-fonce);
+	font-size: 14px;
+}
+.etr-app .etr-materiel__bilan--manque { background: #fbefed; color: #7d211a; }
+.etr-materiel__bilan .etr-icone { width: 18px; height: 18px; }
+
+/* Décision */
+.etr-decision { display: flex; flex-direction: column; gap: 18px; }
+.etr-decision fieldset { border: 0; min-width: 0; }
+.etr-decision legend { padding: 0; }
+.etr-decision__choix { display: flex; flex-direction: column; border: 1px solid var(--etr-trait); border-radius: 10px; overflow: hidden; }
+.etr-app .etr-decision__option {
+	position: relative;
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	margin: 0;
+	padding: 10px 14px;
+	cursor: pointer;
+	transition: background-color .15s ease;
+}
+.etr-decision__option + .etr-decision__option { border-top: 1px solid var(--etr-trait-doux); }
+.etr-decision__option:hover { background: var(--etr-voile); }
+.etr-decision__option input { position: absolute; opacity: 0; pointer-events: none; }
+.etr-decision__option strong { display: block; font-size: 14px; font-weight: 500; color: var(--etr-encre); }
+.etr-decision__option small { display: block; font-size: 13px; color: var(--etr-gris); }
+.etr-decision__puce { flex: none; width: 16px; height: 16px; margin-top: 2px; border: 1.5px solid #b8afa2; border-radius: 50%; background: #fff; transition: border-color .15s ease, box-shadow .15s ease; }
+.etr-decision__option input:checked ~ .etr-decision__puce { border: 5px solid currentColor; }
+.etr-decision__option input:focus-visible ~ .etr-decision__puce { box-shadow: 0 0 0 3px rgba(77, 91, 62, .3); }
+.etr-decision__option:has(input:checked) { background: var(--etr-voile); }
+.etr-decision__option--en_attente { color: #a06a0a; }
+.etr-decision__option--validee { color: var(--etr-olive); }
+.etr-decision__option--refusee { color: var(--etr-rouge); }
+.etr-decision__option--livree { color: var(--etr-bleu); }
+.etr-decision__option--cloturee,
+.etr-decision__option--annulee { color: var(--etr-gris); }
+.etr-app .etr-decision .etr-muted { margin-top: -6px; }
+
+/* Fiche traiteur */
+.etr-fiche .etr-panneau__titre { margin-bottom: 2px; }
+.etr-app .etr-fiche__coord { display: flex; flex-direction: column; gap: 8px; margin: 14px 0 16px; font-size: 14px; }
+.etr-fiche__coord li { display: flex; align-items: center; gap: 10px; min-width: 0; overflow-wrap: anywhere; }
+.etr-fiche__coord .etr-icone { width: 18px; height: 18px; color: var(--etr-gris); }
+
+/* Planning */
+.etr-mois-nav { display: flex; gap: 8px; }
+.etr-gestion .etr-page-entete__titre::first-letter { text-transform: uppercase; }
+.etr-app .etr-legende { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: -16px 0 20px; font-size: 13px; color: var(--etr-gris); }
+.etr-legende li { display: inline-flex; align-items: center; gap: 8px; }
+.etr-legende li::before { content: ""; width: 3px; height: 14px; background: var(--etr-encre); }
+.etr-legende--livraison::before { background: var(--etr-sauge) !important; }
+.etr-legende--reprise::before { background: var(--etr-bleu) !important; }
+.etr-legende--attente::before { width: 0 !important; border-left: 3px dashed var(--etr-gris); }
+.etr-calendrier { border: 1px solid var(--etr-trait); border-radius: 14px; background: #fff; overflow: hidden; }
+.etr-calendrier__semaine { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.etr-calendrier__semaine + .etr-calendrier__semaine { border-top: 1px solid var(--etr-trait-doux); }
+.etr-calendrier__entete { background: var(--etr-voile); }
+.etr-calendrier__entete span { padding: 10px 12px; font-size: 13px; color: var(--etr-gris); }
+.etr-calendrier__jour { display: flex; flex-direction: column; gap: 6px; min-height: 128px; padding: 8px; }
+.etr-calendrier__jour + .etr-calendrier__jour { border-left: 1px solid var(--etr-trait-doux); }
+.etr-calendrier__jour time { padding: 2px 4px; font: 400 18px/1 var(--etr-serif); color: var(--etr-encre); font-variant-numeric: lining-nums; }
+.etr-calendrier__jour--hors { background: var(--etr-voile); }
+.etr-calendrier__jour--hors time { color: #b8afa2; }
+.etr-calendrier__jour--aujourdhui { background: var(--etr-lin); }
+.etr-calendrier__jour--aujourdhui time { color: var(--etr-olive); font-weight: 600; }
+.etr-calendrier__jour ul { display: flex; flex-direction: column; gap: 4px; }
+.etr-calendrier .etr-mvt { padding: 4px 6px 4px 8px; font-size: 12px; }
+.etr-calendrier .etr-mvt__sous { display: none; }
+.etr-calendrier .etr-mvt__type { font-size: 11px; }
+
+/* Traiteurs */
+.etr-traiteurs-gestion { display: grid; grid-template-columns: minmax(0, 1fr) 340px; align-items: start; gap: 24px; }
+.etr-ajout { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 24px; }
+.etr-app .etr-ajout .etr-panneau__titre { margin-bottom: 0; }
+.etr-app .etr-ajout > .etr-muted { margin-top: -10px; }
+.etr-app .etr-ajout input[type="email"],
+.etr-app .etr-ajout input[type="tel"] {
+	display: block;
+	width: 100%;
+	min-height: 46px;
+	margin: 0;
+	padding: 10px 14px;
+	border: 1px solid var(--etr-trait);
+	border-radius: 8px;
+	background: #fff;
+	font: 400 15px/1.4 var(--etr-sans);
+	color: var(--etr-encre);
+}
+.etr-app .etr-ajout input[type="email"]:focus,
+.etr-app .etr-ajout input[type="tel"]:focus { outline: none; border-color: var(--etr-olive); box-shadow: 0 0 0 3px rgba(77, 91, 62, .16); }
+.etr-app .etr-champ__aide,
+.etr-app .etr-champ__erreur { margin-top: 6px; font-size: 13px; color: var(--etr-gris); }
+.etr-app .etr-champ__erreur { color: var(--etr-rouge); }
+.etr-app .etr-champ--erreur input { border-color: var(--etr-rouge); }
+.etr-app .etr-ajout .etr-notice { margin: 0; }
+.etr-app .etr-table--traiteurs td:first-child { min-width: 170px; }
+.etr-table--traiteurs td small,
+.etr-table--traiteurs .etr-lien { white-space: nowrap; }
+.etr-app .etr-table--traiteurs .etr-table__actions { white-space: normal; }
+.etr-table--traiteurs .etr-table__actions form { display: block; margin: 0; }
+.etr-table--traiteurs .etr-table__actions form + form { margin-top: 6px; }
+
+/* Responsive */
+@media (max-width: 1180px) {
+	.etr-dossier,
+	.etr-traiteurs-gestion { grid-template-columns: 1fr; }
+	.etr-dossier__cote,
+	.etr-ajout { position: static; }
+	.etr-semaine__jours { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+	.etr-semaine__jour { min-height: 160px; border-bottom: 1px solid var(--etr-trait-doux); }
+	.etr-semaine__jour + .etr-semaine__jour { border-left: 0; }
+	.etr-semaine__jour:not(:nth-child(4n + 1)) { border-left: 1px solid var(--etr-trait-doux); }
+}
+
+@media (max-width: 900px) {
+	.etr-gestion { background: var(--etr-voile); }
+	.etr-gestion .etr-app__barre { border-bottom: 0; }
+	.etr-gestion .etr-app__logo { flex-direction: row; align-items: baseline; }
+	.etr-gestion__marque { display: none; }
+	.etr-gestion .etr-app__nav { overflow-x: auto; scrollbar-width: none; }
+	.etr-gestion .etr-app__nav ul { flex-wrap: nowrap; }
+	.etr-gestion .etr-app__nav a { white-space: nowrap; }
+	.etr-gestion .etr-app__nav a[aria-current="page"] { box-shadow: none; }
+	.etr-chiffres { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.etr-chiffres li:nth-child(3) { border-left: 0; }
+	.etr-chiffres li:nth-child(n + 3) { border-top: 1px solid var(--etr-trait); }
+	.etr-app .etr-chiffres li:nth-child(3) a { padding-left: 0; }
+	.etr-dossier__infos { grid-template-columns: 1fr; }
+	.etr-dossier__infos > :first-child { grid-row: auto; }
+	.etr-calendrier { overflow-x: auto; }
+	.etr-calendrier__semaine { min-width: 760px; }
+}
+
+@media (max-width: 640px) {
+	.etr-chiffres strong { font-size: 34px; }
+	.etr-app .etr-chiffres a { padding: 16px; }
+	.etr-semaine__jours { grid-template-columns: 1fr; }
+	.etr-semaine__jour { min-height: 0; flex-direction: row; align-items: flex-start; gap: 16px; }
+	.etr-semaine__jour:not(:nth-child(4n + 1)) { border-left: 0; }
+	.etr-app .etr-semaine__date { flex: none; width: 76px; padding: 0; border: 0; }
+	.etr-semaine__jour ul { flex: 1; min-width: 0; }
+	.etr-barre-outils,
+	.etr-recherche-gestion { flex-direction: column; align-items: stretch; }
+	.etr-app .etr-recherche-gestion input[type="search"] { width: 100%; }
+	.etr-filtres { overflow-x: auto; scrollbar-width: none; margin: 0 -20px; padding: 0 20px; }
+	.etr-filtres ul { flex-wrap: nowrap; }
+	.etr-filtres li { flex: none; }
+	.etr-table__logistique { display: none; }
+}
