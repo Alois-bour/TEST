@@ -20,6 +20,13 @@ class ETR_Frontend {
 	private static $erreurs = array();
 
 	/**
+	 * Demande actuellement modifiée dans le formulaire.
+	 *
+	 * @var int
+	 */
+	private static $demande_modifiee_id = 0;
+
+	/**
 	 * Hooks.
 	 */
 	public static function init() {
@@ -125,6 +132,13 @@ class ETR_Frontend {
 			$valeur        = isset( $_POST[ $cle ] ) ? sanitize_text_field( wp_unslash( $_POST[ $cle ] ) ) : '';
 			$dates[ $cle ] = etr_date_valide( $valeur ) ? $valeur : '';
 		}
+		$demande_id = isset( $_POST['demande_id'] ) ? absint( $_POST['demande_id'] ) : 0;
+		if ( $demande_id && ( ! etr_est_gestionnaire() ) ) {
+			$demande = get_post( $demande_id );
+			if ( ! $demande || (int) $demande->post_author !== get_current_user_id() || 'en_attente' !== etr_get_statut( $demande_id ) ) {
+				$demande_id = 0;
+			}
+		}
 		list( $debut, $fin ) = etr_periode( $dates['date_evenement'], $dates['date_livraison'], $dates['date_reprise'] );
 		if ( ! $debut ) {
 			wp_send_json_error( array( 'message' => __( 'Choisissez la date de l’événement pour voir les quantités disponibles.', 'espace-traiteur' ) ) );
@@ -133,7 +147,7 @@ class ETR_Frontend {
 		wp_send_json_success(
 			array(
 				'periode'  => self::texte_periode( $debut, $fin ),
-				'articles' => self::disponibilites_catalogue( etr_quantites_reservees( $debut, $fin ) ),
+				'articles' => self::disponibilites_catalogue( etr_quantites_reservees( $debut, $fin, $demande_id ) ),
 			)
 		);
 	}
@@ -187,9 +201,113 @@ class ETR_Frontend {
 		$action = sanitize_key( wp_unslash( $_POST['etr_action'] ) );
 		if ( 'nouvelle_demande' === $action ) {
 			self::creer_demande();
+		} elseif ( 'modifier_demande' === $action ) {
+			self::modifier_demande();
 		} elseif ( 'annuler_demande' === $action ) {
 			self::annuler_demande();
 		}
+	}
+
+	/**
+	 * Modification d'une demande tant qu'elle est en attente.
+	 */
+	private static function modifier_demande() {
+		$demande_id = isset( $_POST['demande_id'] ) ? absint( $_POST['demande_id'] ) : 0;
+		if ( ! $demande_id || ! isset( $_POST['etr_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['etr_nonce'] ) ), 'etr_modifier_' . $demande_id ) ) {
+			self::$erreurs[] = __( 'Votre session a expiré, merci de renvoyer le formulaire.', 'espace-traiteur' );
+			return;
+		}
+
+		$demande = get_post( $demande_id );
+		if ( ! $demande || 'etr_demande' !== $demande->post_type || (int) $demande->post_author !== get_current_user_id() || 'en_attente' !== etr_get_statut( $demande_id ) ) {
+			self::$erreurs[] = __( 'Cette demande ne peut plus être modifiée.', 'espace-traiteur' );
+			return;
+		}
+
+		$saisie  = isset( $_POST['etr'] ) && is_array( $_POST['etr'] ) ? wp_unslash( $_POST['etr'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- assaini champ par champ.
+		$donnees = array();
+		foreach ( etr_champs_demande() as $cle => $champ ) {
+			$brut   = isset( $saisie[ $cle ] ) && is_string( $saisie[ $cle ] ) ? $saisie[ $cle ] : '';
+			$valeur = 'textarea' === $champ['type'] ? sanitize_textarea_field( $brut ) : sanitize_text_field( $brut );
+			if ( 'number' === $champ['type'] && '' !== $valeur ) {
+				$valeur = (string) absint( $valeur );
+			}
+			if ( 'date' === $champ['type'] && '' !== $valeur && ! etr_date_valide( $valeur ) ) {
+				self::$erreurs[] = sprintf( __( 'La date « %s » est invalide.', 'espace-traiteur' ), $champ['label'] );
+				$valeur          = '';
+			}
+			if ( ! empty( $champ['requis'] ) && '' === $valeur ) {
+				self::$erreurs[] = sprintf( __( 'Le champ « %s » est obligatoire.', 'espace-traiteur' ), $champ['label'] );
+			}
+			$donnees[ $cle ] = $valeur;
+		}
+
+		if ( ! empty( $donnees['date_evenement'] ) && $donnees['date_evenement'] < current_time( 'Y-m-d' ) ) {
+			self::$erreurs[] = __( 'La date de l’événement ne peut pas être passée.', 'espace-traiteur' );
+		}
+		if ( ! empty( $donnees['date_livraison'] ) && ! empty( $donnees['date_reprise'] ) && $donnees['date_reprise'] < $donnees['date_livraison'] ) {
+			self::$erreurs[] = __( 'La date de reprise doit être postérieure à la date de livraison.', 'espace-traiteur' );
+		}
+		if ( self::$erreurs ) {
+			return;
+		}
+
+		global $wpdb;
+		$lock_name = 'etr_reservations_' . md5( $wpdb->prefix );
+		if ( '1' !== (string) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 10)', $lock_name ) ) ) {
+			self::$erreurs[] = __( 'La demande n’a pas pu être enregistrée. Merci de réessayer.', 'espace-traiteur' );
+			return;
+		}
+
+		try {
+			list( $debut, $fin ) = etr_periode( $donnees['date_evenement'], $donnees['date_livraison'], $donnees['date_reprise'] );
+			$reservees           = $debut ? etr_quantites_reservees( $debut, $fin, $demande_id ) : array();
+			$quantites           = isset( $_POST['quantites'] ) && is_array( $_POST['quantites'] ) ? wp_unslash( $_POST['quantites'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- converti en entiers ci-dessous.
+			$lignes              = array();
+			foreach ( $quantites as $article_id => $quantite ) {
+				if ( (string) absint( $article_id ) !== (string) $article_id ) {
+					continue;
+				}
+				$article_id = absint( $article_id );
+				$quantite   = is_scalar( $quantite ) ? absint( $quantite ) : 0;
+				if ( ! $article_id || ! $quantite ) {
+					continue;
+				}
+				$article = etr_get_article( $article_id );
+				if ( ! $article ) {
+					continue;
+				}
+				$dispo = etr_disponibilite( $article_id, $reservees );
+				if ( 0 === $dispo ) {
+					self::$erreurs[] = sprintf( __( '« %s » n’est plus disponible sur ces dates.', 'espace-traiteur' ), $article['titre'] );
+				} elseif ( null !== $dispo && $quantite > $dispo ) {
+					self::$erreurs[] = sprintf( __( 'La quantité demandée pour « %1$s » dépasse la quantité disponible sur ces dates (%2$s).', 'espace-traiteur' ), $article['titre'], number_format_i18n( $dispo ) );
+				}
+				$lignes[] = array(
+					'article_id' => $article_id,
+					'quantite'   => $quantite,
+					'titre'      => $article['titre'],
+					'unite'      => $article['unite'],
+				);
+			}
+			if ( empty( $lignes ) && empty( $donnees['autres_besoins'] ) ) {
+				self::$erreurs[] = __( 'Indiquez au moins un article du catalogue ou un besoin hors catalogue.', 'espace-traiteur' );
+			}
+			if ( self::$erreurs ) {
+				return;
+			}
+
+			wp_update_post( array( 'ID' => $demande_id, 'post_title' => $donnees['evenement'] ) );
+			foreach ( $donnees as $cle => $valeur ) {
+				update_post_meta( $demande_id, '_etr_' . $cle, $valeur );
+			}
+			update_post_meta( $demande_id, '_etr_lignes', $lignes );
+		} finally {
+			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
+		}
+
+		wp_safe_redirect( etr_url( array( 'etr_vue' => 'demande', 'id' => $demande_id, 'etr_msg' => 'modifiee' ) ) );
+		exit;
 	}
 
 	/**
@@ -367,7 +485,7 @@ class ETR_Frontend {
 	 */
 	private static function ancienne_valeur( $cle ) {
 		if ( ! self::$erreurs || ! isset( $_POST['etr'][ $cle ] ) || ! is_string( $_POST['etr'][ $cle ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
-			return '';
+			return self::$demande_modifiee_id ? (string) get_post_meta( self::$demande_modifiee_id, '_etr_' . $cle, true ) : '';
 		}
 		return sanitize_textarea_field( wp_unslash( $_POST['etr'][ $cle ] ) ); // phpcs:ignore WordPress.Security.NonceVerification
 	}
@@ -380,6 +498,13 @@ class ETR_Frontend {
 	 */
 	private static function ancienne_quantite( $article_id ) {
 		if ( ! self::$erreurs || ! isset( $_POST['quantites'][ $article_id ] ) || ! is_scalar( $_POST['quantites'][ $article_id ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			if ( self::$demande_modifiee_id ) {
+				foreach ( etr_get_lignes( self::$demande_modifiee_id ) as $ligne ) {
+					if ( (int) $ligne['article_id'] === (int) $article_id && (int) $ligne['quantite'] > 0 ) {
+						return (string) (int) $ligne['quantite'];
+					}
+				}
+			}
 			return '';
 		}
 		$q = absint( $_POST['quantites'][ $article_id ] ); // phpcs:ignore WordPress.Security.NonceVerification
@@ -406,7 +531,12 @@ class ETR_Frontend {
 		} else {
 			$vue = isset( $_GET['etr_vue'] ) ? sanitize_key( wp_unslash( $_GET['etr_vue'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 			if ( self::$erreurs ) {
-				$vue = 'nouvelle';
+				if ( ! empty( $_POST['demande_id'] ) ) {
+					$vue       = 'modifier';
+					$_GET['id'] = absint( $_POST['demande_id'] ); // phpcs:ignore WordPress.Security.NonceVerification
+				} else {
+					$vue = 'nouvelle';
+				}
 			}
 
 			self::entete();
@@ -414,6 +544,8 @@ class ETR_Frontend {
 
 			if ( 'nouvelle' === $vue ) {
 				self::vue_formulaire();
+			} elseif ( 'modifier' === $vue && isset( $_GET['id'] ) ) {
+				self::vue_formulaire( absint( $_GET['id'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
 			} elseif ( 'demande' === $vue && isset( $_GET['id'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
 				self::vue_demande( absint( $_GET['id'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
 			} else {
@@ -447,6 +579,7 @@ class ETR_Frontend {
 		$msg = isset( $_GET['etr_msg'] ) ? sanitize_key( wp_unslash( $_GET['etr_msg'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$textes = array(
 			'creee'   => __( 'Votre demande a bien été envoyée. Vous serez prévenu par e-mail de son traitement.', 'espace-traiteur' ),
+			'modifiee' => __( 'Votre demande a bien été modifiée.', 'espace-traiteur' ),
 			'annulee' => __( 'Votre demande a été annulée.', 'espace-traiteur' ),
 		);
 		if ( isset( $textes[ $msg ] ) && ! self::$erreurs ) {
@@ -566,6 +699,7 @@ class ETR_Frontend {
 		echo '<div class="etr-table-wrap">' . etr_lignes_html( $demande_id ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput
 
 		if ( 'en_attente' === $statut && (int) $demande->post_author === get_current_user_id() ) {
+			echo '<p><a class="etr-btn etr-btn--secondaire" href="' . esc_url( etr_url( array( 'etr_vue' => 'modifier', 'id' => $demande_id ) ) ) . '">' . esc_html__( 'Modifier la demande', 'espace-traiteur' ) . '</a></p>';
 			echo '<form method="post" class="etr-annuler" onsubmit="return confirm(\'' . esc_js( __( 'Annuler cette demande ?', 'espace-traiteur' ) ) . '\');">';
 			wp_nonce_field( 'etr_annuler_' . $demande_id, 'etr_nonce' );
 			echo '<input type="hidden" name="etr_action" value="annuler_demande">';
@@ -578,11 +712,22 @@ class ETR_Frontend {
 	/**
 	 * Formulaire de nouvelle demande.
 	 */
-	private static function vue_formulaire() {
-		echo '<h2>' . esc_html__( 'Nouvelle demande', 'espace-traiteur' ) . '</h2>';
+	private static function vue_formulaire( $demande_id = 0 ) {
+		$demande = $demande_id ? get_post( $demande_id ) : null;
+		if ( $demande && ( 'etr_demande' !== $demande->post_type || (int) $demande->post_author !== get_current_user_id() || 'en_attente' !== etr_get_statut( $demande_id ) ) ) {
+			$demande = null;
+		}
+		self::$demande_modifiee_id = $demande ? (int) $demande_id : 0;
+		echo '<h2>' . esc_html( $demande ? __( 'Modifier la demande', 'espace-traiteur' ) : __( 'Nouvelle demande', 'espace-traiteur' ) ) . '</h2>';
 		echo '<form method="post" class="etr-form" action="' . esc_url( etr_url( array( 'etr_vue' => 'nouvelle' ) ) ) . '">';
-		wp_nonce_field( 'etr_nouvelle_demande', 'etr_nonce' );
-		echo '<input type="hidden" name="etr_action" value="nouvelle_demande">';
+		if ( $demande ) {
+			wp_nonce_field( 'etr_modifier_' . $demande_id, 'etr_nonce' );
+			echo '<input type="hidden" name="etr_action" value="modifier_demande">';
+			echo '<input type="hidden" name="demande_id" value="' . (int) $demande_id . '">';
+		} else {
+			wp_nonce_field( 'etr_nouvelle_demande', 'etr_nonce' );
+			echo '<input type="hidden" name="etr_action" value="nouvelle_demande">';
+		}
 
 		$champs   = etr_champs_demande();
 		$sections = array(
@@ -657,7 +802,7 @@ class ETR_Frontend {
 
 		// Après une erreur, les dates sont connues : on affiche directement les disponibilités.
 		list( $debut, $fin ) = etr_periode( self::ancienne_valeur( 'date_evenement' ), self::ancienne_valeur( 'date_livraison' ), self::ancienne_valeur( 'date_reprise' ) );
-		$reservees           = $debut ? etr_quantites_reservees( $debut, $fin ) : null;
+		$reservees           = $debut ? etr_quantites_reservees( $debut, $fin, self::$demande_modifiee_id ) : null;
 
 		echo '<fieldset class="etr-fieldset etr-catalogue"><legend>' . esc_html__( 'Mobilier, art de la table et décoration', 'espace-traiteur' ) . '</legend>';
 

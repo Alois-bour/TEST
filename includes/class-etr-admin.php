@@ -33,6 +33,7 @@ class ETR_Admin {
 		add_action( 'restrict_manage_posts', array( __CLASS__, 'filtre_statut' ) );
 		add_action( 'pre_get_posts', array( __CLASS__, 'appliquer_filtre_statut' ) );
 		add_filter( 'post_row_actions', array( __CLASS__, 'actions_ligne' ), 10, 2 );
+		add_action( 'admin_post_etr_export_csv', array( __CLASS__, 'export_csv' ) );
 
 		add_filter( 'manage_etr_article_posts_columns', array( __CLASS__, 'colonnes_article' ) );
 		add_action( 'manage_etr_article_posts_custom_column', array( __CLASS__, 'colonne_article' ), 10, 2 );
@@ -577,6 +578,15 @@ class ETR_Admin {
 			printf( '<option value="%s"%s>%s</option>', esc_attr( $slug ), selected( $courant, $slug, false ), esc_html( $label ) );
 		}
 		echo '</select>';
+		$export_args = array( 'action' => 'etr_export_csv', 'format' => 'demandes' );
+		foreach ( array( 'etr_statut', 's' ) as $cle ) {
+			if ( ! empty( $_GET[ $cle ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+				$export_args[ $cle ] = sanitize_text_field( wp_unslash( $_GET[ $cle ] ) ); // phpcs:ignore WordPress.Security.NonceVerification
+			}
+		}
+		echo '<a class="button" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?' . http_build_query( $export_args ) ), 'etr_export_csv' ) ) . '">' . esc_html__( 'Exporter CSV (demandes)', 'espace-traiteur' ) . '</a>';
+		$export_args['format'] = 'articles';
+		echo ' <a class="button" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?' . http_build_query( $export_args ) ), 'etr_export_csv' ) ) . '">' . esc_html__( 'Exporter CSV (articles)', 'espace-traiteur' ) . '</a>';
 	}
 
 	/**
@@ -600,6 +610,113 @@ class ETR_Admin {
 				)
 			);
 		}
+	}
+
+	/**
+	 * Exporte les demandes correspondant aux filtres de la liste.
+	 */
+	public static function export_csv() {
+		if ( ! current_user_can( 'gerer_espace_traiteur' ) || ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'etr_export_csv' ) ) {
+			wp_die( esc_html__( 'Accès refusé.', 'espace-traiteur' ) );
+		}
+
+		$args = array(
+			'post_type'      => 'etr_demande',
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+		);
+		$statut = isset( $_GET['etr_statut'] ) ? sanitize_key( wp_unslash( $_GET['etr_statut'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+		if ( $statut && array_key_exists( $statut, etr_statuts() ) ) {
+			$args['meta_key']   = '_etr_statut';
+			$args['meta_value'] = $statut;
+		}
+		if ( ! empty( $_GET['s'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			$args['s'] = sanitize_text_field( wp_unslash( $_GET['s'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
+		}
+
+		$format = isset( $_GET['format'] ) ? sanitize_key( wp_unslash( $_GET['format'] ) ) : 'demandes'; // phpcs:ignore WordPress.Security.NonceVerification
+		$posts  = get_posts( $args );
+		$nom    = 'demandes-' . gmdate( 'Y-m-d-His' ) . '.csv';
+
+		nocache_headers();
+		header( 'Content-Type: text/csv; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="' . $nom . '"' );
+		echo "\xEF\xBB\xBF";
+		$output = fopen( 'php://output', 'w' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		if ( 'articles' === $format ) {
+			fputcsv( $output, array( 'Reference demande', 'Evenement', 'Date evenement', 'Livraison', 'Reprise', 'Statut', 'Traiteur', 'Reference article', 'Article', 'Quantite', 'Prix unitaire', 'Sous-total ligne' ), ';' );
+			foreach ( $posts as $post ) {
+				$traiteur = get_userdata( (int) $post->post_author );
+				foreach ( etr_get_lignes( $post->ID ) as $ligne ) {
+					$article  = etr_get_article( (int) $ligne['article_id'] );
+					$prix     = self::prix_article( (int) $ligne['article_id'] );
+					$reference = $article ? (string) $article['reference'] : '';
+					$quantite = (int) $ligne['quantite'];
+					fputcsv(
+						$output,
+						array(
+							$post->ID,
+							get_the_title( $post ),
+							get_post_meta( $post->ID, '_etr_date_evenement', true ),
+							get_post_meta( $post->ID, '_etr_date_livraison', true ),
+							get_post_meta( $post->ID, '_etr_date_reprise', true ),
+							etr_get_statut( $post->ID ),
+							$traiteur ? etr_nom( $traiteur ) : '',
+							$reference,
+							$ligne['titre'],
+							$quantite,
+							self::csv_decimal( $prix ),
+							self::csv_decimal( $prix * $quantite ),
+						),
+						';'
+					);
+				}
+			}
+		} else {
+			fputcsv( $output, array( 'Reference', 'Evenement', 'Date evenement', 'Livraison', 'Reprise', 'Statut', 'Traiteur', 'Sous-total', 'Remise', 'Livraison montant', 'Total' ), ';' );
+			foreach ( $posts as $post ) {
+				$traiteur = get_userdata( (int) $post->post_author );
+				$sous_total = 0;
+				foreach ( etr_get_lignes( $post->ID ) as $ligne ) {
+					$sous_total += self::prix_article( (int) $ligne['article_id'] ) * (int) $ligne['quantite'];
+				}
+				fputcsv(
+					$output,
+					array(
+						$post->ID,
+						get_the_title( $post ),
+						get_post_meta( $post->ID, '_etr_date_evenement', true ),
+						get_post_meta( $post->ID, '_etr_date_livraison', true ),
+						get_post_meta( $post->ID, '_etr_date_reprise', true ),
+						etr_get_statut( $post->ID ),
+						$traiteur ? etr_nom( $traiteur ) : '',
+						self::csv_decimal( $sous_total ),
+						self::csv_decimal( 0 ),
+						self::csv_decimal( 0 ),
+						self::csv_decimal( $sous_total ),
+					),
+					';'
+				);
+			}
+		}
+		fclose( $output ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		exit;
+	}
+
+	private static function prix_article( $article_id ) {
+		if ( etr_source_woocommerce() && function_exists( 'wc_get_product' ) ) {
+			$produit = wc_get_product( $article_id );
+			if ( $produit ) {
+				return (float) $produit->get_price();
+			}
+		}
+		return 0.0;
+	}
+
+	private static function csv_decimal( $montant ) {
+		return number_format( (float) $montant, 2, ',', '' );
 	}
 
 	/**
