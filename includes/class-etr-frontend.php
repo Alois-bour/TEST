@@ -1006,8 +1006,9 @@ class ETR_Frontend {
 		if ( ! $lignes ) {
 			echo '<p class="etr-muted">' . esc_html__( 'Aucun article du catalogue : voir les besoins hors catalogue.', 'espace-traiteur' ) . '</p>';
 		} else {
-			echo '<ul class="etr-lignes">';
-			foreach ( $lignes as $ligne ) {
+			$chiffrage = ( get_option( 'etr_afficher_prix' ) || etr_est_gestionnaire() ) ? etr_chiffrage( $demande_id ) : null;
+			echo '<ul class="etr-lignes' . ( $chiffrage ? ' etr-lignes--prix' : '' ) . '">';
+			foreach ( $lignes as $index => $ligne ) {
 				$article = etr_get_article( $ligne['article_id'] );
 				echo '<li class="etr-ligne">';
 				echo ( $article && $article['image'] ) ? wp_kses_post( $article['image'] ) : '<span class="etr-article__img etr-article__img--vide">' . self::icone( 'image' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput
@@ -1017,9 +1018,15 @@ class ETR_Frontend {
 				}
 				echo '</span>';
 				echo '<span class="etr-ligne__qte">' . esc_html( number_format_i18n( $ligne['quantite'] ) ) . ( ! empty( $ligne['unite'] ) ? '<small>' . esc_html( $ligne['unite'] ) . '</small>' : '' ) . '</span>';
+				if ( $chiffrage ) {
+					echo etr_prix_ligne_html( $chiffrage['lignes'][ $index ], (int) $ligne['quantite'] ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans etr_prix_ligne_html().
+				}
 				echo '</li>';
 			}
 			echo '</ul>';
+			if ( $chiffrage ) {
+				echo etr_total_indicatif_html( $chiffrage ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans etr_total_indicatif_html().
+			}
 		}
 		echo '</section>';
 		echo '</div>';

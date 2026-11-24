@@ -38,6 +38,7 @@
 
 .etr-muted { color: #6b655f; font-size: .9em; }
 .etr-alerte { color: #a12622; font-weight: 600; }
+.etr-table .etr-num { text-align: right; white-space: nowrap; }
 
 /* Tableaux (administration) */
 .etr-table-wrap { overflow-x: auto; }
@@ -480,6 +481,14 @@
 .etr-ligne__nom { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 15px; color: var(--etr-encre); }
 .etr-ligne__qte { display: flex; align-items: baseline; gap: 6px; font: 400 22px/1 var(--etr-serif); color: var(--etr-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .etr-ligne__qte small { font: 400 13px var(--etr-sans); color: var(--etr-gris); }
+.etr-lignes--prix .etr-ligne { grid-template-columns: 48px minmax(0, 1fr) auto minmax(110px, auto); }
+.etr-ligne__prix { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 15px; font-weight: 500; color: var(--etr-encre); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.etr-ligne__prix small { font-size: 12px; font-weight: 400; color: var(--etr-gris); }
+.etr-ligne__prix--vide { font-size: 13px; font-weight: 400; color: var(--etr-gris); }
+.etr-chiffrage { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 4px 16px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--etr-trait); }
+.etr-chiffrage__libelle { font-size: 15px; font-weight: 500; color: var(--etr-encre); }
+.etr-chiffrage__total { font: 400 24px/1 var(--etr-serif); color: var(--etr-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.etr-chiffrage__note { grid-column: 1 / -1; font-size: 13px; color: var(--etr-gris); }
 
 .etr-annuler {
 	display: flex;
@@ -851,6 +860,8 @@
 	.etr-app .etr-details > div { grid-template-columns: 1fr; gap: 2px; }
 	.etr-ligne { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; }
 	.etr-app .etr-ligne .etr-article__img { width: 40px; height: 40px; }
+	.etr-lignes--prix .etr-ligne { grid-template-columns: 40px minmax(0, 1fr) auto; }
+	.etr-lignes--prix .etr-ligne__prix { grid-column: 2 / -1; flex-direction: row; align-items: baseline; justify-content: space-between; gap: 8px; }
 	.etr-panneau { padding: 20px; }
 }
 

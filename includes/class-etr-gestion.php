@@ -989,9 +989,10 @@ class ETR_Gestion {
 			/* translators: 1 : début, 2 : fin. */
 			echo '<p class="etr-muted etr-materiel__periode">' . esc_html( $debut === $fin ? sprintf( __( 'Disponibilités calculées pour le %s, hors cette demande.', 'espace-traiteur' ), etr_format_date( $debut ) ) : sprintf( __( 'Disponibilités calculées du %1$s au %2$s, hors cette demande.', 'espace-traiteur' ), etr_format_date( $debut ), etr_format_date( $fin ) ) ) . '</p>';
 		}
-		$manques = 0;
-		echo '<ul class="etr-lignes">';
-		foreach ( $lignes as $ligne ) {
+		$manques   = 0;
+		$chiffrage = etr_chiffrage( $id );
+		echo '<ul class="etr-lignes etr-lignes--prix">';
+		foreach ( $lignes as $index => $ligne ) {
 			$article = etr_get_article( $ligne['article_id'] );
 			$dispo   = etr_disponibilite( (int) $ligne['article_id'], $reservees );
 			$court   = null !== $dispo && (int) $ligne['quantite'] > $dispo;
@@ -1010,9 +1011,11 @@ class ETR_Gestion {
 			}
 			echo '</span>';
 			echo '<span class="etr-ligne__qte">' . esc_html( number_format_i18n( $ligne['quantite'] ) ) . ( ! empty( $ligne['unite'] ) ? '<small>' . esc_html( $ligne['unite'] ) . '</small>' : '' ) . '</span>';
+			echo etr_prix_ligne_html( $chiffrage['lignes'][ $index ], (int) $ligne['quantite'] ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans etr_prix_ligne_html().
 			echo '</li>';
 		}
 		echo '</ul>';
+		echo etr_total_indicatif_html( $chiffrage ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans etr_total_indicatif_html().
 		if ( $manques ) {
 			echo '<p class="etr-materiel__bilan etr-materiel__bilan--manque">' . self::icone( 'alerte' ) . esc_html(
 				/* translators: %s : nombre d'articles. */

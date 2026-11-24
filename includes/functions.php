@@ -146,6 +146,97 @@ function etr_get_lignes( $demande_id ) {
 }
 
 /**
+ * Prix unitaire indicatif d'un article (prix actuel du produit WooCommerce).
+ *
+ * @param int $article_id ID article.
+ * @return float|null Prix, ou null si l'article n'a pas de prix.
+ */
+function etr_prix_unitaire( $article_id ) {
+	$prix = null;
+	if ( etr_source_woocommerce() ) {
+		$produit = wc_get_product( absint( $article_id ) );
+		if ( $produit && '' !== (string) $produit->get_price() ) {
+			$prix = (float) wc_get_price_to_display( $produit );
+		}
+	}
+	$prix = apply_filters( 'etr_prix_unitaire', $prix, (int) $article_id );
+	return null === $prix || '' === $prix ? null : (float) $prix;
+}
+
+/**
+ * Montant formaté (HTML sûr).
+ *
+ * @param float $montant Montant.
+ * @return string
+ */
+function etr_format_prix( $montant ) {
+	if ( function_exists( 'wc_price' ) ) {
+		return wc_price( $montant );
+	}
+	return esc_html( number_format_i18n( $montant, 2 ) . "\xc2\xa0€" );
+}
+
+/**
+ * Chiffrage indicatif d'une demande, ligne par ligne.
+ *
+ * @param int $demande_id ID de la demande.
+ * @return array{lignes:array<int,array{unitaire:float|null,total:float|null}>,total:float,sans_prix:int}
+ */
+function etr_chiffrage( $demande_id ) {
+	$chiffrage = array(
+		'lignes'    => array(),
+		'total'     => 0.0,
+		'sans_prix' => 0,
+	);
+	foreach ( etr_get_lignes( $demande_id ) as $index => $ligne ) {
+		$unitaire = etr_prix_unitaire( $ligne['article_id'] );
+		$total    = null === $unitaire ? null : $unitaire * (int) $ligne['quantite'];
+		$chiffrage['lignes'][ $index ] = array(
+			'unitaire' => $unitaire,
+			'total'    => $total,
+		);
+		if ( null === $total ) {
+			++$chiffrage['sans_prix'];
+		} else {
+			$chiffrage['total'] += $total;
+		}
+	}
+	return $chiffrage;
+}
+
+/**
+ * Prix d'une ligne pour l'application (total et détail unitaire).
+ *
+ * @param array{unitaire:float|null,total:float|null} $prix Prix de la ligne (etr_chiffrage()).
+ * @param int                                         $quantite Quantité.
+ * @return string HTML.
+ */
+function etr_prix_ligne_html( $prix, $quantite ) {
+	if ( null === $prix['total'] ) {
+		return '<span class="etr-ligne__prix etr-ligne__prix--vide">' . esc_html__( 'Prix non renseigné', 'espace-traiteur' ) . '</span>';
+	}
+	return '<span class="etr-ligne__prix">' . etr_format_prix( $prix['total'] ) . '<small>' . esc_html( number_format_i18n( $quantite ) ) . ' × ' . etr_format_prix( $prix['unitaire'] ) . '</small></span>';
+}
+
+/**
+ * Total indicatif d'une demande pour l'application.
+ *
+ * @param array $chiffrage Résultat de etr_chiffrage().
+ * @return string HTML.
+ */
+function etr_total_indicatif_html( $chiffrage ) {
+	$html  = '<div class="etr-chiffrage"><span class="etr-chiffrage__libelle">' . esc_html__( 'Prix final indicatif', 'espace-traiteur' ) . '</span>';
+	$html .= '<span class="etr-chiffrage__total">' . etr_format_prix( $chiffrage['total'] ) . '</span>';
+	$note  = __( 'Selon les tarifs actuels du site, hors livraison et reprise.', 'espace-traiteur' );
+	if ( $chiffrage['sans_prix'] ) {
+		/* translators: %s : nombre d'articles. */
+		$note .= ' ' . sprintf( _n( '%s article sans prix n’est pas compté.', '%s articles sans prix ne sont pas comptés.', $chiffrage['sans_prix'], 'espace-traiteur' ), number_format_i18n( $chiffrage['sans_prix'] ) );
+	}
+	$html .= '<span class="etr-chiffrage__note">' . esc_html( $note ) . '</span></div>';
+	return $html;
+}
+
+/**
  * Vérifie une date au format AAAA-MM-JJ.
  *
  * @param string $date Date.
@@ -307,8 +398,11 @@ function etr_lignes_html( $demande_id, $avec_dispo = false ) {
 	if ( $avec_dispo ) {
 		$html .= '<th>' . esc_html__( 'Disponible sur la période (hors cette demande)', 'espace-traiteur' ) . '</th>';
 	}
-	$html .= '</tr></thead><tbody>';
-	foreach ( $lignes as $ligne ) {
+	$html     .= '<th class="etr-num">' . esc_html__( 'Prix unitaire', 'espace-traiteur' ) . '</th>';
+	$html     .= '<th class="etr-num">' . esc_html__( 'Prix de la ligne', 'espace-traiteur' ) . '</th>';
+	$html     .= '</tr></thead><tbody>';
+	$chiffrage = etr_chiffrage( $demande_id );
+	foreach ( $lignes as $index => $ligne ) {
 		$article   = etr_get_article( $ligne['article_id'] );
 		$reference = $article ? $article['reference'] : '';
 		$quantite  = number_format_i18n( $ligne['quantite'] ) . ( ! empty( $ligne['unite'] ) ? ' ' . $ligne['unite'] : '' );
@@ -324,9 +418,19 @@ function etr_lignes_html( $demande_id, $avec_dispo = false ) {
 				$html .= '<td>' . esc_html( number_format_i18n( $dispo ) ) . '</td>';
 			}
 		}
+		$prix  = isset( $chiffrage['lignes'][ $index ] ) ? $chiffrage['lignes'][ $index ] : array( 'unitaire' => null, 'total' => null );
+		$html .= '<td class="etr-num">' . ( null === $prix['unitaire'] ? '—' : etr_format_prix( $prix['unitaire'] ) ) . '</td>';
+		$html .= '<td class="etr-num">' . ( null === $prix['total'] ? '—' : etr_format_prix( $prix['total'] ) ) . '</td>';
 		$html .= '</tr>';
 	}
-	$html .= '</tbody></table>';
+	$html .= '</tbody><tfoot><tr><th colspan="' . ( $avec_dispo ? 5 : 4 ) . '">' . esc_html__( 'Prix final indicatif', 'espace-traiteur' ) . '</th>';
+	$html .= '<th class="etr-num"><strong>' . etr_format_prix( $chiffrage['total'] ) . '</strong></th></tr></tfoot></table>';
+	$note  = __( 'Selon les tarifs actuels du site, hors livraison et reprise.', 'espace-traiteur' );
+	if ( $chiffrage['sans_prix'] ) {
+		/* translators: %s : nombre d'articles. */
+		$note .= ' ' . sprintf( _n( '%s article sans prix n’est pas compté.', '%s articles sans prix ne sont pas comptés.', $chiffrage['sans_prix'], 'espace-traiteur' ), number_format_i18n( $chiffrage['sans_prix'] ) );
+	}
+	$html .= '<p class="etr-muted">' . esc_html( $note ) . '</p>';
 	return $html;
 }
 

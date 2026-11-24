@@ -7,7 +7,7 @@ Un espace privé pour les traiteurs partenaires de [Maison Anamé](https://maiso
 Quand WooCommerce est actif (cas de maisonaname.com), le plugin **reprend directement les produits du site** : pas de double saisie.
 
 - Sont proposés les produits **publiés** et visibles dans le catalogue, regroupés par famille et sous-catégorie (ex. *Mobilier › Tables*, *Art de la table › Verrerie*).
-- *Espace traiteur › Réglages* : choisir les catégories proposées (toutes par défaut), afficher ou non les prix du site, e-mail de l'équipe.
+- *Espace traiteur › Réglages* : choisir les catégories proposées (toutes par défaut), afficher ou non les prix du site (catalogue, et prix de chaque ligne et total indicatif dans le détail d'une demande), e-mail de l'équipe.
 - En haut de cette page, un **récapitulatif** indique le nombre de produits publiés, proposés et écartés, la liste des produits écartés avec la raison (non publié, visibilité « Masqué », case « Masquer » cochée, hors des catégories proposées), et les produits proposés sans quantité possédée.
 - Sur chaque produit, onglet **Inventaire**, bloc « Espace traiteur » :
   - **Quantité possédée** : nombre de pièces réservables par les traiteurs ;
@@ -37,7 +37,7 @@ Sans WooCommerce, le plugin utilise son propre catalogue (menu *Espace traiteur 
 
 - **Tableau de bord** : compteurs (demandes à traiter, événements validés, livraisons et reprises des 7 jours), agenda des 7 prochains jours, file « À traiter » avec alerte sur le matériel insuffisant.
 - **Demandes** : liste classée par date d'événement, filtres par statut et par traiteur, recherche.
-- **Fiche d'une demande** : matériel et disponibilités sur la période, informations de l'événement, coordonnées du traiteur ; choix du statut et message au traiteur (e-mail envoyé si le statut change).
+- **Fiche d'une demande** : matériel et disponibilités sur la période, prix de chaque ligne et prix final indicatif (tarifs actuels du site, hors livraison et reprise), informations de l'événement, coordonnées du traiteur ; choix du statut et message au traiteur (e-mail envoyé si le statut change).
 - **Planning** : calendrier du mois avec livraisons, événements et reprises (en pointillés : demandes encore en attente).
 - **Traiteurs** : liste, nombre de demandes, ajout d'un traiteur, renvoi d'invitation, désactivation et réactivation.
 - **Catalogue** : stock, quantités sorties et disponibles aujourd'hui, lien vers la fiche produit.
@@ -127,6 +127,7 @@ add_filter( 'etr_email_equipe', fn() => 'logistique@exemple.fr' );
 - `etr_routes_api_traiteurs` : routes de l'API REST autorisées aux traiteurs connectés.
 - `etr_migrations` : étapes de migration (par version).
 - `etr_gestion_slug` : adresse de l'espace de gestion (`gestion-traiteur` par défaut).
+- `etr_prix_unitaire` : prix unitaire utilisé pour le chiffrage indicatif d'une demande (`$prix, $article_id`).
 - Actions : `etr_demande_creee`, `etr_demande_annulee`, `etr_statut_change` (`$id, $ancien, $nouveau`).
 
 ## Structure
