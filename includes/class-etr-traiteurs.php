@@ -208,7 +208,7 @@ class ETR_Traiteurs {
 			return '<span class="etr-statut etr-statut--en_attente">' . esc_html__( 'À inviter', 'espace-traiteur' ) . '</span>';
 		}
 		/* translators: %s : date. */
-		return '<span class="etr-statut etr-statut--validee">' . esc_html__( 'Actif', 'espace-traiteur' ) . '</span><small class="etr-acces-date">' . esc_html( sprintf( __( 'Invité le %s', 'espace-traiteur' ), wp_date( 'j M Y', $invite_le ) ) ) . '</small>';
+		return '<span class="etr-statut etr-statut--validee">' . esc_html__( 'Actif', 'espace-traiteur' ) . '</span><small class="etr-acces-date">' . esc_html( sprintf( __( 'Invité le %s', 'espace-traiteur' ), wp_date( 'j M Y, H:i', $invite_le ) ) ) . '</small>';
 	}
 
 	/**
