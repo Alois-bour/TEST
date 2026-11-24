@@ -1641,7 +1641,7 @@ class ETR_Gestion {
 		if ( ! $traiteurs ) {
 			echo '<div class="etr-vide etr-vide--compact"><p>' . esc_html__( 'Aucun traiteur pour le moment. Ajoutez le premier avec le formulaire.', 'espace-traiteur' ) . '</p></div>';
 		} else {
-			echo '<div class="etr-table-cadre"><table class="etr-table etr-table--traiteurs">';
+			echo '<div class="etr-table-cadre" tabindex="0" role="region" aria-label="' . esc_attr__( 'Liste des traiteurs', 'espace-traiteur' ) . '"><table class="etr-table etr-table--traiteurs">';
 			echo '<thead><tr><th scope="col">' . esc_html__( 'Traiteur', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Coordonnées', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Demandes', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Accès', 'espace-traiteur' ) . '</th><th scope="col"><span class="screen-reader-text">' . esc_html__( 'Actions', 'espace-traiteur' ) . '</span></th></tr></thead><tbody>';
 			foreach ( $traiteurs as $user ) {
 				$desactive = ETR_Comptes::est_desactive( $user->ID );
@@ -1651,7 +1651,7 @@ class ETR_Gestion {
 				echo '<tr' . ( $desactive ? ' class="etr-table__passee"' : '' ) . '>';
 				echo '<td><strong>' . esc_html( etr_nom( $user ) ) . '</strong><small>' . esc_html( $contact ? $contact : $user->user_login ) . '</small></td>';
 				echo '<td><a class="etr-lien" href="mailto:' . esc_attr( $user->user_email ) . '">' . esc_html( $user->user_email ) . '</a>' . ( $tel ? '<small>' . esc_html( $tel ) . '</small>' : '' ) . '</td>';
-				echo '<td>';
+				echo '<td data-label="' . esc_attr__( 'Demandes', 'espace-traiteur' ) . '">';
 				if ( $nb ) {
 					echo '<a class="etr-lien" href="' . esc_url( self::url( array( 'vue' => 'demandes', 'traiteur' => $user->ID ) ) ) . '">' . esc_html( number_format_i18n( $nb ) ) . '</a>';
 					/* translators: %s : date. */
@@ -1661,7 +1661,7 @@ class ETR_Gestion {
 				}
 				echo '</td>';
 				$invite_le = ETR_Traiteurs::date_invitation( $user->ID );
-				echo '<td>' . ETR_Traiteurs::badge_acces( $desactive, $invite_le ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans badge_acces().
+				echo '<td data-label="' . esc_attr__( 'Accès', 'espace-traiteur' ) . '">' . ETR_Traiteurs::badge_acces( $desactive, $invite_le ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans badge_acces().
 				echo '<td class="etr-table__actions">';
 				if ( ! $desactive ) {
 					self::bouton_compte( 'inviter', $user->ID, $invite_le ? __( 'Renvoyer l’invitation', 'espace-traiteur' ) : __( 'Envoyer l’invitation', 'espace-traiteur' ), '', ! $invite_le );

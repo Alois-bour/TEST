@@ -131,7 +131,7 @@
 .etr-semaine__jour--we .etr-mvt:not(.etr-mvt--evenement) { background: #fff; }
 
 /* Tableaux */
-.etr-table-cadre { overflow-x: auto; border: 1px solid var(--etr-trait); border-radius: 12px; background: #fff; }
+.etr-table-cadre { position: relative; overflow-x: auto; border: 1px solid var(--etr-trait); border-radius: 12px; background: #fff; }
 /* Les règles du thème (bordures de cellules, lignes alternées) sont neutralisées. */
 .etr-app .etr-table { width: 100%; margin: 0; border: 0; border-collapse: collapse; border-spacing: 0; background: none; font-size: 14px; line-height: 1.45; }
 .etr-app .etr-table tr { border: 0; background: none; }
@@ -332,19 +332,29 @@ td.etr-table__nombre .etr-manque { margin: 0; font-size: inherit; font-weight: 5
 .etr-app .etr-champ__erreur { color: var(--etr-rouge); }
 .etr-app .etr-champ--erreur input { border-color: var(--etr-rouge); }
 .etr-app .etr-ajout .etr-notice { margin: 0; }
-.etr-app .etr-table--traiteurs td:first-child { min-width: 150px; }
-.etr-table--traiteurs .etr-lien { white-space: nowrap; }
-.etr-app .etr-table--traiteurs td:last-child { min-width: 11.5em; }
+/* Le tableau tient à côté du formulaire : pas de largeur minimale imposée,
+   les adresses e-mail passent à la ligne et les actions s'empilent. */
+.etr-app .etr-table--traiteurs th,
+.etr-app .etr-table--traiteurs td { padding-right: 12px; padding-left: 12px; }
+.etr-app .etr-table--traiteurs th:first-child,
+.etr-app .etr-table--traiteurs td:first-child { padding-left: 16px; }
+.etr-table--traiteurs .etr-lien { overflow-wrap: anywhere; }
+.etr-app .etr-table--traiteurs .etr-statut { white-space: nowrap; }
 .etr-app .etr-table--traiteurs .etr-table__actions { white-space: normal; }
 .etr-table--traiteurs .etr-table__actions form { display: block; margin: 0; }
 .etr-table--traiteurs .etr-table__actions form + form { margin-top: 6px; }
 
 /* Responsive */
+/* Traiteurs : sous 1366 px, le tableau n'a plus la place à côté du formulaire ;
+   le formulaire passe dessous. */
+@media (max-width: 1365px) {
+	.etr-traiteurs-gestion { grid-template-columns: minmax(0, 1fr); }
+	.etr-ajout { position: static; max-width: 640px; }
+}
+
 @media (max-width: 1180px) {
-	.etr-dossier,
-	.etr-traiteurs-gestion { grid-template-columns: 1fr; }
-	.etr-dossier__cote,
-	.etr-ajout { position: static; }
+	.etr-dossier { grid-template-columns: minmax(0, 1fr); }
+	.etr-dossier__cote { position: static; }
 	.etr-semaine__jours { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 	.etr-semaine__jour { min-height: 160px; border-bottom: 1px solid var(--etr-trait-doux); }
 	.etr-semaine__jour + .etr-semaine__jour { border-left: 0; }
@@ -474,8 +484,34 @@ td.etr-table__nombre .etr-manque { margin: 0; font-size: inherit; font-weight: 5
 }
 
 /* Traiteurs : invitation envoyée maintenant ou plus tard */
-.etr-app .etr-btn.etr-btn--petit { width: auto; min-height: 34px; padding: 6px 14px; font-size: 13px; }
+.etr-app .etr-btn.etr-btn--petit { width: auto; min-height: 34px; padding: 6px 14px; font-size: 13px; white-space: normal; text-align: center; }
 .etr-app .etr-acces-date { display: block; margin-top: 4px; font-size: 12px; color: var(--etr-gris); }
 .etr-app .etr-case { display: flex; align-items: flex-start; gap: 10px; margin: 0; font-weight: 500; cursor: pointer; }
 .etr-app .etr-case input[type="checkbox"] { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--etr-olive); }
 .etr-app .etr-case small { display: block; margin-top: 2px; font-weight: 400; font-size: 13px; color: var(--etr-gris); }
+
+/* Traiteurs sur téléphone : une fiche par traiteur plutôt qu'un tableau à faire défiler. */
+@media (max-width: 640px) {
+	.etr-app .etr-table--traiteurs thead {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+	}
+	.etr-app .etr-table--traiteurs,
+	.etr-app .etr-table--traiteurs tbody,
+	.etr-app .etr-table--traiteurs tr,
+	.etr-app .etr-table--traiteurs td { display: block; }
+	.etr-app .etr-table--traiteurs tr { padding: 16px; border-bottom: 1px solid var(--etr-trait-doux); }
+	.etr-app .etr-table--traiteurs tbody tr:last-child { border-bottom: 0; }
+	.etr-app .etr-table--traiteurs td,
+	.etr-app .etr-table--traiteurs td:first-child { padding: 3px 0; border: 0; }
+	.etr-app .etr-table--traiteurs tbody tr:hover > td { background: none; }
+	.etr-app .etr-table--traiteurs td[data-label] { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+	.etr-app .etr-table--traiteurs td[data-label]::before { content: attr(data-label) " :"; flex: none; min-width: 5.5em; font-size: 13px; color: var(--etr-gris); }
+	.etr-app .etr-table--traiteurs td[data-label] small { width: 100%; margin-left: calc(5.5em + 8px); }
+	.etr-app .etr-table--traiteurs .etr-table__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding-top: 10px; }
+	.etr-table--traiteurs .etr-table__actions form + form { margin-top: 0; }
+}
