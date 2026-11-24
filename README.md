@@ -92,7 +92,9 @@ L'espace de gestion (`/gestion-traiteur/`) s'installe comme une application sur 
 
 - **Une personne peut avoir plusieurs rôles** (par exemple Préparateur et Livreur) : elle cumule ce que chacun permet. Le rôle Bureau inclut déjà la préparation et la livraison.
 - *Gestion › Équipe* (bureau) : ajouter une personne (nom, e-mail, téléphone, un ou plusieurs rôles), cocher ou décocher ses rôles directement dans la liste (au moins un rôle ; pour fermer l'application, « Retirer l'accès »), envoyer ou renvoyer l'invitation, **retirer l'accès** (déconnexion immédiate, rôles mis de côté) ou le rendre. Les administrateurs et son propre compte ne sont pas modifiables ici.
-- **Invitation** : envoyée à la création (case « Envoyer l'invitation maintenant », cochée par défaut ; décochez pour l'envoyer plus tard). Le mail donne l'identifiant, un lien pour choisir le mot de passe (24 h) et l'adresse de l'application à installer.
+- **Invitation** : envoyée à la création (case « Envoyer l'invitation maintenant », cochée par défaut ; décochez pour l'envoyer plus tard). Le mail donne l'identifiant, un lien pour choisir le mot de passe et l'adresse de l'application à installer.
+- **Mot de passe : tout se passe dans l'application**, jamais sur les écrans de WordPress (choix du mot de passe depuis l'invitation, « Mot de passe oublié ? », y compris si la demande part de `wp-login.php`). Un lien ne sert qu'une fois, expire après 24 h et est annulé par une invitation plus récente : l'application l'explique et propose d'en recevoir un nouveau.
+- **Comptes jamais mélangés** : si un lien d'invitation est ouvert sur un appareil où quelqu'un d'autre est connecté (par exemple l'administrateur), l'application l'affiche (« Ce lien permet à … de choisir son mot de passe, mais cet appareil est connecté au compte de … ») et propose de déconnecter ce compte avant de continuer, ou d'annuler. Après l'enregistrement du mot de passe, la personne arrive sur la connexion, identifiant prérempli : aucune connexion automatique.
 - Les droits sont vérifiés côté serveur : une demande en attente est introuvable pour le terrain (fiche, bons), toute action de gestion est refusée hors bureau.
 - Les administrateurs WordPress ont tous les droits.
 
@@ -189,6 +191,7 @@ includes/class-etr-access.php       Accès : traiteurs tenus hors de wp-admin, W
 includes/class-etr-comptes.php      Connexion, mot de passe oublié, choix du mot de passe
 includes/class-etr-traiteurs.php    Page « Traiteurs » : création, invitation, désactivation
 includes/class-etr-equipe.php       Rôles de l'équipe (bureau, préparateur, livreur), page Équipe
+includes/class-etr-equipe-acces.php Connexion, mot de passe oublié et choix du mot de passe dans l'application
 includes/class-etr-pwa.php          Application installable : manifeste, service worker, hors ligne
 includes/class-etr-admin.php        Écrans d'administration
 includes/class-etr-frontend.php     Espace traiteur (shortcode)

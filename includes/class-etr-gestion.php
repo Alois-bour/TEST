@@ -30,13 +30,6 @@ class ETR_Gestion {
 	private static $erreurs_membre = array();
 
 	/**
-	 * Erreur de l'écran de connexion.
-	 *
-	 * @var string
-	 */
-	private static $erreur_connexion = '';
-
-	/**
 	 * Cache des demandes.
 	 *
 	 * @var int[]|null
@@ -121,12 +114,9 @@ class ETR_Gestion {
 		}
 		nocache_headers();
 
-		if ( ! is_user_logged_in() ) {
-			// Connexion dans l'application même : une app installée sur iPhone a ses propres
-			// cookies, une connexion faite hors de l'app (wp-login.php) n'y serait pas reconnue.
-			if ( isset( $_POST['etr_gestion_action'] ) && 'connexion' === $_POST['etr_gestion_action'] ) { // phpcs:ignore WordPress.Security.NonceVerification -- formulaire de connexion public.
-				self::action_connexion();
-			}
+		// Connexion, mot de passe oublié, choix du mot de passe : dans l'application même
+		// (une app installée sur iPhone a ses propres cookies), voir ETR_Equipe_Acces.
+		if ( ETR_Equipe_Acces::preparer() ) {
 			self::page_trouvee();
 			return;
 		}
@@ -178,50 +168,6 @@ class ETR_Gestion {
 		$wp_query->is_home = false;
 		$wp_query->is_404  = false;
 		status_header( 200 );
-	}
-
-	/**
-	 * Connexion d'un membre de l'équipe depuis l'application.
-	 */
-	private static function action_connexion() {
-		// phpcs:disable WordPress.Security.NonceVerification -- formulaire de connexion public, comme wp-login.php.
-		$login = isset( $_POST['log'] ) ? sanitize_text_field( wp_unslash( $_POST['log'] ) ) : '';
-		$mdp   = isset( $_POST['pwd'] ) ? (string) wp_unslash( $_POST['pwd'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- mot de passe : jamais modifié.
-		$garde = ! empty( $_POST['rememberme'] );
-		// phpcs:enable
-		$cle = 'equipe|' . $login;
-
-		if ( '' === $login || '' === $mdp ) {
-			self::$erreur_connexion = __( 'Saisissez votre identifiant et votre mot de passe.', 'espace-traiteur' );
-			return;
-		}
-		if ( ETR_Comptes::est_bloque( $cle ) ) {
-			self::$erreur_connexion = __( 'Trop de tentatives de connexion. Réessayez dans 15 minutes.', 'espace-traiteur' );
-			return;
-		}
-		$user = wp_signon(
-			array(
-				'user_login'    => $login,
-				'user_password' => $mdp,
-				'remember'      => $garde,
-			),
-			is_ssl()
-		);
-		if ( is_wp_error( $user ) ) {
-			ETR_Comptes::compter_echec( $cle );
-			self::$erreur_connexion = 'etr_hors_espace' === $user->get_error_code()
-				? __( 'Les traiteurs se connectent depuis l’espace traiteur, pas depuis l’application de l’équipe.', 'espace-traiteur' )
-				: __( 'Identifiant ou mot de passe incorrect.', 'espace-traiteur' );
-			return;
-		}
-		if ( ! ETR_Equipe::acces( $user->ID ) ) {
-			wp_logout();
-			self::$erreur_connexion = __( 'Cette application est réservée à l’équipe. Si votre accès a été retiré, contactez le bureau.', 'espace-traiteur' );
-			return;
-		}
-		delete_transient( ETR_Comptes::cle_echecs( $cle ) );
-		wp_safe_redirect( self::url() );
-		exit;
 	}
 
 	/**
@@ -618,7 +564,7 @@ class ETR_Gestion {
 		wp_enqueue_script( 'espace-traiteur-gestion', ETR_URL . 'assets/js/gestion.js', array(), ETR_VERSION, true );
 		wp_enqueue_script( 'espace-traiteur-app', ETR_URL . 'assets/js/app.js', array(), ETR_VERSION, true );
 		wp_localize_script( 'espace-traiteur-app', 'etrApp', ETR_PWA::config_script() );
-		if ( ! is_user_logged_in() ) {
+		if ( ETR_Equipe_Acces::ecran() ) {
 			wp_enqueue_script( 'espace-traiteur-connexion', ETR_URL . 'assets/js/connexion.js', array(), ETR_VERSION, true );
 		}
 	}
@@ -660,8 +606,8 @@ class ETR_Gestion {
 		$vues = self::vues();
 		$vue  = self::vue_courante();
 		$nom  = isset( $vues[ $vue ] ) ? $vues[ $vue ][0] : __( 'Demande', 'espace-traiteur' );
-		if ( ! is_user_logged_in() ) {
-			$nom = __( 'Connexion', 'espace-traiteur' );
+		if ( ETR_Equipe_Acces::ecran() ) {
+			$nom = ETR_Equipe_Acces::titre();
 		}
 		return $nom . ' – ' . __( 'Gestion', 'espace-traiteur' ) . ' – ' . wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
 	}
@@ -922,8 +868,8 @@ class ETR_Gestion {
 	 * Affiche l'application.
 	 */
 	public static function rendu() {
-		if ( ! is_user_logged_in() ) {
-			self::vue_connexion();
+		if ( ETR_Equipe_Acces::ecran() ) {
+			ETR_Equipe_Acces::afficher();
 			return;
 		}
 		$vue   = self::vue_courante();
@@ -962,33 +908,6 @@ class ETR_Gestion {
 		}
 
 		echo '</main></div>';
-	}
-
-	/**
-	 * Écran de connexion de l'application.
-	 */
-	private static function vue_connexion() {
-		$login   = isset( $_POST['log'] ) ? sanitize_text_field( wp_unslash( $_POST['log'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
-		$logo_id = ETR_Comptes::logo_id();
-		$site    = get_bloginfo( 'name' );
-
-		echo '<div class="etr-auth etr-auth--app"><div class="etr-auth__panneau"><div class="etr-auth__contenu">';
-		echo '<span class="etr-auth__logo">' . ( $logo_id ? wp_get_attachment_image( $logo_id, 'medium', false, array( 'alt' => $site ) ) : '<span class="etr-auth__nom-site">' . esc_html( $site ) . '</span>' ) . '</span>';
-		echo '<p class="etr-auth__surtitre">' . esc_html__( 'Application de l’équipe', 'espace-traiteur' ) . '</p>';
-		echo '<h1 class="etr-auth__titre">' . esc_html__( 'Bonjour', 'espace-traiteur' ) . '</h1>';
-		echo '<p class="etr-auth__intro">' . esc_html__( 'Connectez-vous pour voir le planning, les demandes et les livraisons.', 'espace-traiteur' ) . '</p>';
-		if ( self::$erreur_connexion ) {
-			echo '<div class="etr-auth__message etr-auth__message--erreur" role="alert"><p>' . esc_html( self::$erreur_connexion ) . '</p></div>';
-		}
-		echo '<form method="post" action="' . esc_url( self::url() ) . '" class="etr-auth__form" novalidate>';
-		echo '<input type="hidden" name="etr_gestion_action" value="connexion">';
-		echo '<div class="etr-auth__champ"><label for="user_login">' . esc_html__( 'Identifiant ou e-mail', 'espace-traiteur' ) . '</label><div class="etr-auth__saisie"><input type="text" name="log" id="user_login" value="' . esc_attr( $login ) . '" autocomplete="username" autocapitalize="none" spellcheck="false" required' . ( $login ? '' : ' autofocus' ) . '></div></div>';
-		echo '<div class="etr-auth__champ"><label for="user_pass">' . esc_html__( 'Mot de passe', 'espace-traiteur' ) . '</label><div class="etr-auth__saisie etr-auth__saisie--mdp"><input type="password" name="pwd" id="user_pass" autocomplete="current-password" required' . ( $login ? ' autofocus' : '' ) . '>';
-		echo '<button type="button" class="etr-auth__oeil" aria-controls="user_pass" aria-pressed="false" data-afficher="' . esc_attr__( 'Afficher', 'espace-traiteur' ) . '" data-masquer="' . esc_attr__( 'Masquer', 'espace-traiteur' ) . '">' . esc_html__( 'Afficher', 'espace-traiteur' ) . '</button></div></div>';
-		echo '<div class="etr-auth__ligne"><label class="etr-auth__case"><input type="checkbox" name="rememberme" value="1" checked> <span>' . esc_html__( 'Rester connecté', 'espace-traiteur' ) . '</span></label>';
-		echo '<a href="' . esc_url( wp_lostpassword_url( self::url() ) ) . '">' . esc_html__( 'Mot de passe oublié ?', 'espace-traiteur' ) . '</a></div>';
-		echo '<button type="submit" id="wp-submit" class="etr-auth__bouton" data-chargement="' . esc_attr__( 'Un instant…', 'espace-traiteur' ) . '"><span>' . esc_html__( 'Se connecter', 'espace-traiteur' ) . '</span></button>';
-		echo '</form></div></div></div>';
 	}
 
 	/**

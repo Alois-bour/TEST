@@ -418,7 +418,7 @@ class ETR_Equipe {
 			return false;
 		}
 		$site  = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
-		$lien  = network_site_url( 'wp-login.php?action=rp&key=' . rawurlencode( $cle ) . '&login=' . rawurlencode( $user->user_login ), 'login' );
+		$lien  = ETR_Equipe_Acces::url_mot_de_passe( $cle, $user->user_login ); // Dans l'application, pas sur wp-login.php.
 		$roles = self::roles_equipe( $user );
 
 		/* translators: %s : nom du site. */
