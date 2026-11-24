@@ -158,7 +158,7 @@ class ETR_Equipe_Acces {
 		$cle   = isset( $_REQUEST['key'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['key'] ) ) : '';
 		// phpcs:enable
 
-		$user        = check_password_reset_key( $cle, $login );
+		$user        = etr_verifier_cle( $cle, $login );
 		self::$cible = ( ! is_wp_error( $user ) && self::autorise( $user ) ) ? $user : null;
 		if ( is_wp_error( $user ) ) {
 			self::$refus = in_array( $user->get_error_code(), array( 'expired_key', 'expiredkey' ), true ) ? 'expire' : 'remplace';
@@ -206,6 +206,7 @@ class ETR_Equipe_Acces {
 			self::$erreur = __( 'Trop de tentatives de connexion. Réessayez dans 15 minutes.', 'espace-traiteur' );
 			return;
 		}
+		etr_rafraichir_compte( $login ); // Mot de passe tout juste choisi : jamais une copie en cache.
 		$user = wp_signon(
 			array(
 				'user_login'    => $login,

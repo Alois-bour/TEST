@@ -139,6 +139,8 @@ Les traiteurs sont techniquement des utilisateurs WordPress (rôle « Traiteur �
 
 **Vérifier que le site envoie bien ses e-mails** : *Espace traiteur › Réglages › E-mails* affiche l'adresse d'expédition utilisée et propose « Envoyer un e-mail de test ». Si l'envoi échoue, la raison technique est affichée (aussi après une invitation qui n'est pas partie). Si l'envoi réussit mais que rien n'arrive (indésirables compris), l'hébergement n'envoie pas les e-mails de façon fiable : installer une extension SMTP (WP Mail SMTP, FluentSMTP…) reliée à une vraie boîte d'envoi.
 
+**Un lien « choisir mon mot de passe » est refusé** : l'écran dit pourquoi (déjà utilisé ou remplacé par un plus récent, expiré, compte sans accès). *Espace traiteur › Réglages › E-mails › Tester les liens de mot de passe* vérifie qu'un lien tout juste créé est accepté. Les liens et les connexions sont toujours vérifiés dans la base de données : un cache d'objets (LiteSpeed Cache, Redis…) qui garderait une ancienne copie des comptes ne peut plus les faire refuser.
+
 
 | Événement | Destinataire |
 |---|---|
