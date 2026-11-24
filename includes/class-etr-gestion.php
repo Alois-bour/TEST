@@ -133,6 +133,8 @@ class ETR_Gestion {
 			self::action_creer_traiteur();
 		} elseif ( 'inviter' === $action || 'basculer' === $action ) {
 			self::action_compte( $action );
+		} elseif ( 'export' === $action ) {
+			self::action_export();
 		}
 
 		// Bons imprimables : page autonome, hors application.
@@ -190,6 +192,223 @@ class ETR_Gestion {
 			)
 		);
 		exit;
+	}
+
+	/**
+	 * Adresse d'un export CSV.
+	 *
+	 * @param string $type demandes|articles|planning.
+	 * @param array  $args Filtres.
+	 * @return string
+	 */
+	private static function url_export( $type, $args = array() ) {
+		return wp_nonce_url(
+			self::url(
+				array_merge(
+					$args,
+					array(
+						'etr_gestion_action' => 'export',
+						'type'               => $type,
+					)
+				)
+			),
+			'etr_gestion_export'
+		);
+	}
+
+	/**
+	 * Export CSV (séparateur « ; », UTF-8 avec BOM : s'ouvre directement dans Excel).
+	 */
+	private static function action_export() {
+		check_admin_referer( 'etr_gestion_export' );
+		// phpcs:disable WordPress.Security.NonceVerification -- vérifié ci-dessus.
+		$type     = isset( $_GET['type'] ) ? sanitize_key( wp_unslash( $_GET['type'] ) ) : '';
+		$statut   = isset( $_GET['statut'] ) ? sanitize_key( wp_unslash( $_GET['statut'] ) ) : '';
+		$traiteur = isset( $_GET['traiteur'] ) ? absint( $_GET['traiteur'] ) : 0;
+		$q        = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
+		$mois     = isset( $_GET['mois'] ) ? sanitize_text_field( wp_unslash( $_GET['mois'] ) ) : '';
+		// phpcs:enable
+		if ( ! array_key_exists( $statut, etr_statuts() ) ) {
+			$statut = '';
+		}
+		if ( ! preg_match( '/^\d{4}-(0[1-9]|1[0-2])$/', $mois ) ) {
+			$mois = current_time( 'Y-m' );
+		}
+
+		if ( 'planning' === $type ) {
+			$nom    = 'planning-' . $mois;
+			$lignes = self::export_planning( $mois );
+		} elseif ( 'articles' === $type ) {
+			$nom    = 'demandes-articles-' . current_time( 'Y-m-d' );
+			$lignes = self::export_articles( self::filtrer_demandes( $statut, $traiteur, $q )[1] );
+		} else {
+			$nom    = 'demandes-' . current_time( 'Y-m-d' );
+			$lignes = self::export_demandes( self::filtrer_demandes( $statut, $traiteur, $q )[1] );
+		}
+		$lignes = apply_filters( 'etr_export_csv', $lignes, $type );
+
+		nocache_headers();
+		header( 'Content-Type: text/csv; charset=UTF-8' );
+		header( 'Content-Disposition: attachment; filename="' . sanitize_file_name( $nom ) . '.csv"' );
+		$sortie = fopen( 'php://output', 'w' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+		fwrite( $sortie, "\xEF\xBB\xBF" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
+		foreach ( $lignes as $ligne ) {
+			fputcsv( $sortie, array_map( array( __CLASS__, 'cellule_csv' ), $ligne ), ';', '"', '\\' );
+		}
+		fclose( $sortie ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+		exit;
+	}
+
+	/**
+	 * Cellule CSV : nombres au format français, formules neutralisées.
+	 *
+	 * @param mixed $valeur Valeur.
+	 * @return string
+	 */
+	private static function cellule_csv( $valeur ) {
+		if ( is_float( $valeur ) ) {
+			return number_format( $valeur, 2, ',', '' );
+		}
+		$valeur = (string) $valeur;
+		// Évite l'exécution de formules à l'ouverture dans un tableur.
+		if ( '' !== $valeur && in_array( $valeur[0], array( '=', '+', '-', '@', "\t", "\r" ), true ) && ! is_numeric( $valeur ) ) {
+			$valeur = "'" . $valeur;
+		}
+		return $valeur;
+	}
+
+	/**
+	 * Valeur brute d'un champ de demande.
+	 *
+	 * @param int    $id  Demande.
+	 * @param string $cle Champ.
+	 * @return string
+	 */
+	private static function meta( $id, $cle ) {
+		return (string) get_post_meta( $id, '_etr_' . $cle, true );
+	}
+
+	/**
+	 * Export : une ligne par demande.
+	 *
+	 * @param int[] $ids Demandes.
+	 * @return array[]
+	 */
+	private static function export_demandes( $ids ) {
+		$statuts = etr_statuts();
+		$lignes  = array(
+			array( 'N°', 'Reçue le', 'Traiteur', 'E-mail du traiteur', 'Événement', 'Date de l’événement', 'Invités', 'Lieu', 'Contact sur place', 'Livraison', 'Reprise', 'Statut', 'Articles', 'Quantité totale', 'Sous-total', 'Remise (%)', 'Remise', 'Livraison et reprise', 'Total indicatif', 'Hors catalogue', 'Message au traiteur', 'Lien' ),
+		);
+		foreach ( $ids as $id ) {
+			$auteur    = get_userdata( (int) get_post_field( 'post_author', $id ) );
+			$chiffrage = etr_chiffrage( $id );
+			$quantite  = 0;
+			foreach ( etr_get_lignes( $id ) as $ligne ) {
+				$quantite += (int) $ligne['quantite'];
+			}
+			$statut   = etr_get_statut( $id );
+			$lignes[] = array(
+				$id,
+				get_the_date( 'Y-m-d', $id ),
+				$auteur ? etr_nom( $auteur ) : '',
+				$auteur ? $auteur->user_email : '',
+				wp_specialchars_decode( get_the_title( $id ), ENT_QUOTES ),
+				self::meta( $id, 'date_evenement' ),
+				self::meta( $id, 'nb_invites' ),
+				self::meta( $id, 'lieu' ),
+				self::meta( $id, 'contact' ),
+				self::meta( $id, 'date_livraison' ),
+				self::meta( $id, 'date_reprise' ),
+				isset( $statuts[ $statut ] ) ? $statuts[ $statut ] : $statut,
+				count( etr_get_lignes( $id ) ),
+				$quantite,
+				(float) $chiffrage['sous_total'],
+				$chiffrage['remise_pct'] ? (float) $chiffrage['remise_pct'] : '',
+				$chiffrage['remise_pct'] ? (float) $chiffrage['remise'] : '',
+				null === $chiffrage['livraison'] ? '' : (float) $chiffrage['livraison'],
+				(float) $chiffrage['total'],
+				self::meta( $id, 'autres_besoins' ),
+				self::meta( $id, 'reponse' ),
+				self::url_demande( $id ),
+			);
+		}
+		return $lignes;
+	}
+
+	/**
+	 * Export : une ligne par article demandé (pour Odoo ou la comptabilité).
+	 *
+	 * @param int[] $ids Demandes.
+	 * @return array[]
+	 */
+	private static function export_articles( $ids ) {
+		$statuts = etr_statuts();
+		$lignes  = array(
+			array( 'N°', 'Traiteur', 'Événement', 'Date de l’événement', 'Livraison', 'Reprise', 'Statut', 'Article', 'Référence', 'Quantité', 'Unité', 'Prix unitaire', 'Prix de la ligne' ),
+		);
+		foreach ( $ids as $id ) {
+			$statut    = etr_get_statut( $id );
+			$chiffrage = etr_chiffrage( $id );
+			foreach ( etr_get_lignes( $id ) as $index => $ligne ) {
+				$article  = etr_get_article( $ligne['article_id'] );
+				$prix     = $chiffrage['lignes'][ $index ];
+				$lignes[] = array(
+					$id,
+					self::traiteur( $id ),
+					wp_specialchars_decode( get_the_title( $id ), ENT_QUOTES ),
+					self::meta( $id, 'date_evenement' ),
+					self::meta( $id, 'date_livraison' ),
+					self::meta( $id, 'date_reprise' ),
+					isset( $statuts[ $statut ] ) ? $statuts[ $statut ] : $statut,
+					$ligne['titre'],
+					$article ? $article['reference'] : '',
+					(int) $ligne['quantite'],
+					isset( $ligne['unite'] ) ? $ligne['unite'] : '',
+					null === $prix['unitaire'] ? '' : (float) $prix['unitaire'],
+					null === $prix['total'] ? '' : (float) $prix['total'],
+				);
+			}
+		}
+		return $lignes;
+	}
+
+	/**
+	 * Export : mouvements du mois (livraisons, événements, reprises).
+	 *
+	 * @param string $mois AAAA-MM.
+	 * @return array[]
+	 */
+	private static function export_planning( $mois ) {
+		$statuts = etr_statuts();
+		$types   = self::types_mouvement();
+		$jours   = self::mouvements( $mois . '-01', gmdate( 'Y-m-t', strtotime( $mois . '-01' ) ) );
+		ksort( $jours );
+		$lignes = array(
+			array( 'Date', 'Mouvement', 'N°', 'Événement', 'Traiteur', 'Statut', 'Lieu', 'Contact sur place', 'Articles', 'Quantité totale' ),
+		);
+		foreach ( $jours as $date => $mouvements ) {
+			foreach ( $mouvements as $mvt ) {
+				$id       = $mvt['id'];
+				$statut   = etr_get_statut( $id );
+				$quantite = 0;
+				foreach ( etr_get_lignes( $id ) as $ligne ) {
+					$quantite += (int) $ligne['quantite'];
+				}
+				$lignes[] = array(
+					$date,
+					isset( $types[ $mvt['type'] ] ) ? $types[ $mvt['type'] ] : $mvt['type'],
+					$id,
+					wp_specialchars_decode( get_the_title( $id ), ENT_QUOTES ),
+					self::traiteur( $id ),
+					isset( $statuts[ $statut ] ) ? $statuts[ $statut ] : $statut,
+					self::meta( $id, 'lieu' ),
+					self::meta( $id, 'contact' ),
+					count( etr_get_lignes( $id ) ),
+					$quantite,
+				);
+			}
+		}
+		return $lignes;
 	}
 
 	/**
@@ -855,6 +1074,37 @@ class ETR_Gestion {
 	/* ------------------------------------------------------------------ */
 
 	/**
+	 * Demandes filtrées (traiteur, recherche), puis par statut, triées.
+	 *
+	 * @param string $statut   Statut ('' = tous).
+	 * @param int    $traiteur Traiteur (0 = tous).
+	 * @param string $q        Recherche.
+	 * @return array{0:int[],1:int[]} Demandes sans filtre de statut, liste finale triée.
+	 */
+	private static function filtrer_demandes( $statut, $traiteur, $q ) {
+		$base  = array_filter(
+			self::demandes(),
+			function ( $id ) use ( $traiteur, $q ) {
+				if ( $traiteur && (int) get_post_field( 'post_author', $id ) !== $traiteur ) {
+					return false;
+				}
+				if ( '' === $q ) {
+					return true;
+				}
+				$texte = implode( ' ', array( $id, get_the_title( $id ), self::traiteur( $id ), get_post_meta( $id, '_etr_lieu', true ), get_post_meta( $id, '_etr_contact', true ) ) );
+				return false !== stripos( remove_accents( $texte ), remove_accents( $q ) );
+			}
+		);
+		$liste = $statut ? array_filter(
+			$base,
+			function ( $id ) use ( $statut ) {
+				return etr_get_statut( $id ) === $statut;
+			}
+		) : $base;
+		return array( $base, self::trier( array_values( $liste ) ) );
+	}
+
+	/**
 	 * Liste filtrable des demandes.
 	 */
 	private static function vue_demandes() {
@@ -870,39 +1120,31 @@ class ETR_Gestion {
 		}
 
 		// Filtres traiteur + recherche, puis comptes par statut.
-		$base = array_filter(
-			self::demandes(),
-			function ( $id ) use ( $traiteur, $q ) {
-				if ( $traiteur && (int) get_post_field( 'post_author', $id ) !== $traiteur ) {
-					return false;
-				}
-				if ( '' === $q ) {
-					return true;
-				}
-				$texte = implode( ' ', array( $id, get_the_title( $id ), self::traiteur( $id ), get_post_meta( $id, '_etr_lieu', true ), get_post_meta( $id, '_etr_contact', true ) ) );
-				return false !== stripos( remove_accents( $texte ), remove_accents( $q ) );
-			}
-		);
-		$comptes = array_fill_keys( array_keys( $statuts ), 0 );
+		list( $base, $liste ) = self::filtrer_demandes( $statut, $traiteur, $q );
+		$comptes              = array_fill_keys( array_keys( $statuts ), 0 );
 		foreach ( $base as $id ) {
 			$s = etr_get_statut( $id );
 			if ( isset( $comptes[ $s ] ) ) {
 				++$comptes[ $s ];
 			}
 		}
-		$liste = $statut ? array_filter(
-			$base,
-			function ( $id ) use ( $statut ) {
-				return etr_get_statut( $id ) === $statut;
-			}
-		) : $base;
-		$liste = self::trier( array_values( $liste ) );
 		$total = count( $liste );
 		$pages = max( 1, (int) ceil( $total / self::PAR_PAGE ) );
 		$page  = min( $page, $pages );
 
+		$export = array_filter(
+			array(
+				'statut'   => $statut,
+				'traiteur' => $traiteur,
+				'q'        => $q,
+			)
+		);
+		$action = '<div class="etr-export">'
+			. '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_export( 'demandes', $export ) ) . '">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Exporter les demandes', 'espace-traiteur' ) . '</span></a>'
+			. '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_export( 'articles', $export ) ) . '">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Détail des articles', 'espace-traiteur' ) . '</span></a>'
+			. '</div>';
 		/* translators: %s : nombre de demandes. */
-		self::entete( __( 'Demandes', 'espace-traiteur' ), sprintf( _n( '%s demande', '%s demandes', count( self::demandes() ), 'espace-traiteur' ), number_format_i18n( count( self::demandes() ) ) ) );
+		self::entete( __( 'Demandes', 'espace-traiteur' ), sprintf( _n( '%s demande', '%s demandes', count( self::demandes() ), 'espace-traiteur' ), number_format_i18n( count( self::demandes() ) ) ), $action );
 
 		$filtres = array_filter(
 			array(
@@ -1230,6 +1472,7 @@ class ETR_Gestion {
 		$nav .= '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url( array( 'vue' => 'planning' ) ) ) . '">' . esc_html__( 'Ce mois-ci', 'espace-traiteur' ) . '</a>';
 		$nav .= '<a class="etr-btn etr-btn--icone" href="' . esc_url( self::url( array( 'vue' => 'planning', 'mois' => $precedent ) ) ) . '" aria-label="' . esc_attr__( 'Mois précédent', 'espace-traiteur' ) . '">' . self::icone( 'retour' ) . '</a>';
 		$nav .= '<a class="etr-btn etr-btn--icone" href="' . esc_url( self::url( array( 'vue' => 'planning', 'mois' => $suivant ) ) ) . '" aria-label="' . esc_attr__( 'Mois suivant', 'espace-traiteur' ) . '">' . self::icone( 'suite' ) . '</a>';
+		$nav .= '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_export( 'planning', array( 'mois' => $mois ) ) ) . '">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Exporter', 'espace-traiteur' ) . '</span></a>';
 		$nav .= '</div>';
 		self::entete( ucfirst( date_i18n( 'F Y', $ts ) ), __( 'Livraisons, événements et reprises des demandes en cours.', 'espace-traiteur' ), $nav );
 

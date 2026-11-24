@@ -407,3 +407,10 @@ td.etr-table__nombre .etr-manque { margin: 0; font-size: inherit; font-weight: 5
 .etr-app .etr-documents__lien:hover { border-color: var(--etr-olive); background: var(--etr-olive-clair); }
 .etr-documents__lien strong { font-weight: 500; }
 .etr-documents__lien small { color: var(--etr-gris); font-size: 13px; }
+
+/* Exports */
+.etr-export { display: flex; flex-wrap: wrap; gap: 8px; }
+.etr-app .etr-export .etr-btn,
+.etr-app .etr-mois-nav .etr-btn--discret { display: inline-flex; align-items: center; gap: 6px; }
+.etr-export .etr-icone,
+.etr-mois-nav .etr-icone { width: 18px; height: 18px; }

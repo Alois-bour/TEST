@@ -36,9 +36,9 @@ Sans WooCommerce, le plugin utilise son propre catalogue (menu *Espace traiteur 
 **Espace de gestion** (`/gestion-traiteur/`, lien « Espace de gestion » dans le menu *Espace traiteur* et « Gestion traiteurs » dans la barre d'admin) : un back-office plein écran, dans l'identité de l'espace traiteur, réservé à l'équipe (droit `gerer_espace_traiteur`). Les écrans WordPress restent disponibles.
 
 - **Tableau de bord** : compteurs (demandes à traiter, événements validés, livraisons et reprises des 7 jours), agenda des 7 prochains jours, file « À traiter » avec alerte sur le matériel insuffisant.
-- **Demandes** : liste classée par date d'événement, filtres par statut et par traiteur, recherche.
+- **Demandes** : liste classée par date d'événement, filtres par statut et par traiteur, recherche ; **export CSV** (filtres appliqués) : une ligne par demande (dates, statut, sous-total, remise, livraison, total) ou une ligne par article (référence, quantité, prix), pour Excel, Odoo ou la comptabilité.
 - **Fiche d'une demande** : matériel et disponibilités sur la période, prix de chaque ligne et prix final indicatif (tarifs actuels du site) ; **tarification** : remise en % (ex. traiteur partenaire) et frais de livraison et reprise, intégrés au prix final (sous-total, remise, livraison, total), aussi modifiables dans l'administration WordPress ; **documents à imprimer** : bon de préparation (liste à cocher pour l'entrepôt, groupée par famille) et bon de retour (rendu OK, casse, manquants, observations, signatures), au format A4, informations de l'événement, coordonnées du traiteur ; choix du statut et message au traiteur (e-mail envoyé si le statut change) ; **historique** de la demande (envoi, changements de statut, messages, modifications et annulation : qui, quoi, quand), aussi visible dans l'administration WordPress.
-- **Planning** : calendrier du mois avec livraisons, événements et reprises (en pointillés : demandes encore en attente).
+- **Planning** : calendrier du mois avec livraisons, événements et reprises (en pointillés : demandes encore en attente) ; export CSV des mouvements du mois.
 - **Traiteurs** : liste, nombre de demandes, ajout d'un traiteur, renvoi d'invitation, désactivation et réactivation.
 - **Catalogue** : stock, quantités sorties et disponibles aujourd'hui, lien vers la fiche produit ; recherche instantanée (nom, référence, catégorie) pendant la frappe.
 
@@ -129,6 +129,7 @@ add_filter( 'etr_email_equipe', fn() => 'logistique@exemple.fr' );
 - `etr_gestion_slug` : adresse de l'espace de gestion (`gestion-traiteur` par défaut).
 - `etr_prix_unitaire` : prix unitaire utilisé pour le chiffrage indicatif d'une demande (`$prix, $article_id`).
 - Actions : `etr_demande_creee`, `etr_demande_annulee`, `etr_statut_change` (`$id, $ancien, $nouveau`), `etr_reponse_modifiee` (`$id, $message`), `etr_tarif_change` (`$id, $tarif`).
+- `etr_export_csv` : lignes d'un export CSV avant écriture (`$lignes, $type` : demandes, articles ou planning).
 - `etr_bon_signatures` : libellés des signatures en bas des bons (`$signatures, $type, $id`).
 - Historique : `ETR_Historique::ajouter( $id, $type, $texte )` pour journaliser un événement personnalisé.
 
@@ -172,4 +173,3 @@ uninstall.php                       Nettoyage à la désinstallation
 ## Limites actuelles / pistes
 
 - L'équipe ne peut pas encore modifier les quantités d'une demande depuis l'admin (elle répond via le message).
-- Pas encore d'export (PDF / CSV) des demandes.
