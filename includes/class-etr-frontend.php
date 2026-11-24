@@ -475,13 +475,15 @@ class ETR_Frontend {
 			'orderby'        => 'date',
 			'order'          => 'DESC',
 		);
-		$demandes = new WP_Query(
-			$args
-		);
-		if ( $demandes->max_num_pages && $page > $demandes->max_num_pages ) {
-			$page              = $demandes->max_num_pages;
-			$args['paged']     = $page;
-			$demandes          = new WP_Query( $args );
+		$demandes = new WP_Query( $args );
+
+		// Page au-delà de la dernière : WordPress ne calcule pas le nombre de pages quand
+		// la page demandée est vide, on revient donc sur la dernière page existante.
+		if ( ! $demandes->posts && $page > 1 ) {
+			$total         = (int) count_user_posts( get_current_user_id(), 'etr_demande' );
+			$page          = max( 1, (int) ceil( $total / $args['posts_per_page'] ) );
+			$args['paged'] = $page;
+			$demandes      = new WP_Query( $args );
 		}
 
 		echo '<h2>' . esc_html__( 'Mes demandes', 'espace-traiteur' ) . '</h2>';
