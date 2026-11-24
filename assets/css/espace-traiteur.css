@@ -48,6 +48,17 @@
 .etr-panneau-demande .postbox-header h2 { margin: 0; padding: 8px 12px; font-size: 14px; line-height: 1.4; }
 .etr-panneau-demande .inside { overflow-x: auto; }
 
+/* Historique d'une demande (site et administration) */
+ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-left: 2px solid #e3ddd3; }
+.etr-historique__entree { position: relative; display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0 0 14px; }
+.etr-historique__entree:last-child { padding-bottom: 0; }
+.etr-historique__entree::before { content: ""; position: absolute; top: 6px; left: -24px; width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid #b5ad9f; box-sizing: border-box; }
+.etr-historique__entree--creation::before,
+.etr-historique__entree--statut::before { border-color: #4d5b3e; background: #4d5b3e; }
+.etr-historique__entree--annulation::before { border-color: #a3342a; background: #a3342a; }
+.etr-historique__texte { color: #1d1d1b; overflow-wrap: anywhere; }
+.etr-historique__meta { color: #6b655f; font-size: 12px; }
+
 /* Message hors application (compte non traiteur) */
 .etr-espace .etr-notice--erreur { padding: 12px 16px; border-radius: 8px; background: #fbefed; color: #8a1f1b; }
 

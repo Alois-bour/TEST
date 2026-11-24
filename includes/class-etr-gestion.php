@@ -960,6 +960,7 @@ class ETR_Gestion {
 		echo '<div class="etr-dossier__principal">';
 		self::panneau_materiel( $id );
 		self::panneaux_infos( $id );
+		echo '<section class="etr-panneau"><h2 class="etr-panneau__titre">' . esc_html__( 'Historique', 'espace-traiteur' ) . '</h2>' . ETR_Historique::html( $id ) . '</section>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans ETR_Historique::html().
 		echo '</div>';
 
 		echo '<aside class="etr-dossier__cote">';

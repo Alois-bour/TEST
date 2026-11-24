@@ -459,8 +459,9 @@ class ETR_Admin {
 			return;
 		}
 		$panneaux = array(
-			'details' => array( __( 'Détails de la demande', 'espace-traiteur' ), 'mb_details' ),
-			'lignes'  => array( __( 'Articles demandés', 'espace-traiteur' ), 'mb_lignes' ),
+			'details'    => array( __( 'Détails de la demande', 'espace-traiteur' ), 'mb_details' ),
+			'lignes'     => array( __( 'Articles demandés', 'espace-traiteur' ), 'mb_lignes' ),
+			'historique' => array( __( 'Historique', 'espace-traiteur' ), 'mb_historique' ),
 		);
 		echo '<div class="etr-panneaux-demande">';
 		foreach ( $panneaux as $cle => $panneau ) {
@@ -520,6 +521,15 @@ class ETR_Admin {
 	}
 
 	/**
+	 * Panneau : historique.
+	 *
+	 * @param WP_Post $post Demande.
+	 */
+	public static function mb_historique( $post ) {
+		echo ETR_Historique::html( $post->ID ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans ETR_Historique::html().
+	}
+
+	/**
 	 * Metabox : statut + réponse au traiteur.
 	 *
 	 * @param WP_Post $post Demande.
@@ -566,17 +576,20 @@ class ETR_Admin {
 	 * @return bool Le statut a-t-il changé ?
 	 */
 	public static function appliquer_decision( $post_id, $statut, $reponse ) {
-		$ancien  = etr_get_statut( $post_id );
-		$nouveau = array_key_exists( $statut, etr_statuts() ) ? $statut : $ancien;
+		$ancien           = etr_get_statut( $post_id );
+		$nouveau          = array_key_exists( $statut, etr_statuts() ) ? $statut : $ancien;
+		$ancienne_reponse = (string) get_post_meta( $post_id, '_etr_reponse', true );
 
 		update_post_meta( $post_id, '_etr_reponse', $reponse );
 		update_post_meta( $post_id, '_etr_statut', $nouveau );
 
 		if ( $ancien !== $nouveau ) {
 			do_action( 'etr_statut_change', $post_id, $ancien, $nouveau );
-			return true;
 		}
-		return false;
+		if ( $ancienne_reponse !== (string) $reponse ) {
+			do_action( 'etr_reponse_modifiee', $post_id, (string) $reponse );
+		}
+		return $ancien !== $nouveau;
 	}
 
 	/**
