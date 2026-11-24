@@ -1,5 +1,8 @@
 <?php
 // Exécution autonome : php tests/rappels.php
+if ( PHP_SAPI !== 'cli' ) {
+	exit;
+}
 define( 'ABSPATH', __DIR__ );
 $meta = array(
 	1 => array( '_etr_statut' => 'validee', '_etr_date_evenement' => '2026-03-30', '_etr_date_livraison' => '2026-03-29' ),

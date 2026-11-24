@@ -717,6 +717,7 @@ class ETR_Gestion {
 			'planning'  => array( __( 'Planning', 'espace-traiteur' ), 'calendrier' ),
 			'traiteurs' => array( __( 'Traiteurs', 'espace-traiteur' ), 'invites' ),
 			'catalogue' => array( __( 'Catalogue', 'espace-traiteur' ), 'catalogue' ),
+			'statistiques' => array( __( 'Statistiques', 'espace-traiteur' ), 'demandes' ),
 		);
 	}
 
@@ -763,6 +764,9 @@ class ETR_Gestion {
 				break;
 			case 'catalogue':
 				self::vue_catalogue();
+				break;
+			case 'statistiques':
+				self::vue_statistiques();
 				break;
 			default:
 				self::vue_tableau();
@@ -946,6 +950,70 @@ class ETR_Gestion {
 	/* ------------------------------------------------------------------ */
 	/* Tableau de bord                                                    */
 	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Pilotage basé sur les demandes et les disponibilités actuelles.
+	 */
+	private static function vue_statistiques() {
+		$stats = ETR_Statistiques::calculer( self::demandes(), self::aujourdhui() );
+		self::entete(
+			__( 'Statistiques', 'espace-traiteur' ),
+			__( 'Demandes validées, livrées ou clôturées, regroupées par date d’événement.', 'espace-traiteur' )
+		);
+		echo '<p class="etr-muted">' . esc_html__( 'Montants indicatifs calculés avec les prix actuels, remises et frais renseignés : ce ne sont pas des encaissements. Les besoins hors catalogue et les prix manquants ne sont pas chiffrés.', 'espace-traiteur' ) . '</p>';
+
+		echo '<section class="etr-file"><h2 class="etr-section-titre">' . esc_html__( 'Chiffre d’affaires indicatif par mois', 'espace-traiteur' ) . '</h2>';
+		if ( ! $stats['mois'] ) {
+			echo '<p class="etr-muted">' . esc_html__( 'Aucune demande à afficher.', 'espace-traiteur' ) . '</p>';
+		} else {
+			echo '<div class="etr-table-cadre"><table class="etr-table"><thead><tr><th scope="col">' . esc_html__( 'Mois', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Demandes', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Total indicatif', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Chiffrages incomplets', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
+			foreach ( $stats['mois'] as $mois => $ligne ) {
+				echo '<tr><td>' . esc_html( $mois ) . '</td><td>' . esc_html( number_format_i18n( $ligne['demandes'] ) ) . '</td><td>' . wp_kses_post( etr_format_prix( $ligne['total'] ) ) . '</td><td>' . esc_html( number_format_i18n( $ligne['incomplets'] ) ) . '</td></tr>';
+			}
+			echo '</tbody></table></div>';
+			echo '<p class="etr-muted">' . esc_html__( 'Un chiffrage est incomplet si un prix ou les frais de livraison manquent, ou si des besoins hors catalogue sont indiqués.', 'espace-traiteur' ) . '</p>';
+		}
+		echo '</section>';
+
+		echo '<section class="etr-file"><h2 class="etr-section-titre">' . esc_html__( 'Meilleurs traiteurs', 'espace-traiteur' ) . '</h2>';
+		if ( ! $stats['traiteurs'] ) {
+			echo '<p class="etr-muted">' . esc_html__( 'Aucun traiteur à afficher.', 'espace-traiteur' ) . '</p>';
+		} else {
+			echo '<div class="etr-table-cadre"><table class="etr-table"><thead><tr><th scope="col">' . esc_html__( 'Traiteur', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Demandes', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Total indicatif', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
+			foreach ( array_slice( $stats['traiteurs'], 0, 10, true ) as $id => $ligne ) {
+				$user = get_userdata( $id );
+				$nom  = $user ? etr_nom( $user ) : sprintf( __( 'Compte supprimé #%d', 'espace-traiteur' ), $id );
+				echo '<tr><td>' . esc_html( $nom ) . '</td><td>' . esc_html( number_format_i18n( $ligne['demandes'] ) ) . '</td><td>' . wp_kses_post( etr_format_prix( $ligne['total'] ) ) . '</td></tr>';
+			}
+			echo '</tbody></table></div>';
+		}
+		echo '</section>';
+
+		echo '<section class="etr-file"><h2 class="etr-section-titre">' . esc_html__( 'Articles les plus demandés', 'espace-traiteur' ) . '</h2>';
+		if ( ! $stats['articles'] ) {
+			echo '<p class="etr-muted">' . esc_html__( 'Aucun article à afficher.', 'espace-traiteur' ) . '</p>';
+		} else {
+			echo '<div class="etr-table-cadre"><table class="etr-table"><thead><tr><th scope="col">' . esc_html__( 'Article', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Quantité demandée', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
+			foreach ( array_slice( $stats['articles'], 0, 10, true ) as $ligne ) {
+				echo '<tr><td>' . esc_html( $ligne['titre'] ) . '</td><td>' . esc_html( number_format_i18n( $ligne['quantite'] ) ) . '</td></tr>';
+			}
+			echo '</tbody></table></div>';
+		}
+		echo '</section>';
+
+		echo '<section class="etr-file"><h2 class="etr-section-titre">' . esc_html__( 'Articles complets sur les réservations actives', 'espace-traiteur' ) . '</h2>';
+		echo '<p class="etr-muted">' . esc_html__( 'Nombre de demandes actives dont la période atteint ou dépasse le stock actuel. Les chevauchements sont calculés prudemment ; ce n’est pas un historique des ruptures.', 'espace-traiteur' ) . '</p>';
+		if ( ! $stats['ruptures'] ) {
+			echo '<p class="etr-muted">' . esc_html__( 'Aucun article complet sur les périodes actives.', 'espace-traiteur' ) . '</p>';
+		} else {
+			echo '<div class="etr-table-cadre"><table class="etr-table"><thead><tr><th scope="col">' . esc_html__( 'Article', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Demandes concernées', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
+			foreach ( array_slice( $stats['ruptures'], 0, 10, true ) as $ligne ) {
+				echo '<tr><td>' . esc_html( $ligne['titre'] ) . '</td><td>' . esc_html( number_format_i18n( $ligne['demandes'] ) ) . '</td></tr>';
+			}
+			echo '</tbody></table></div>';
+		}
+		echo '</section>';
+	}
 
 	/**
 	 * Tableau de bord : chiffres du moment, semaine logistique, demandes à traiter.

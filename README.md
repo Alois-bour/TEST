@@ -119,6 +119,12 @@ Pour changer le destinataire côté équipe :
 add_filter( 'etr_email_equipe', fn() => 'logistique@exemple.fr' );
 ```
 
+## Statistiques
+
+Dans l'espace de gestion, l'onglet **Statistiques** regroupe les demandes validées, livrées et clôturées par mois d'événement, et classe les traiteurs par montant indicatif et les articles par quantité. Les prix sont ceux du catalogue actuel ; les frais non renseignés et besoins hors catalogue ne sont pas connus. Ce n'est pas un chiffre d'affaires encaissé. Les demandes sans date d'événement valide sont exclues.
+
+Les articles complets sont classés par nombre de demandes actives, présentes ou futures, dont les périodes chevauchantes atteignent le stock actuel. Ce calcul prudent ne constitue pas un historique des ruptures.
+
 ## Personnalisation (hooks)
 
 - `etr_statuts` : modifier la liste des statuts.
