@@ -249,7 +249,7 @@ class ETR_Admin {
 		if ( ! is_email( $a ) ) {
 			$a = wp_get_current_user()->user_email;
 		}
-		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		$site = etr_nom_site();
 		/* translators: %s : nom du site. */
 		$objet  = sprintf( __( '[%s] E-mail de test de l’espace traiteur', 'espace-traiteur' ), $site );
 		$corps  = __( 'Bonjour,', 'espace-traiteur' ) . "\n\n";

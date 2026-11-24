@@ -58,7 +58,7 @@ class ETR_Traiteurs {
 		if ( is_wp_error( $cle ) ) {
 			return false;
 		}
-		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		$site = etr_nom_site();
 
 		/* translators: %s : nom du site. */
 		$objet = sprintf( __( '[%s] Votre accès à l’espace traiteur', 'espace-traiteur' ), $site );
