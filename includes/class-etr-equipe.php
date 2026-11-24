@@ -436,7 +436,7 @@ class ETR_Equipe {
 		$corps .= __( 'Choisissez votre mot de passe (lien valable 24 heures) :', 'espace-traiteur' ) . "\n" . $lien . "\n\n";
 		$corps .= __( 'Ensuite, ouvrez l’application sur votre iPhone avec Safari, puis touchez « Partager » et « Sur l’écran d’accueil » pour l’installer :', 'espace-traiteur' ) . "\n" . ETR_Gestion::url() . "\n";
 
-		$envoye = wp_mail( $user->user_email, $objet, $corps );
+		$envoye = etr_envoyer_mail( $user->user_email, $objet, $corps );
 		if ( $envoye ) {
 			update_user_meta( $user->ID, 'etr_invitation_envoyee', time() );
 		}

@@ -18,6 +18,7 @@ class ETR_Admin {
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_init', array( __CLASS__, 'enregistrer_reglages' ) );
+		add_action( 'admin_post_etr_test_mail', array( __CLASS__, 'envoyer_mail_test' ) );
 
 		// Champs « Espace traiteur » sur les produits WooCommerce.
 		add_action( 'woocommerce_product_options_inventory_product_data', array( __CLASS__, 'champs_produit' ) );
@@ -192,8 +193,83 @@ class ETR_Admin {
 		echo '</tbody></table>';
 		submit_button();
 		echo '</form>';
+		self::test_mail();
 		self::mises_a_jour();
 		echo '</div>';
+	}
+
+	/**
+	 * Section « E-mails » : vérifier en un clic que le site sait envoyer des e-mails
+	 * (invitations, notifications). Beaucoup d'hébergements les bloquent ou les font
+	 * classer en indésirables sans configuration SMTP.
+	 */
+	private static function test_mail() {
+		// phpcs:disable WordPress.Security.NonceVerification -- simple message après redirection.
+		$etat = isset( $_GET['etr_test_mail'] ) ? sanitize_key( wp_unslash( $_GET['etr_test_mail'] ) ) : '';
+		$a    = isset( $_GET['etr_a'] ) ? sanitize_email( wp_unslash( $_GET['etr_a'] ) ) : '';
+		// phpcs:enable
+		$user = wp_get_current_user();
+
+		echo '<hr><h2 id="etr-emails">' . esc_html__( 'E-mails', 'espace-traiteur' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Les invitations (traiteurs, équipe) et les notifications partent par e-mail. Envoyez-vous un e-mail de test pour vérifier qu’ils arrivent.', 'espace-traiteur' ) . '</p>';
+
+		if ( 'ok' === $etat ) {
+			/* translators: %s : adresse e-mail. */
+			echo '<div class="notice notice-success inline"><p><strong>' . esc_html( sprintf( __( 'E-mail de test remis au serveur d’envoi pour %s.', 'espace-traiteur' ), $a ) ) . '</strong><br>' . esc_html__( 'S’il n’arrive pas d’ici quelques minutes (regardez aussi les indésirables), le serveur d’envoi de l’hébergement n’est pas fiable : installez une extension SMTP (par exemple WP Mail SMTP ou FluentSMTP) reliée à une vraie boîte d’envoi, puis refaites le test.', 'espace-traiteur' ) . '</p></div>';
+		} elseif ( 'echec' === $etat ) {
+			$raison = etr_raison_echec_mail();
+			echo '<div class="notice notice-error inline"><p><strong>' . esc_html__( 'L’e-mail de test n’a pas pu partir : le site ne sait pas envoyer d’e-mails pour l’instant.', 'espace-traiteur' ) . '</strong>';
+			if ( $raison ) {
+				/* translators: %s : message d'erreur technique. */
+				echo '<br>' . esc_html( sprintf( __( 'Raison : %s', 'espace-traiteur' ), $raison ) );
+			}
+			echo '<br>' . esc_html__( 'Installez une extension SMTP (par exemple WP Mail SMTP ou FluentSMTP) reliée à une vraie boîte d’envoi, ou demandez à l’hébergeur d’activer l’envoi d’e-mails.', 'espace-traiteur' ) . '</p></div>';
+		}
+
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+		wp_nonce_field( 'etr_test_mail' );
+		echo '<input type="hidden" name="action" value="etr_test_mail">';
+		echo '<table class="form-table" role="presentation"><tbody>';
+		echo '<tr><th scope="row">' . esc_html__( 'Expéditeur utilisé', 'espace-traiteur' ) . '</th><td><code>' . esc_html( etr_expediteur_mail() ) . '</code><p class="description">' . esc_html__( 'Adresse utilisée par WordPress (modifiable par une extension SMTP).', 'espace-traiteur' ) . '</p></td></tr>';
+		echo '<tr><th scope="row"><label for="etr-test-a">' . esc_html__( 'Envoyer le test à', 'espace-traiteur' ) . '</label></th><td><input type="email" class="regular-text" id="etr-test-a" name="etr_a" value="' . esc_attr( $a ? $a : $user->user_email ) . '" required></td></tr>';
+		echo '</tbody></table>';
+		submit_button( __( 'Envoyer un e-mail de test', 'espace-traiteur' ), 'secondary' );
+		echo '</form>';
+	}
+
+	/**
+	 * Envoie l'e-mail de test puis revient sur les réglages avec le résultat.
+	 */
+	public static function envoyer_mail_test() {
+		check_admin_referer( 'etr_test_mail' );
+		if ( ! current_user_can( 'gerer_espace_traiteur' ) ) {
+			wp_die( esc_html__( 'Action non autorisée.', 'espace-traiteur' ), '', array( 'response' => 403 ) );
+		}
+		$a = isset( $_POST['etr_a'] ) ? sanitize_email( wp_unslash( $_POST['etr_a'] ) ) : '';
+		if ( ! is_email( $a ) ) {
+			$a = wp_get_current_user()->user_email;
+		}
+		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		/* translators: %s : nom du site. */
+		$objet  = sprintf( __( '[%s] E-mail de test de l’espace traiteur', 'espace-traiteur' ), $site );
+		$corps  = __( 'Bonjour,', 'espace-traiteur' ) . "\n\n";
+		$corps .= __( 'Cet e-mail confirme que le site sait envoyer les invitations et les notifications de l’espace traiteur.', 'espace-traiteur' ) . "\n\n";
+		/* translators: %s : adresse d'expédition. */
+		$corps .= sprintf( __( 'Expéditeur : %s', 'espace-traiteur' ), etr_expediteur_mail() ) . "\n";
+		$envoye = etr_envoyer_mail( $a, $objet, $corps );
+
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'post_type'     => 'etr_demande',
+					'page'          => 'etr-reglages',
+					'etr_test_mail' => $envoye ? 'ok' : 'echec',
+					'etr_a'         => rawurlencode( $a ),
+				),
+				admin_url( 'edit.php' )
+			) . '#etr-emails'
+		);
+		exit;
 	}
 
 	/**

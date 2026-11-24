@@ -561,3 +561,52 @@ function etr_est_gestionnaire( $user_id = 0 ) {
 	$user_id = $user_id ? $user_id : get_current_user_id();
 	return $user_id && user_can( $user_id, 'gerer_espace_traiteur' );
 }
+
+/**
+ * Envoie un e-mail et, en cas d'échec, garde la raison donnée par WordPress
+ * (par exemple « SMTP connect() failed ») pour l'afficher à la personne qui a lancé l'envoi.
+ *
+ * @param string|string[] $a       Destinataire(s).
+ * @param string          $objet   Objet.
+ * @param string          $corps   Message.
+ * @param string[]        $entetes En-têtes.
+ * @return bool
+ */
+function etr_envoyer_mail( $a, $objet, $corps, $entetes = array() ) {
+	$cle = 'etr_erreur_mail_' . get_current_user_id();
+	delete_transient( $cle );
+	$noter = function ( $erreur ) use ( $cle ) {
+		if ( is_wp_error( $erreur ) ) {
+			set_transient( $cle, wp_strip_all_tags( $erreur->get_error_message() ), 10 * MINUTE_IN_SECONDS );
+		}
+	};
+	add_action( 'wp_mail_failed', $noter );
+	$envoye = wp_mail( $a, $objet, $corps, $entetes );
+	remove_action( 'wp_mail_failed', $noter );
+	return $envoye;
+}
+
+/**
+ * Raison du dernier échec d'envoi lancé par l'utilisateur courant (lue une seule fois).
+ *
+ * @return string
+ */
+function etr_raison_echec_mail() {
+	$cle    = 'etr_erreur_mail_' . get_current_user_id();
+	$raison = (string) get_transient( $cle );
+	delete_transient( $cle );
+	return $raison;
+}
+
+/**
+ * Adresse d'expédition utilisée par WordPress pour ses e-mails.
+ *
+ * @return string
+ */
+function etr_expediteur_mail() {
+	$domaine = strtolower( (string) wp_parse_url( network_home_url(), PHP_URL_HOST ) );
+	if ( 0 === strpos( $domaine, 'www.' ) ) {
+		$domaine = substr( $domaine, 4 );
+	}
+	return (string) apply_filters( 'wp_mail_from', 'wordpress@' . $domaine ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals -- filtre de WordPress.
+}

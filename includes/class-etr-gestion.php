@@ -660,6 +660,9 @@ class ETR_Gestion {
 		$vues = self::vues();
 		$vue  = self::vue_courante();
 		$nom  = isset( $vues[ $vue ] ) ? $vues[ $vue ][0] : __( 'Demande', 'espace-traiteur' );
+		if ( ! is_user_logged_in() ) {
+			$nom = __( 'Connexion', 'espace-traiteur' );
+		}
 		return $nom . ' – ' . __( 'Gestion', 'espace-traiteur' ) . ' – ' . wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
 	}
 
@@ -1113,7 +1116,10 @@ class ETR_Gestion {
 		if ( isset( $succes[ $msg ] ) ) {
 			echo '<div class="etr-notice etr-notice--succes" role="status">' . self::icone( 'coche' ) . '<p>' . esc_html( $succes[ $msg ] ) . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		} elseif ( isset( $alertes[ $msg ] ) ) {
-			echo '<div class="etr-notice etr-notice--erreur" role="alert">' . self::icone( 'alerte' ) . '<p>' . esc_html( $alertes[ $msg ] ) . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			$raison = in_array( $msg, array( 'cree_sans_mail', 'mail_echec', 'membre_cree_sans_mail' ), true ) ? etr_raison_echec_mail() : '';
+			/* translators: %s : message d'erreur technique. */
+			$raison = $raison ? '<br><small>' . esc_html( sprintf( __( 'Raison : %s', 'espace-traiteur' ), $raison ) ) . '</small>' : '';
+			echo '<div class="etr-notice etr-notice--erreur" role="alert">' . self::icone( 'alerte' ) . '<p>' . esc_html( $alertes[ $msg ] ) . $raison . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
 	}
 
