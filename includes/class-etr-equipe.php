@@ -173,19 +173,27 @@ class ETR_Equipe {
 	}
 
 	/**
-	 * Libellé du rôle d'équipe d'un utilisateur.
+	 * Libellé des rôles d'équipe d'un utilisateur (« Préparateur · Livreur »).
 	 *
 	 * @param WP_User $user Utilisateur.
 	 * @return string
 	 */
 	public static function libelle_role( $user ) {
-		$roles = self::roles();
-		foreach ( (array) $user->roles as $slug ) {
-			if ( isset( $roles[ $slug ] ) ) {
-				return $roles[ $slug ][0];
-			}
+		$libelle = self::libelle_roles( self::roles_equipe( $user ) );
+		if ( '' !== $libelle ) {
+			return $libelle;
 		}
 		return in_array( 'administrator', (array) $user->roles, true ) ? __( 'Administrateur', 'espace-traiteur' ) : '';
+	}
+
+	/**
+	 * Libellé d'une liste de rôles d'équipe.
+	 *
+	 * @param string[] $roles Rôles.
+	 * @return string
+	 */
+	public static function libelle_roles( $roles ) {
+		return implode( ' · ', array_filter( array_map( array( __CLASS__, 'libelle_role_slug' ), $roles ) ) );
 	}
 
 	/**
@@ -210,50 +218,78 @@ class ETR_Equipe {
 	 */
 	public static function descriptions() {
 		return array(
-			'etr_bureau'      => __( 'Tout l’espace de gestion : demandes, décisions, prix, traiteurs, équipe.', 'espace-traiteur' ),
+			'etr_bureau'      => __( 'Tout l’espace de gestion : demandes, décisions, prix, traiteurs, équipe (inclut la préparation et la livraison).', 'espace-traiteur' ),
 			'etr_preparateur' => __( 'Planning, demandes validées, catalogue et bons de préparation.', 'espace-traiteur' ),
 			'etr_livreur'     => __( 'Planning, livraisons et reprises, bons.', 'espace-traiteur' ),
 		);
 	}
 
 	/* ------------------------------------------------------------------ */
-	/* Membres                                                            */
+	/* Membres (une personne peut avoir plusieurs rôles)                  */
 	/* ------------------------------------------------------------------ */
 
 	/**
-	 * Rôle d'équipe actuel d'un utilisateur (slug), ou chaîne vide.
+	 * Garde les rôles d'équipe valides, sans doublon, dans l'ordre Bureau, Préparateur, Livreur.
 	 *
-	 * @param WP_User $user Utilisateur.
-	 * @return string
+	 * @param mixed $roles Rôles (bruts).
+	 * @return string[]
 	 */
-	public static function role_equipe( $user ) {
-		foreach ( (array) $user->roles as $slug ) {
-			if ( isset( self::roles()[ $slug ] ) ) {
-				return $slug;
-			}
-		}
-		return '';
+	public static function normaliser_roles( $roles ) {
+		$roles = array_map( 'sanitize_key', array_filter( (array) $roles, 'is_string' ) );
+		return array_values( array_intersect( array_keys( self::roles() ), $roles ) );
 	}
 
 	/**
-	 * Accès retiré ? (le rôle est mis de côté pour pouvoir le rendre).
+	 * Rôles d'équipe actuels d'un utilisateur.
+	 *
+	 * @param WP_User $user Utilisateur.
+	 * @return string[]
+	 */
+	public static function roles_equipe( $user ) {
+		return self::normaliser_roles( $user->roles );
+	}
+
+	/**
+	 * Remplace les rôles d'équipe d'un utilisateur (ses autres rôles éventuels sont conservés).
+	 *
+	 * @param WP_User  $user  Utilisateur.
+	 * @param string[] $roles Rôles d'équipe à donner.
+	 */
+	private static function appliquer_roles( $user, $roles ) {
+		foreach ( array_keys( self::roles() ) as $slug ) {
+			if ( in_array( $slug, $roles, true ) ) {
+				if ( ! in_array( $slug, (array) $user->roles, true ) ) {
+					$user->add_role( $slug );
+				}
+			} elseif ( in_array( $slug, (array) $user->roles, true ) ) {
+				$user->remove_role( $slug );
+			}
+		}
+	}
+
+	/**
+	 * Rôles mis de côté lors du retrait de l'accès (vide si l'accès n'est pas retiré).
+	 *
+	 * @param int $user_id Utilisateur.
+	 * @return string[]
+	 */
+	public static function roles_retires( $user_id ) {
+		$roles = get_user_meta( $user_id, 'etr_roles_retires', true );
+		if ( ! $roles ) {
+			// Accès retiré avant la 1.8.1 : un seul rôle, enregistré sous une autre clé.
+			$roles = get_user_meta( $user_id, 'etr_role_retire', true );
+		}
+		return self::normaliser_roles( $roles );
+	}
+
+	/**
+	 * Accès retiré ? (les rôles sont mis de côté pour pouvoir les rendre).
 	 *
 	 * @param int $user_id Utilisateur.
 	 * @return bool
 	 */
 	public static function acces_retire( $user_id ) {
-		return '' !== self::role_retire( $user_id );
-	}
-
-	/**
-	 * Rôle mis de côté lors du retrait de l'accès.
-	 *
-	 * @param int $user_id Utilisateur.
-	 * @return string
-	 */
-	public static function role_retire( $user_id ) {
-		$role = (string) get_user_meta( $user_id, 'etr_role_retire', true );
-		return isset( self::roles()[ $role ] ) ? $role : '';
+		return (bool) self::roles_retires( $user_id );
 	}
 
 	/**
@@ -270,8 +306,18 @@ class ETR_Equipe {
 		);
 		$retires = get_users(
 			array(
-				'meta_key' => 'etr_role_retire', // phpcs:ignore WordPress.DB.SlowDBQuery
-				'orderby'  => 'display_name',
+				'meta_query' => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+					'relation' => 'OR',
+					array(
+						'key'     => 'etr_roles_retires',
+						'compare' => 'EXISTS',
+					),
+					array(
+						'key'     => 'etr_role_retire',
+						'compare' => 'EXISTS',
+					),
+				),
+				'orderby'    => 'display_name',
 			)
 		);
 		$membres = array();
@@ -298,7 +344,7 @@ class ETR_Equipe {
 		if ( ! $user || (int) $user_id === get_current_user_id() || in_array( 'administrator', (array) $user->roles, true ) ) {
 			return false;
 		}
-		return '' !== self::role_equipe( $user ) || self::acces_retire( $user_id );
+		return self::roles_equipe( $user ) || self::acces_retire( $user_id );
 	}
 
 	/**
@@ -306,7 +352,7 @@ class ETR_Equipe {
 	 *
 	 * Codes d'erreur : nom, email, email_existe, role, creation.
 	 *
-	 * @param array $donnees nom, email, telephone, role (bruts).
+	 * @param array $donnees nom, email, telephone (bruts), roles (liste de rôles d'équipe).
 	 * @param bool  $inviter Envoyer l'invitation tout de suite.
 	 * @return array|WP_Error { user_id, invitation : true envoyée, false échec, null non demandée }
 	 */
@@ -314,7 +360,7 @@ class ETR_Equipe {
 		$nom       = sanitize_text_field( isset( $donnees['nom'] ) ? $donnees['nom'] : '' );
 		$email     = sanitize_email( isset( $donnees['email'] ) ? $donnees['email'] : '' );
 		$telephone = sanitize_text_field( isset( $donnees['telephone'] ) ? $donnees['telephone'] : '' );
-		$role      = sanitize_key( isset( $donnees['role'] ) ? $donnees['role'] : '' );
+		$roles     = self::normaliser_roles( isset( $donnees['roles'] ) ? $donnees['roles'] : array() );
 
 		if ( '' === $nom ) {
 			return new WP_Error( 'nom' );
@@ -325,7 +371,7 @@ class ETR_Equipe {
 		if ( email_exists( $email ) ) {
 			return new WP_Error( 'email_existe' );
 		}
-		if ( ! isset( self::roles()[ $role ] ) ) {
+		if ( ! $roles ) {
 			return new WP_Error( 'role' );
 		}
 
@@ -345,12 +391,13 @@ class ETR_Equipe {
 				'nickname'     => $nom,
 				'first_name'   => $noms[0],
 				'last_name'    => isset( $noms[1] ) ? $noms[1] : '',
-				'role'         => $role,
+				'role'         => $roles[0],
 			)
 		);
 		if ( is_wp_error( $user_id ) ) {
 			return new WP_Error( 'creation' );
 		}
+		self::appliquer_roles( get_userdata( $user_id ), $roles );
 		update_user_meta( $user_id, 'etr_telephone', $telephone );
 
 		return array(
@@ -370,15 +417,20 @@ class ETR_Equipe {
 		if ( is_wp_error( $cle ) ) {
 			return false;
 		}
-		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
-		$lien = network_site_url( 'wp-login.php?action=rp&key=' . rawurlencode( $cle ) . '&login=' . rawurlencode( $user->user_login ), 'login' );
+		$site  = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		$lien  = network_site_url( 'wp-login.php?action=rp&key=' . rawurlencode( $cle ) . '&login=' . rawurlencode( $user->user_login ), 'login' );
+		$roles = self::roles_equipe( $user );
 
 		/* translators: %s : nom du site. */
 		$objet = sprintf( __( '[%s] Votre accès à l’application de l’équipe', 'espace-traiteur' ), $site );
 		/* translators: %s : prénom et nom. */
 		$corps  = sprintf( __( 'Bonjour %s,', 'espace-traiteur' ), etr_nom( $user ) ) . "\n\n";
-		/* translators: 1 : nom du site, 2 : rôle. */
-		$corps .= sprintf( __( 'Un accès à l’application de gestion %1$s vous a été ouvert (rôle : %2$s).', 'espace-traiteur' ), $site, self::libelle_role_slug( self::role_equipe( $user ) ) ) . "\n\n";
+		$corps .= sprintf(
+			/* translators: 1 : nom du site, 2 : rôle(s). */
+			_n( 'Un accès à l’application de gestion %1$s vous a été ouvert (rôle : %2$s).', 'Un accès à l’application de gestion %1$s vous a été ouvert (rôles : %2$s).', max( 1, count( $roles ) ), 'espace-traiteur' ),
+			$site,
+			implode( ', ', array_map( array( __CLASS__, 'libelle_role_slug' ), $roles ) )
+		) . "\n\n";
 		/* translators: %s : identifiant. */
 		$corps .= sprintf( __( 'Votre identifiant : %s', 'espace-traiteur' ), $user->user_login ) . "\n\n";
 		$corps .= __( 'Choisissez votre mot de passe (lien valable 24 heures) :', 'espace-traiteur' ) . "\n" . $lien . "\n\n";
@@ -392,46 +444,51 @@ class ETR_Equipe {
 	}
 
 	/**
-	 * Modifie un membre : rôle, invitation, retrait ou retour de l'accès.
+	 * Modifie un membre : rôles, invitation, retrait ou retour de l'accès.
 	 *
-	 * @param int    $user_id Membre.
-	 * @param string $op      role|inviter|retirer|rendre.
-	 * @param string $role    Nouveau rôle (op « role »).
+	 * @param int      $user_id Membre.
+	 * @param string   $op      roles|inviter|retirer|rendre.
+	 * @param string[] $roles   Nouveaux rôles (op « roles »).
 	 * @return string|WP_Error Code du message à afficher.
 	 */
-	public static function modifier_membre( $user_id, $op, $role = '' ) {
+	public static function modifier_membre( $user_id, $op, $roles = array() ) {
 		if ( ! self::modifiable( $user_id ) ) {
 			return new WP_Error( 'interdit', __( 'Ce compte ne peut pas être modifié ici.', 'espace-traiteur' ) );
 		}
 		$user = get_userdata( $user_id );
 
 		switch ( $op ) {
-			case 'role':
-				if ( ! isset( self::roles()[ $role ] ) || self::acces_retire( $user_id ) ) {
-					return new WP_Error( 'role', __( 'Rôle inconnu.', 'espace-traiteur' ) );
+			case 'roles':
+				if ( self::acces_retire( $user_id ) ) {
+					return new WP_Error( 'interdit', __( 'Rendez d’abord l’accès à cette personne.', 'espace-traiteur' ) );
 				}
-				$user->set_role( $role );
+				$roles = self::normaliser_roles( $roles );
+				if ( ! $roles ) {
+					return 'roles_vides'; // Au moins un rôle : pour retirer l'accès, il y a « Retirer l'accès ».
+				}
+				self::appliquer_roles( $user, $roles );
 				return 'role';
 
 			case 'inviter':
 				return self::envoyer_invitation( $user ) ? 'invite' : 'mail_echec';
 
 			case 'retirer':
-				$actuel = self::role_equipe( $user );
-				if ( '' === $actuel ) {
-					return 'retire';
+				$actuels = self::roles_equipe( $user );
+				if ( $actuels ) {
+					update_user_meta( $user_id, 'etr_roles_retires', $actuels );
+					delete_user_meta( $user_id, 'etr_role_retire' );
+					self::appliquer_roles( $user, array() );
+					WP_Session_Tokens::get_instance( $user_id )->destroy_all(); // Déconnexion immédiate.
 				}
-				update_user_meta( $user_id, 'etr_role_retire', $actuel );
-				$user->set_role( '' );
-				WP_Session_Tokens::get_instance( $user_id )->destroy_all(); // Déconnexion immédiate.
 				return 'retire';
 
 			case 'rendre':
-				$ancien = self::role_retire( $user_id );
-				if ( '' !== $ancien ) {
-					$user->set_role( $ancien );
-					delete_user_meta( $user_id, 'etr_role_retire' );
+				$anciens = self::roles_retires( $user_id );
+				if ( $anciens ) {
+					self::appliquer_roles( $user, $anciens );
 				}
+				delete_user_meta( $user_id, 'etr_roles_retires' );
+				delete_user_meta( $user_id, 'etr_role_retire' );
 				return 'rendu';
 		}
 		return new WP_Error( 'op', __( 'Action inconnue.', 'espace-traiteur' ) );

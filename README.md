@@ -90,7 +90,9 @@ L'espace de gestion (`/gestion-traiteur/`) s'installe comme une application sur 
 | **Préparateur** | Planning, demandes validées, livrées ou clôturées (sans prix), catalogue, bons de préparation et de retour. Pas d'administration WordPress. |
 | **Livreur** | Planning, demandes validées, livrées ou clôturées (sans prix), bons. Pas d'administration WordPress. |
 
-- *Gestion › Équipe* (bureau) : ajouter une personne (nom, e-mail, téléphone, rôle ; invitation envoyée maintenant ou plus tard), changer son rôle, envoyer l'invitation, **retirer l'accès** (déconnexion immédiate) ou le rendre. Les administrateurs et son propre compte ne sont pas modifiables ici.
+- **Une personne peut avoir plusieurs rôles** (par exemple Préparateur et Livreur) : elle cumule ce que chacun permet. Le rôle Bureau inclut déjà la préparation et la livraison.
+- *Gestion › Équipe* (bureau) : ajouter une personne (nom, e-mail, téléphone, un ou plusieurs rôles), cocher ou décocher ses rôles directement dans la liste (au moins un rôle ; pour fermer l'application, « Retirer l'accès »), envoyer ou renvoyer l'invitation, **retirer l'accès** (déconnexion immédiate, rôles mis de côté) ou le rendre. Les administrateurs et son propre compte ne sont pas modifiables ici.
+- **Invitation** : envoyée à la création (case « Envoyer l'invitation maintenant », cochée par défaut ; décochez pour l'envoyer plus tard). Le mail donne l'identifiant, un lien pour choisir le mot de passe (24 h) et l'adresse de l'application à installer.
 - Les droits sont vérifiés côté serveur : une demande en attente est introuvable pour le terrain (fiche, bons), toute action de gestion est refusée hors bureau.
 - Les administrateurs WordPress ont tous les droits.
 
