@@ -417,7 +417,7 @@ class ETR_Equipe {
 		if ( is_wp_error( $cle ) ) {
 			return false;
 		}
-		$site  = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		$site  = etr_nom_site();
 		$lien  = ETR_Equipe_Acces::url_mot_de_passe( $cle, $user->user_login ); // Dans l'application, pas sur wp-login.php.
 		$roles = self::roles_equipe( $user );
 
@@ -427,7 +427,7 @@ class ETR_Equipe {
 		$corps  = sprintf( __( 'Bonjour %s,', 'espace-traiteur' ), etr_nom( $user ) ) . "\n\n";
 		$corps .= sprintf(
 			/* translators: 1 : nom du site, 2 : rôle(s). */
-			_n( 'Un accès à l’application de gestion %1$s vous a été ouvert (rôle : %2$s).', 'Un accès à l’application de gestion %1$s vous a été ouvert (rôles : %2$s).', max( 1, count( $roles ) ), 'espace-traiteur' ),
+			_n( 'Un accès à l’application de l’équipe %1$s vous a été ouvert (rôle : %2$s).', 'Un accès à l’application de l’équipe %1$s vous a été ouvert (rôles : %2$s).', max( 1, count( $roles ) ), 'espace-traiteur' ),
 			$site,
 			implode( ', ', array_map( array( __CLASS__, 'libelle_role_slug' ), $roles ) )
 		) . "\n\n";

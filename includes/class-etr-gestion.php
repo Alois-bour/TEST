@@ -609,7 +609,7 @@ class ETR_Gestion {
 		if ( ETR_Equipe_Acces::ecran() ) {
 			$nom = ETR_Equipe_Acces::titre();
 		}
-		return $nom . ' – ' . __( 'Gestion', 'espace-traiteur' ) . ' – ' . wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		return $nom . ' – ' . __( 'Gestion', 'espace-traiteur' ) . ' – ' . etr_nom_site();
 	}
 
 	/**

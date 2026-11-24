@@ -89,7 +89,7 @@ class ETR_PWA {
 	 * @return string
 	 */
 	public static function nom( $court = false ) {
-		$site = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		$site = etr_nom_site();
 		if ( $court ) {
 			return (string) apply_filters( 'etr_app_nom_court', __( 'Gestion', 'espace-traiteur' ) );
 		}

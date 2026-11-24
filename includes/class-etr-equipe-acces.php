@@ -286,7 +286,7 @@ class ETR_Equipe_Acces {
 		if ( ! $user_data instanceof WP_User || ! ETR_Equipe::roles_equipe( $user_data ) || in_array( 'administrator', (array) $user_data->roles, true ) ) {
 			return $defaults;
 		}
-		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		$site = etr_nom_site();
 		/* translators: %s : nom du site. */
 		$defaults['subject'] = sprintf( __( '[%s] Nouveau mot de passe pour l’application de l’équipe', 'espace-traiteur' ), $site );
 		/* translators: %s : prénom et nom. */

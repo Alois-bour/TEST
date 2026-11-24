@@ -138,7 +138,7 @@ class ETR_Notifications {
 	 * @return string
 	 */
 	private static function site() {
-		return wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		return etr_nom_site();
 	}
 
 	/**

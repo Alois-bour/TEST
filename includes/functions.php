@@ -610,3 +610,15 @@ function etr_expediteur_mail() {
 	}
 	return (string) apply_filters( 'wp_mail_from', 'wordpress@' . $domaine ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals -- filtre de WordPress.
 }
+
+/**
+ * Nom du site pour les e-mails et l'application, sans le slogan :
+ * « Maison Anamé | Location de Mobilier & Art de la table » devient « Maison Anamé ».
+ *
+ * @return string
+ */
+function etr_nom_site() {
+	$nom   = wp_specialchars_decode( (string) get_option( 'blogname' ), ENT_QUOTES );
+	$court = trim( (string) preg_split( '/\s+[|–—-]\s+/u', $nom, 2 )[0] );
+	return (string) apply_filters( 'etr_nom_site', '' !== $court ? $court : $nom, $nom );
+}

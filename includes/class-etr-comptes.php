@@ -191,7 +191,7 @@ class ETR_Comptes {
 		if ( ! $user_data instanceof WP_User || ! ETR_Access::traiteur_seulement( $user_data->ID ) ) {
 			return $defaults;
 		}
-		$site = wp_specialchars_decode( get_option( 'blogname' ), ENT_QUOTES );
+		$site = etr_nom_site();
 
 		/* translators: %s : nom du site. */
 		$defaults['subject'] = sprintf( __( '[%s] Nouveau mot de passe pour votre espace traiteur', 'espace-traiteur' ), $site );

@@ -172,6 +172,7 @@ Les articles complets sont classés par nombre de demandes actives, présentes o
 - `etr_routes_api_traiteurs` : routes de l'API REST autorisées aux traiteurs connectés.
 - `etr_migrations` : étapes de migration (par version).
 - `etr_app_nom`, `etr_app_nom_court` : nom de l'application installée (« Gestion » sous l'icône).
+- `etr_nom_site` : nom du site dans les e-mails et l'application (par défaut, le titre du site sans son slogan : « Maison Anamé »).
 - `etr_gestion_slug` : adresse de l'espace de gestion (`gestion-traiteur` par défaut).
 - `etr_prix_unitaire` : prix unitaire utilisé pour le chiffrage indicatif d'une demande (`$prix, $article_id`).
 - Actions : `etr_demande_creee`, `etr_demande_annulee`, `etr_statut_change` (`$id, $ancien, $nouveau`), `etr_reponse_modifiee` (`$id, $message`), `etr_tarif_change` (`$id, $tarif`).
