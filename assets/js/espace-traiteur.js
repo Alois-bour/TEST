@@ -240,6 +240,10 @@
 		var donnees = new FormData();
 		donnees.append( 'action', 'etr_disponibilites' );
 		donnees.append( 'nonce', etrDispo.nonce );
+		var demande = form.querySelector( 'input[name="demande_id"]' );
+		if ( demande ) {
+			donnees.append( 'demande_id', demande.value );
+		}
 		cles.forEach( function ( cle ) {
 			var c = champ( cle );
 			donnees.append( cle, c ? c.value : '' );
