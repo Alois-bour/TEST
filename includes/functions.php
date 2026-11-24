@@ -657,5 +657,7 @@ function etr_rafraichir_compte( $login ) {
  */
 function etr_verifier_cle( $cle, $login ) {
 	etr_rafraichir_compte( $login );
-	return check_password_reset_key( $cle, $login );
+	$user = check_password_reset_key( $cle, $login );
+	ETR_Journal_Liens::lien_ouvert( $login, $cle, $user );
+	return $user;
 }

@@ -631,3 +631,26 @@ td.etr-table__nombre .etr-manque { margin: 0; font-size: inherit; font-weight: 5
 .etr-app .etr-equipe__roles legend { margin: 0 0 4px; padding: 0; font-weight: 500; font-size: 14px; color: var(--etr-encre); }
 /* Les cases à cocher gardent leur mise en page dans un champ (la règle « .etr-champ label » les mettrait en bloc). */
 .etr-app .etr-champ .etr-case { display: flex; align-items: flex-start; gap: 10px; margin: 0; }
+
+/* Notifications : page de réglage et invitation. */
+.etr-notifs { max-width: 680px; margin-bottom: 20px; }
+.etr-notifs__etat { margin: 0 0 16px; padding: 12px 14px; border-radius: 10px; background: var(--etr-voile, #f2eee8); font-size: 15px; line-height: 1.45; }
+.etr-notifs__etat--ok { background: #e9f2e4; color: #2f4a23; }
+.etr-notifs__etat--erreur { background: #f8e9e6; color: #7a2a1f; }
+.etr-notifs__etat--info { background: #eef1f5; color: #2b3a4d; }
+.etr-notifs__actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.etr-notifs__actions [hidden] { display: none; }
+.etr-notifs__actions [aria-busy="true"] { opacity: .6; cursor: progress; }
+.etr-notifs__liste { margin: 0 0 14px; padding-left: 20px; line-height: 1.5; }
+.etr-notifs__liste li + li { margin-top: 6px; }
+.etr-notifs__sous-titre { margin: 18px 0 8px; font-size: 15px; font-weight: 600; }
+.etr-notifs-invite__icone { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 10px; background: var(--etr-nuit, #2c3424); color: #fff; }
+.etr-app .etr-notifs-invite__icone .etr-icone { width: 22px; height: 22px; color: #fff; }
+.etr-notifs-invite { flex-wrap: wrap; }
+.etr-notifs-invite p { flex: 1 1 200px; }
+.etr-notifs-invite .etr-btn { flex: none; }
+@media (max-width: 480px) {
+	.etr-notifs__actions .etr-btn { width: 100%; justify-content: center; }
+	.etr-notifs-invite .etr-installer__fermer { order: 2; }
+	.etr-notifs-invite .etr-btn { order: 3; flex: 1 1 100%; justify-content: center; }
+}

@@ -566,6 +566,17 @@ class ETR_Gestion {
 		wp_localize_script( 'espace-traiteur-app', 'etrApp', ETR_PWA::config_script() );
 		if ( ETR_Equipe_Acces::ecran() ) {
 			wp_enqueue_script( 'espace-traiteur-connexion', ETR_URL . 'assets/js/connexion.js', array(), ETR_VERSION, true );
+		} elseif ( is_user_logged_in() && ETR_Push::disponible() ) {
+			wp_enqueue_script( 'espace-traiteur-notifications', ETR_URL . 'assets/js/notifications.js', array( 'espace-traiteur-app' ), ETR_VERSION, true );
+			wp_localize_script(
+				'espace-traiteur-notifications',
+				'etrNotifs',
+				array(
+					'cle'   => ETR_Push::cle_publique(),
+					'api'   => esc_url_raw( rest_url( ETR_Push::API . '/notifications/' ) ),
+					'nonce' => wp_create_nonce( 'wp_rest' ),
+				)
+			);
 		}
 	}
 
@@ -861,6 +872,9 @@ class ETR_Gestion {
 		if ( 'demande' === $vue ) {
 			return isset( $_GET['id'] ) ? 'demande' : 'demandes'; // phpcs:ignore WordPress.Security.NonceVerification
 		}
+		if ( 'notifications' === $vue ) {
+			return 'notifications'; // Pour toute l'équipe, depuis la cloche (pas d'onglet).
+		}
 		return array_key_exists( $vue, $vues ) ? $vue : $defaut;
 	}
 
@@ -879,6 +893,9 @@ class ETR_Gestion {
 		self::barre_laterale( $actif );
 		echo '<main class="etr-app__principal" id="etr-contenu">';
 		self::aide_installation();
+		if ( 'notifications' !== $vue ) {
+			self::invitation_notifications();
+		}
 		self::messages();
 
 		switch ( $vue ) {
@@ -903,11 +920,111 @@ class ETR_Gestion {
 			case 'equipe':
 				self::vue_equipe();
 				break;
+			case 'notifications':
+				self::vue_notifications();
+				break;
 			default:
 				self::vue_tableau();
 		}
 
 		echo '</main></div>';
+	}
+
+	/**
+	 * Invitation à activer les notifications (affichée par notifications.js dans l'application
+	 * installée, tant que la personne n'a ni accepté ni refusé).
+	 */
+	private static function invitation_notifications() {
+		if ( ! ETR_Push::disponible() ) {
+			return;
+		}
+		echo '<aside class="etr-installer etr-notifs-invite" id="etr-notifs-invite" hidden>';
+		echo '<span class="etr-notifs-invite__icone" aria-hidden="true">' . self::icone( 'cloche' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique.
+		echo '<p><strong>' . esc_html__( 'Recevoir les alertes sur ce téléphone', 'espace-traiteur' ) . '</strong>';
+		echo '<span>' . esc_html( self::texte_alertes() ) . '</span></p>';
+		echo '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url( array( 'vue' => 'notifications' ) ) ) . '">' . esc_html__( 'Activer', 'espace-traiteur' ) . '</a>';
+		echo '<button type="button" class="etr-installer__fermer" aria-label="' . esc_attr__( 'Plus tard', 'espace-traiteur' ) . '">×</button>';
+		echo '</aside>';
+	}
+
+	/**
+	 * Ce que la personne recevra, selon ses rôles.
+	 *
+	 * @return string[]
+	 */
+	private static function alertes_recues() {
+		$alertes = array();
+		$roles   = ETR_Equipe::roles_equipe( wp_get_current_user() );
+		if ( ETR_Equipe::bureau() ) {
+			$alertes[] = __( 'Chaque nouvelle demande d’un traiteur, et chaque demande qu’un traiteur annule.', 'espace-traiteur' );
+		}
+		if ( array_intersect( array( 'etr_preparateur', 'etr_livreur' ), $roles ) ) {
+			$alertes[] = __( 'Chaque commande validée par le bureau (à préparer, à livrer), et chaque commande validée puis annulée.', 'espace-traiteur' );
+		}
+		return $alertes;
+	}
+
+	/**
+	 * Résumé d'une ligne des alertes reçues.
+	 *
+	 * @return string
+	 */
+	private static function texte_alertes() {
+		$roles = ETR_Equipe::roles_equipe( wp_get_current_user() );
+		$bureau = ETR_Equipe::bureau();
+		$terrain = (bool) array_intersect( array( 'etr_preparateur', 'etr_livreur' ), $roles );
+		if ( $bureau && $terrain ) {
+			return __( 'Nouvelles demandes et commandes à préparer, même application fermée.', 'espace-traiteur' );
+		}
+		return $bureau
+			? __( 'Nouvelles demandes des traiteurs, même application fermée.', 'espace-traiteur' )
+			: __( 'Commandes validées à préparer et à livrer, même application fermée.', 'espace-traiteur' );
+	}
+
+	/**
+	 * Page « Notifications » : activer, tester ou désactiver sur cet appareil.
+	 */
+	private static function vue_notifications() {
+		self::entete( __( 'Notifications', 'espace-traiteur' ), __( 'Des alertes sur ce téléphone, même quand l’application est fermée.', 'espace-traiteur' ) );
+
+		echo '<section class="etr-panneau etr-notifs" id="etr-notifs">';
+		if ( ! ETR_Push::disponible() ) {
+			echo '<p class="etr-notifs__etat etr-notifs__etat--erreur">' . esc_html__( 'Le serveur du site ne peut pas envoyer de notifications : l’extension PHP OpenSSL est absente ou trop ancienne. Demandez à l’hébergeur de l’activer.', 'espace-traiteur' ) . '</p>';
+			echo '</section>';
+			return;
+		}
+		echo '<p class="etr-notifs__etat" id="etr-notifs-etat" role="status">' . esc_html__( 'Vérification de cet appareil…', 'espace-traiteur' ) . '</p>';
+		echo '<noscript><p class="etr-notifs__etat etr-notifs__etat--erreur">' . esc_html__( 'Activez JavaScript pour gérer les notifications.', 'espace-traiteur' ) . '</p></noscript>';
+		echo '<div class="etr-notifs__actions">';
+		echo '<button type="button" class="etr-btn" id="etr-notifs-activer" hidden>' . self::icone( 'cloche' ) . '<span>' . esc_html__( 'Activer sur cet appareil', 'espace-traiteur' ) . '</span></button>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique.
+		echo '<button type="button" class="etr-btn etr-btn--discret" id="etr-notifs-test" hidden>' . esc_html__( 'Envoyer une notification de test', 'espace-traiteur' ) . '</button>';
+		echo '<button type="button" class="etr-btn etr-btn--discret" id="etr-notifs-desactiver" hidden>' . esc_html__( 'Désactiver sur cet appareil', 'espace-traiteur' ) . '</button>';
+		echo '</div>';
+		echo '</section>';
+
+		$alertes = self::alertes_recues();
+		echo '<section class="etr-panneau etr-notifs"><h2 class="etr-panneau__titre">' . esc_html__( 'Ce que vous recevez', 'espace-traiteur' ) . '</h2>';
+		if ( $alertes ) {
+			echo '<ul class="etr-notifs__liste">';
+			foreach ( $alertes as $alerte ) {
+				echo '<li>' . esc_html( $alerte ) . '</li>';
+			}
+			echo '</ul>';
+		} else {
+			echo '<p class="etr-muted">' . esc_html__( 'Aucune alerte pour vos rôles actuels.', 'espace-traiteur' ) . '</p>';
+		}
+		echo '<p class="etr-muted">' . esc_html__( 'Vous ne recevez jamais d’alerte pour vos propres actions. Toucher une alerte ouvre la demande.', 'espace-traiteur' ) . '</p>';
+
+		$appareils = ETR_Push::appareils( get_current_user_id() );
+		if ( $appareils ) {
+			echo '<h3 class="etr-notifs__sous-titre">' . esc_html__( 'Vos appareils', 'espace-traiteur' ) . '</h3><ul class="etr-notifs__liste">';
+			foreach ( $appareils as $appareil ) {
+				/* translators: 1 : appareil, 2 : date. */
+				echo '<li>' . esc_html( sprintf( __( '%1$s, depuis le %2$s', 'espace-traiteur' ), $appareil['nom'] ? $appareil['nom'] : __( 'Appareil', 'espace-traiteur' ), wp_date( 'j M Y', (int) $appareil['depuis'] ) ) ) . '</li>';
+			}
+			echo '</ul>';
+		}
+		echo '</section>';
 	}
 
 	/**
@@ -977,6 +1094,7 @@ class ETR_Gestion {
 			$liens[] = array( admin_url( 'edit.php?post_type=etr_demande&page=etr-reglages' ), __( 'Réglages', 'espace-traiteur' ), 'reglages' );
 			$liens[] = array( admin_url(), __( 'Administration WordPress', 'espace-traiteur' ), 'externe' );
 		}
+		array_unshift( $liens, array( self::url( array( 'vue' => 'notifications' ) ), __( 'Notifications', 'espace-traiteur' ), 'cloche' ) );
 		$liens[] = array( wp_logout_url( self::url() ), __( 'Se déconnecter', 'espace-traiteur' ), 'sortie' );
 		foreach ( $liens as $lien ) {
 			echo '<li><a href="' . esc_url( $lien[0] ) . '">' . self::icone( $lien[2] ) . '<span>' . esc_html( $lien[1] ) . '</span></a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
