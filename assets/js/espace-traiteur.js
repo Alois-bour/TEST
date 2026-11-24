@@ -98,6 +98,7 @@
 		var c = champ( cle );
 		if ( c ) {
 			c.addEventListener( 'change', function () {
+				requete++;
 				clearTimeout( minuteur );
 				minuteur = setTimeout( mettreAJour, 250 );
 			} );
