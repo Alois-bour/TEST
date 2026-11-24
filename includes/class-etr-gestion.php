@@ -134,6 +134,12 @@ class ETR_Gestion {
 		} elseif ( 'inviter' === $action || 'basculer' === $action ) {
 			self::action_compte( $action );
 		}
+
+		// Bons imprimables : page autonome, hors application.
+		if ( isset( $_GET['vue'], $_GET['id'] ) && 'bon' === $_GET['vue'] ) { // phpcs:ignore WordPress.Security.NonceVerification
+			$id = absint( $_GET['id'] ); // phpcs:ignore WordPress.Security.NonceVerification
+			ETR_Bons::afficher( $id, isset( $_GET['type'] ) ? sanitize_key( wp_unslash( $_GET['type'] ) ) : '', self::url_demande( $id ) ); // phpcs:ignore WordPress.Security.NonceVerification
+		}
 	}
 
 	/**
@@ -994,6 +1000,7 @@ class ETR_Gestion {
 		echo '<aside class="etr-dossier__cote">';
 		self::panneau_decision( $id, $statut );
 		self::panneau_tarif( $id );
+		self::panneau_documents( $id );
 		self::panneau_traiteur( $auteur );
 		if ( current_user_can( 'edit_post', $id ) ) {
 			echo '<p class="etr-dossier__wp"><a class="etr-lien" href="' . esc_url( get_edit_post_link( $id, 'url' ) ) . '">' . esc_html__( 'Ouvrir dans l’administration WordPress', 'espace-traiteur' ) . '</a></p>';
@@ -1142,6 +1149,30 @@ class ETR_Gestion {
 		echo '<p class="etr-muted">' . esc_html__( 'Pris en compte dans le prix final indicatif, visible aussi par le traiteur si les prix sont affichés. Livraison vide = non chiffrée, 0 = offerte.', 'espace-traiteur' ) . '</p>';
 		echo '<button type="submit" class="etr-btn">' . esc_html__( 'Mettre à jour le prix', 'espace-traiteur' ) . '</button>';
 		echo '</form>';
+	}
+
+	/**
+	 * Bons imprimables.
+	 *
+	 * @param int $id Demande.
+	 */
+	private static function panneau_documents( $id ) {
+		echo '<section class="etr-panneau etr-documents"><h2 class="etr-panneau__titre">' . esc_html__( 'Documents à imprimer', 'espace-traiteur' ) . '</h2><ul>';
+		$aides = array(
+			'preparation' => __( 'Liste à cocher pour l’entrepôt', 'espace-traiteur' ),
+			'retour'      => __( 'Casse et manquants à la reprise', 'espace-traiteur' ),
+		);
+		foreach ( ETR_Bons::types() as $type => $libelle ) {
+			$url = self::url(
+				array(
+					'vue'  => 'bon',
+					'id'   => $id,
+					'type' => $type,
+				)
+			);
+			echo '<li><a class="etr-documents__lien" href="' . esc_url( $url ) . '" target="_blank" rel="noopener"><strong>' . esc_html( $libelle ) . '</strong><small>' . esc_html( $aides[ $type ] ) . '</small><span class="screen-reader-text"> ' . esc_html__( '(nouvel onglet)', 'espace-traiteur' ) . '</span></a></li>';
+		}
+		echo '</ul></section>';
 	}
 
 	/**
