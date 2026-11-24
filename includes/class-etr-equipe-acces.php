@@ -33,6 +33,13 @@ class ETR_Equipe_Acces {
 	private static $cible = null;
 
 	/**
+	 * Lien refusé : remplace (déjà utilisé ou remplacé par un plus récent) | expire | acces.
+	 *
+	 * @var string
+	 */
+	private static $refus = '';
+
+	/**
 	 * Erreur à afficher.
 	 *
 	 * @var string
@@ -153,6 +160,11 @@ class ETR_Equipe_Acces {
 
 		$user        = check_password_reset_key( $cle, $login );
 		self::$cible = ( ! is_wp_error( $user ) && self::autorise( $user ) ) ? $user : null;
+		if ( is_wp_error( $user ) ) {
+			self::$refus = in_array( $user->get_error_code(), array( 'expired_key', 'expiredkey' ), true ) ? 'expire' : 'remplace';
+		} elseif ( ! self::$cible ) {
+			self::$refus = 'acces';
+		}
 
 		// Quelqu'un d'autre est connecté sur cet appareil : on ne mélange pas les comptes.
 		if ( self::$cible && is_user_logged_in() && get_current_user_id() !== self::$cible->ID ) {
@@ -414,9 +426,7 @@ class ETR_Equipe_Acces {
 	 */
 	private static function ecran_mot_de_passe() {
 		if ( ! self::$cible ) {
-			self::entete( __( 'Lien expiré', 'espace-traiteur' ), __( 'Ce lien n’est plus valable : il ne sert qu’une fois, expire après 24 heures, et une invitation plus récente l’annule. Demandez un nouveau lien, il arrive en quelques instants.', 'espace-traiteur' ) );
-			echo '<a class="etr-auth__bouton" href="' . esc_url( ETR_Gestion::url( array( 'vue' => 'mot-de-passe-oublie' ) ) ) . '"><span>' . esc_html__( 'Recevoir un nouveau lien', 'espace-traiteur' ) . '</span></a>';
-			echo '<p class="etr-auth__retour"><a href="' . esc_url( ETR_Gestion::url() ) . '">' . esc_html__( '← Retour à la connexion', 'espace-traiteur' ) . '</a></p>';
+			self::ecran_lien_refuse();
 			return;
 		}
 		$login = self::$cible->user_login;
@@ -433,6 +443,23 @@ class ETR_Equipe_Acces {
 		self::champ_mot_de_passe( 'pass2', 'pass2', __( 'Confirmer le mot de passe', 'espace-traiteur' ), 'new-password', ' minlength="8"' );
 		self::bouton( __( 'Enregistrer mon mot de passe', 'espace-traiteur' ) );
 		echo '</form>';
+	}
+
+	/**
+	 * Lien refusé : la raison exacte, pour savoir quoi faire.
+	 */
+	private static function ecran_lien_refuse() {
+		if ( 'acces' === self::$refus ) {
+			self::entete( __( 'Accès non ouvert', 'espace-traiteur' ), __( 'Ce compte n’a pas accès à l’application de l’équipe. Demandez au bureau de vérifier vos rôles, puis de vous renvoyer l’invitation.', 'espace-traiteur' ) );
+		} elseif ( 'expire' === self::$refus ) {
+			self::entete( __( 'Lien expiré', 'espace-traiteur' ), __( 'Ce lien n’est valable que 24 heures. Demandez un nouveau lien, il arrive en quelques instants.', 'espace-traiteur' ) );
+		} else {
+			self::entete( __( 'Lien déjà utilisé ou remplacé', 'espace-traiteur' ), __( 'Ce lien a déjà servi, ou un lien plus récent l’a remplacé (nouvelle invitation ou nouveau lien demandé). Utilisez le dernier e-mail reçu, ou demandez un nouveau lien.', 'espace-traiteur' ) );
+		}
+		if ( 'acces' !== self::$refus ) {
+			echo '<a class="etr-auth__bouton" href="' . esc_url( ETR_Gestion::url( array( 'vue' => 'mot-de-passe-oublie' ) ) ) . '"><span>' . esc_html__( 'Recevoir un nouveau lien', 'espace-traiteur' ) . '</span></a>';
+		}
+		echo '<p class="etr-auth__retour"><a href="' . esc_url( ETR_Gestion::url() ) . '">' . esc_html__( '← Retour à la connexion', 'espace-traiteur' ) . '</a></p>';
 	}
 
 	/**
