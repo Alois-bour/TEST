@@ -65,6 +65,7 @@ class ETR_Installer {
 	 * Désactivation.
 	 */
 	public static function deactivate() {
+		wp_clear_scheduled_hook( 'etr_rappels_horaires' );
 		flush_rewrite_rules();
 	}
 

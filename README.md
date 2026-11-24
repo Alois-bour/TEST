@@ -109,6 +109,9 @@ Les traiteurs sont techniquement des utilisateurs WordPress (rôle « Traiteur �
 | Nouvelle demande | Équipe (e-mail des réglages, sinon e-mail d'administration du site) |
 | Demande annulée par le traiteur | Équipe |
 | Changement de statut | Traiteur concerné |
+| Rappel de livraison (J-3) et de reprise (lendemain de l'événement) | Traiteur concerné |
+
+Les rappels concernent les demandes validées ou livrées (pour la livraison, uniquement les demandes validées). Sans date de livraison, la date de l'événement est utilisée. Ils sont traités toutes les heures par WP-Cron, selon le fuseau horaire du site, avec une seule expédition réussie par date. Un échec est retenté le jour même et journalisé. WP-Cron nécessite des visites ou un déclenchement externe ; il ne rattrape pas les rappels dont la journée est passée.
 
 Pour changer le destinataire côté équipe :
 

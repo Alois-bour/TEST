@@ -29,3 +29,4 @@ delete_option( 'etr_journal_migrations' );
 delete_option( 'etr_migration_echec' );
 delete_option( 'etr_migration_verrou' );
 wp_clear_scheduled_hook( 'etr_migration_suite' );
+wp_clear_scheduled_hook( 'etr_rappels_horaires' );
