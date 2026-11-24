@@ -72,7 +72,7 @@ class ETR_Traiteurs {
 		$corps .= ETR_Comptes::url_mot_de_passe( $cle, $user->user_login ) . "\n\n";
 		$corps .= __( 'Ensuite, connectez-vous à tout moment ici :', 'espace-traiteur' ) . "\n" . etr_url() . "\n";
 
-		$envoye = wp_mail( $user->user_email, $objet, $corps );
+		$envoye = etr_envoyer_mail( $user->user_email, $objet, $corps );
 		if ( $envoye ) {
 			update_user_meta( $user->ID, 'etr_invitation_envoyee', time() );
 		}
@@ -296,7 +296,10 @@ class ETR_Traiteurs {
 
 		echo '<div class="wrap"><h1>' . esc_html__( 'Traiteurs', 'espace-traiteur' ) . '</h1>';
 		if ( isset( $notices[ $notice ] ) ) {
-			echo '<div class="notice notice-' . ( in_array( $notice, array( 'cree_sans_mail', 'mail_echec' ), true ) ? 'warning' : 'success' ) . ' is-dismissible"><p>' . esc_html( $notices[ $notice ] ) . '</p></div>';
+			$echec  = in_array( $notice, array( 'cree_sans_mail', 'mail_echec' ), true );
+			$raison = $echec ? etr_raison_echec_mail() : '';
+			/* translators: %s : message d'erreur technique. */
+			echo '<div class="notice notice-' . ( $echec ? 'warning' : 'success' ) . ' is-dismissible"><p>' . esc_html( $notices[ $notice ] ) . ( $raison ? '<br><small>' . esc_html( sprintf( __( 'Raison : %s', 'espace-traiteur' ), $raison ) ) . '</small>' : '' ) . '</p></div>';
 		}
 		if ( isset( $erreurs[ $erreur ] ) ) {
 			echo '<div class="notice notice-error"><p>' . esc_html( $erreurs[ $erreur ] ) . '</p></div>';

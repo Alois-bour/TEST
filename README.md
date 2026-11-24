@@ -135,6 +135,9 @@ Les traiteurs sont techniquement des utilisateurs WordPress (rôle « Traiteur �
 
 ## Notifications e-mail
 
+**Vérifier que le site envoie bien ses e-mails** : *Espace traiteur › Réglages › E-mails* affiche l'adresse d'expédition utilisée et propose « Envoyer un e-mail de test ». Si l'envoi échoue, la raison technique est affichée (aussi après une invitation qui n'est pas partie). Si l'envoi réussit mais que rien n'arrive (indésirables compris), l'hébergement n'envoie pas les e-mails de façon fiable : installer une extension SMTP (WP Mail SMTP, FluentSMTP…) reliée à une vraie boîte d'envoi.
+
+
 | Événement | Destinataire |
 |---|---|
 | Nouvelle demande | Équipe (e-mail des réglages, sinon e-mail d'administration du site) |
