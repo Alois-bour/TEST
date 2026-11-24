@@ -61,8 +61,40 @@ class ETR_Migrations {
 				'description' => __( 'Espace de gestion : adresse /gestion-traiteur/ et disposition par défaut de l’écran des demandes.', 'espace-traiteur' ),
 				'callback'    => array( __CLASS__, 'migrer_1_5_0' ),
 			),
+			'1.7.0' => array(
+				'description' => __( 'Traiteurs existants marqués comme déjà invités (l’invitation partait automatiquement à la création).', 'espace-traiteur' ),
+				'callback'    => array( __CLASS__, 'migrer_1_7_0' ),
+			),
 		);
 		return (array) apply_filters( 'etr_migrations', $etapes );
+	}
+
+	/**
+	 * Migration 1.7.0 : l'invitation n'est plus envoyée d'office à la création.
+	 * Les traiteurs créés avant l'ont reçue : on note la date de création comme date d'invitation,
+	 * pour qu'ils n'apparaissent pas « À inviter ».
+	 *
+	 * @return true
+	 */
+	public static function migrer_1_7_0() {
+		$ids = get_users(
+			array(
+				'role'       => 'traiteur',
+				'fields'     => 'ID',
+				'meta_query' => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+					array(
+						'key'     => 'etr_invitation_envoyee',
+						'compare' => 'NOT EXISTS',
+					),
+				),
+			)
+		);
+		foreach ( $ids as $id ) {
+			$user = get_userdata( $id );
+			$date = $user ? strtotime( $user->user_registered . ' UTC' ) : false;
+			update_user_meta( $id, 'etr_invitation_envoyee', $date ? $date : time() );
+		}
+		return true;
 	}
 
 	/**

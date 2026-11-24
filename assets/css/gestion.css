@@ -472,3 +472,10 @@ td.etr-table__nombre .etr-manque { margin: 0; font-size: inherit; font-weight: 5
 	.etr-stats__table--mois td::before { content: attr(data-label); color: var(--etr-gris); font-weight: 400; text-align: left; }
 	.etr-app .etr-stats__table--mois tr:not(:last-child) td:last-child { border-bottom-color: var(--etr-trait); }
 }
+
+/* Traiteurs : invitation envoyée maintenant ou plus tard */
+.etr-app .etr-btn.etr-btn--petit { width: auto; min-height: 34px; padding: 6px 14px; font-size: 13px; }
+.etr-app .etr-acces-date { display: block; margin-top: 4px; font-size: 12px; color: var(--etr-gris); }
+.etr-app .etr-case { display: flex; align-items: flex-start; gap: 10px; margin: 0; font-weight: 500; cursor: pointer; }
+.etr-app .etr-case input[type="checkbox"] { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--etr-olive); }
+.etr-app .etr-case small { display: block; margin-top: 2px; font-weight: 400; font-size: 13px; color: var(--etr-gris); }

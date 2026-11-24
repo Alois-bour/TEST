@@ -1208,3 +1208,6 @@ body.etr-plein-ecran { margin: 0; padding: 0; background: #fff; }
 	.etr-auth .etr-auth__retour-site { top: 16px; right: 20px; }
 	.etr-auth__panneau { padding-top: 56px; }
 }
+
+/* Admin WordPress : date d'invitation sous le statut d'accès */
+.etr-acces-date { display: block; margin-top: 4px; font-size: 12px; color: #646970; }

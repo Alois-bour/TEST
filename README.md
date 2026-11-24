@@ -39,14 +39,14 @@ Sans WooCommerce, le plugin utilise son propre catalogue (menu *Espace traiteur 
 - **Demandes** : liste classée par date d'événement, filtres par statut et par traiteur, recherche ; **export CSV** (filtres appliqués) : une ligne par demande (dates, statut, sous-total, remise, livraison, total) ou une ligne par article (référence, quantité, prix), pour Excel, Odoo ou la comptabilité.
 - **Fiche d'une demande** : matériel et disponibilités sur la période, prix de chaque ligne et prix final indicatif (tarifs actuels du site) ; **tarification** : remise en % (ex. traiteur partenaire) et frais de livraison et reprise, intégrés au prix final (sous-total, remise, livraison, total), aussi modifiables dans l'administration WordPress ; **documents à imprimer** : bon de préparation (liste à cocher pour l'entrepôt, groupée par famille) et bon de retour (rendu OK, casse, manquants, observations, signatures), au format A4, informations de l'événement, coordonnées du traiteur ; choix du statut et message au traiteur (e-mail envoyé si le statut change) ; **historique** de la demande (envoi, changements de statut, messages, modifications et annulation : qui, quoi, quand), aussi visible dans l'administration WordPress.
 - **Planning** : calendrier du mois avec livraisons, événements et reprises (en pointillés : demandes encore en attente) ; export CSV des mouvements du mois.
-- **Traiteurs** : liste, nombre de demandes, ajout d'un traiteur, renvoi d'invitation, désactivation et réactivation.
+- **Traiteurs** : liste, nombre de demandes, ajout d'un traiteur (invitation envoyée tout de suite ou plus tard), envoi ou renvoi de l'invitation, désactivation et réactivation. Les traiteurs pas encore invités apparaissent « À inviter ».
 - **Catalogue** : stock, quantités sorties et disponibles aujourd'hui, lien vers la fiche produit ; recherche instantanée (nom, référence, catégorie) pendant la frappe.
 
 Sans permaliens, l'adresse est `/?etr_gestion=1`. Filtre `etr_gestion_slug` pour changer `gestion-traiteur`.
 
 Écrans WordPress :
 
-- **Espace traiteur › Traiteurs** : créer un traiteur (société, contact, e-mail, téléphone). Il reçoit une invitation par e-mail pour choisir son mot de passe. Depuis cette page : renvoyer l'invitation, désactiver ou réactiver un accès, voir ses demandes.
+- **Espace traiteur › Traiteurs** : créer un traiteur (société, contact, e-mail, téléphone). L'invitation (e-mail pour choisir son mot de passe) n'est envoyée que si la case « Envoyer l'invitation maintenant » est cochée ; sinon le traiteur apparaît « À inviter » et on l'invite plus tard d'un clic. Depuis cette page : envoyer ou renvoyer l'invitation (date du dernier envoi affichée), désactiver ou réactiver un accès, voir ses demandes.
 - **Produits WooCommerce** : renseigner la « Quantité possédée » des articles à limiter (voir ci-dessus).
 - **Espace traiteur › Réglages** : catégories proposées, prix, e-mail de l'équipe, affichage de l'espace des traiteurs (application plein écran ou intégrée au site).
 - **Espace traiteur › Demandes** : voir les demandes, filtrer par statut, changer le statut et écrire un message au traiteur.

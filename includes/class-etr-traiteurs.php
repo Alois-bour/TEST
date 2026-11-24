@@ -72,7 +72,34 @@ class ETR_Traiteurs {
 		$corps .= ETR_Comptes::url_mot_de_passe( $cle, $user->user_login ) . "\n\n";
 		$corps .= __( 'Ensuite, connectez-vous à tout moment ici :', 'espace-traiteur' ) . "\n" . etr_url() . "\n";
 
-		return wp_mail( $user->user_email, $objet, $corps );
+		$envoye = wp_mail( $user->user_email, $objet, $corps );
+		if ( $envoye ) {
+			update_user_meta( $user->ID, 'etr_invitation_envoyee', time() );
+		}
+		return $envoye;
+	}
+
+	/**
+	 * Date du dernier envoi d'invitation (0 si jamais envoyée).
+	 *
+	 * @param int $user_id Traiteur.
+	 * @return int Horodatage.
+	 */
+	public static function date_invitation( $user_id ) {
+		return (int) get_user_meta( $user_id, 'etr_invitation_envoyee', true );
+	}
+
+	/**
+	 * Message à afficher après une création, selon le sort de l'invitation.
+	 *
+	 * @param array $resultat Résultat de creer_compte().
+	 * @return string cree | cree_sans_invitation | cree_sans_mail
+	 */
+	public static function code_creation( $resultat ) {
+		if ( null === $resultat['invitation'] ) {
+			return 'cree_sans_invitation';
+		}
+		return $resultat['invitation'] ? 'cree' : 'cree_sans_mail';
 	}
 
 	/**
@@ -91,25 +118,27 @@ class ETR_Traiteurs {
 				'email'       => isset( $_POST['email'] ) ? wp_unslash( $_POST['email'] ) : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 				'telephone'   => isset( $_POST['telephone'] ) ? wp_unslash( $_POST['telephone'] ) : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 				'identifiant' => isset( $_POST['identifiant'] ) ? wp_unslash( $_POST['identifiant'] ) : '', // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-			)
+			),
+			! empty( $_POST['envoyer_invitation'] )
 		);
 		if ( is_wp_error( $resultat ) ) {
 			wp_safe_redirect( self::url( array( 'etr_erreur' => $resultat->get_error_code() ) ) );
 			exit;
 		}
-		wp_safe_redirect( self::url( array( 'etr_notice' => $resultat['invitation'] ? 'cree' : 'cree_sans_mail' ) ) );
+		wp_safe_redirect( self::url( array( 'etr_notice' => self::code_creation( $resultat ) ) ) );
 		exit;
 	}
 
 	/**
-	 * Crée un compte traiteur et lui envoie son invitation.
+	 * Crée un compte traiteur et, si demandé, lui envoie son invitation.
 	 *
 	 * Codes d'erreur : societe, email, email_existe, identifiant_existe, creation.
 	 *
 	 * @param array $donnees societe, contact, email, telephone, identifiant (bruts).
-	 * @return array|WP_Error { user_id, invitation (bool) }
+	 * @param bool  $inviter Envoyer l'invitation tout de suite.
+	 * @return array|WP_Error { user_id, invitation : true envoyée, false échec d'envoi, null non demandée }
 	 */
-	public static function creer_compte( $donnees ) {
+	public static function creer_compte( $donnees, $inviter = false ) {
 		$societe   = sanitize_text_field( isset( $donnees['societe'] ) ? $donnees['societe'] : '' );
 		$contact   = sanitize_text_field( isset( $donnees['contact'] ) ? $donnees['contact'] : '' );
 		$email     = sanitize_email( isset( $donnees['email'] ) ? $donnees['email'] : '' );
@@ -160,8 +189,26 @@ class ETR_Traiteurs {
 
 		return array(
 			'user_id'    => $user_id,
-			'invitation' => self::envoyer_invitation( get_userdata( $user_id ) ),
+			'invitation' => $inviter ? self::envoyer_invitation( get_userdata( $user_id ) ) : null,
 		);
+	}
+
+	/**
+	 * Badge « Accès » : désactivé, à inviter, ou actif (avec la date d'invitation).
+	 *
+	 * @param bool $desactive Accès désactivé.
+	 * @param int  $invite_le Date d'envoi de l'invitation (0 si jamais).
+	 * @return string HTML échappé.
+	 */
+	public static function badge_acces( $desactive, $invite_le ) {
+		if ( $desactive ) {
+			return '<span class="etr-statut etr-statut--refusee">' . esc_html__( 'Désactivé', 'espace-traiteur' ) . '</span>';
+		}
+		if ( ! $invite_le ) {
+			return '<span class="etr-statut etr-statut--en_attente">' . esc_html__( 'À inviter', 'espace-traiteur' ) . '</span>';
+		}
+		/* translators: %s : date. */
+		return '<span class="etr-statut etr-statut--validee">' . esc_html__( 'Actif', 'espace-traiteur' ) . '</span><small class="etr-acces-date">' . esc_html( sprintf( __( 'Invité le %s', 'espace-traiteur' ), wp_date( 'j M Y', $invite_le ) ) ) . '</small>';
 	}
 
 	/**
@@ -232,8 +279,9 @@ class ETR_Traiteurs {
 
 		$notices = array(
 			'cree'           => __( 'Traiteur créé. Une invitation lui a été envoyée par e-mail pour choisir son mot de passe.', 'espace-traiteur' ),
+			'cree_sans_invitation' => __( 'Traiteur créé, sans invitation. Utilisez « Envoyer l’invitation » dans la liste quand vous êtes prêt.', 'espace-traiteur' ),
 			'cree_sans_mail' => __( 'Traiteur créé, mais l’e-mail d’invitation n’a pas pu partir. Utilisez « Renvoyer l’invitation ».', 'espace-traiteur' ),
-			'invite'         => __( 'Invitation renvoyée.', 'espace-traiteur' ),
+			'invite'         => __( 'Invitation envoyée.', 'espace-traiteur' ),
 			'mail_echec'     => __( 'L’e-mail n’a pas pu être envoyé. Vérifiez la configuration des e-mails du site.', 'espace-traiteur' ),
 			'desactive'      => __( 'Accès désactivé : le traiteur est déconnecté et ne peut plus se connecter.', 'espace-traiteur' ),
 			'reactive'       => __( 'Accès réactivé.', 'espace-traiteur' ),
@@ -304,10 +352,11 @@ class ETR_Traiteurs {
 			echo '<td>' . esc_html( get_user_meta( $user->ID, 'etr_telephone', true ) ) . '</td>';
 			echo '<td><code>' . esc_html( $user->user_login ) . '</code></td>';
 			echo '<td>' . ( $demandes ? '<a href="' . esc_url( $voir ) . '">' . esc_html( number_format_i18n( $demandes ) ) . '</a>' : '0' ) . '</td>';
-			echo '<td>' . ( $desactive ? '<span class="etr-statut etr-statut--refusee">' . esc_html__( 'Désactivé', 'espace-traiteur' ) . '</span>' : '<span class="etr-statut etr-statut--validee">' . esc_html__( 'Actif', 'espace-traiteur' ) . '</span>' ) . '</td>';
+			$invite_le = self::date_invitation( $user->ID );
+			echo '<td>' . self::badge_acces( $desactive, $invite_le ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans badge_acces().
 			echo '<td>';
 			if ( ! $desactive ) {
-				echo '<a href="' . esc_url( $inviter ) . '">' . esc_html__( 'Renvoyer l’invitation', 'espace-traiteur' ) . '</a> | ';
+				echo '<a href="' . esc_url( $inviter ) . '">' . ( $invite_le ? esc_html__( 'Renvoyer l’invitation', 'espace-traiteur' ) : '<strong>' . esc_html__( 'Envoyer l’invitation', 'espace-traiteur' ) . '</strong>' ) . '</a> | ';
 			}
 			echo '<a href="' . esc_url( $basculer ) . '"' . ( $desactive ? '' : ' onclick="return confirm(\'' . esc_js( __( 'Désactiver l’accès de ce traiteur ? Il sera déconnecté immédiatement.', 'espace-traiteur' ) ) . '\');"' ) . '>' . ( $desactive ? esc_html__( 'Réactiver', 'espace-traiteur' ) : esc_html__( 'Désactiver', 'espace-traiteur' ) ) . '</a>';
 			if ( current_user_can( 'edit_user', $user->ID ) ) {
@@ -330,7 +379,7 @@ class ETR_Traiteurs {
 		$champs = array(
 			'societe'     => array( __( 'Société', 'espace-traiteur' ), 'text', true, '' ),
 			'contact'     => array( __( 'Nom du contact', 'espace-traiteur' ), 'text', false, '' ),
-			'email'       => array( __( 'E-mail', 'espace-traiteur' ), 'email', true, __( 'L’invitation est envoyée à cette adresse.', 'espace-traiteur' ) ),
+			'email'       => array( __( 'E-mail', 'espace-traiteur' ), 'email', true, __( 'Adresse à laquelle l’invitation sera envoyée.', 'espace-traiteur' ) ),
 			'telephone'   => array( __( 'Téléphone', 'espace-traiteur' ), 'tel', false, '' ),
 			'identifiant' => array( __( 'Identifiant', 'espace-traiteur' ), 'text', false, __( 'Facultatif : par défaut, la partie avant le @ de l’e-mail. Le traiteur peut aussi se connecter avec son e-mail.', 'espace-traiteur' ) ),
 		);
@@ -345,8 +394,10 @@ class ETR_Traiteurs {
 				$champ[3] ? '<p class="description">' . esc_html( $champ[3] ) . '</p>' : ''
 			);
 		}
+		echo '<tr><th scope="row">' . esc_html__( 'Invitation', 'espace-traiteur' ) . '</th><td><label><input type="checkbox" name="envoyer_invitation" value="1"> ' . esc_html__( 'Envoyer l’invitation maintenant', 'espace-traiteur' ) . '</label>';
+		echo '<p class="description">' . esc_html__( 'Sinon, le compte est créé sans e-mail : vous l’enverrez plus tard depuis la liste (« Envoyer l’invitation »).', 'espace-traiteur' ) . '</p></td></tr>';
 		echo '</tbody></table>';
-		submit_button( __( 'Créer le traiteur et envoyer l’invitation', 'espace-traiteur' ) );
+		submit_button( __( 'Créer le traiteur', 'espace-traiteur' ) );
 		echo '</form>';
 	}
 }
