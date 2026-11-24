@@ -560,7 +560,7 @@ class ETR_Gestion {
 		echo '<p class="etr-app__societe">' . esc_html( etr_nom( $user ) ) . '<span>' . esc_html( $user->user_email ) . '</span></p>';
 		echo '<ul class="etr-app__liens">';
 		$liens = array(
-			array( etr_url(), __( 'Espace traiteur', 'espace-traiteur' ), 'site' ),
+			array( etr_url(), __( 'Voir l’espace traiteur', 'espace-traiteur' ), 'site' ),
 			array( admin_url( 'edit.php?post_type=etr_demande&page=etr-reglages' ), __( 'Réglages', 'espace-traiteur' ), 'reglages' ),
 			array( admin_url(), __( 'Administration WordPress', 'espace-traiteur' ), 'externe' ),
 			array( wp_logout_url( self::url() ), __( 'Se déconnecter', 'espace-traiteur' ), 'sortie' ),
