@@ -330,9 +330,9 @@ td.etr-table__nombre .etr-manque { margin: 0; font-size: inherit; font-weight: 5
 .etr-app .etr-champ__erreur { color: var(--etr-rouge); }
 .etr-app .etr-champ--erreur input { border-color: var(--etr-rouge); }
 .etr-app .etr-ajout .etr-notice { margin: 0; }
-.etr-app .etr-table--traiteurs td:first-child { min-width: 170px; }
-.etr-table--traiteurs td small,
+.etr-app .etr-table--traiteurs td:first-child { min-width: 150px; }
 .etr-table--traiteurs .etr-lien { white-space: nowrap; }
+.etr-app .etr-table--traiteurs td:last-child { min-width: 11.5em; }
 .etr-app .etr-table--traiteurs .etr-table__actions { white-space: normal; }
 .etr-table--traiteurs .etr-table__actions form { display: block; margin: 0; }
 .etr-table--traiteurs .etr-table__actions form + form { margin-top: 6px; }
