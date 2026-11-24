@@ -24,6 +24,7 @@ class ETR_Admin {
 		add_action( 'woocommerce_admin_process_product_object', array( __CLASS__, 'enregistrer_produit' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'add_meta_boxes_etr_demande', array( __CLASS__, 'metaboxes_demande' ) );
+		add_action( 'edit_form_after_title', array( __CLASS__, 'contenu_demande' ) );
 		add_filter( 'get_user_option_meta-box-order_etr_demande', '__return_empty_array' );
 		add_filter( 'get_user_option_screen_layout_etr_demande', array( __CLASS__, 'deux_colonnes' ) );
 		add_action( 'add_meta_boxes_etr_article', array( __CLASS__, 'metaboxes_article' ) );
@@ -442,9 +443,32 @@ class ETR_Admin {
 	 * Metaboxes de la demande.
 	 */
 	public static function metaboxes_demande() {
-		add_meta_box( 'etr_mb_details', __( 'Détails de la demande', 'espace-traiteur' ), array( __CLASS__, 'mb_details' ), 'etr_demande', 'normal', 'high' );
-		add_meta_box( 'etr_mb_lignes', __( 'Articles demandés', 'espace-traiteur' ), array( __CLASS__, 'mb_lignes' ), 'etr_demande', 'normal', 'default' );
 		add_meta_box( 'etr_mb_statut', __( 'Statut et réponse', 'espace-traiteur' ), array( __CLASS__, 'mb_statut' ), 'etr_demande', 'side', 'high' );
+	}
+
+	/**
+	 * Détails et articles d'une demande, dans la colonne principale sous le titre.
+	 *
+	 * Ce ne sont pas des boîtes déplaçables : elles ne peuvent pas se retrouver
+	 * dans l'étroite colonne latérale, quelle que soit la disposition enregistrée.
+	 *
+	 * @param WP_Post $post Demande.
+	 */
+	public static function contenu_demande( $post ) {
+		if ( 'etr_demande' !== $post->post_type ) {
+			return;
+		}
+		$panneaux = array(
+			'details' => array( __( 'Détails de la demande', 'espace-traiteur' ), 'mb_details' ),
+			'lignes'  => array( __( 'Articles demandés', 'espace-traiteur' ), 'mb_lignes' ),
+		);
+		echo '<div class="etr-panneaux-demande">';
+		foreach ( $panneaux as $cle => $panneau ) {
+			echo '<div class="postbox etr-panneau-demande" id="etr-panneau-' . esc_attr( $cle ) . '"><div class="postbox-header"><h2>' . esc_html( $panneau[0] ) . '</h2></div><div class="inside">';
+			call_user_func( array( __CLASS__, $panneau[1] ), $post );
+			echo '</div></div>';
+		}
+		echo '</div>';
 	}
 
 	/**
