@@ -423,7 +423,7 @@ class ETR_Gestion {
 		foreach ( array( 'societe', 'contact', 'email', 'telephone', 'identifiant' ) as $cle ) {
 			$donnees[ $cle ] = isset( $_POST[ $cle ] ) ? wp_unslash( $_POST[ $cle ] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- nettoyé par creer_compte().
 		}
-		$resultat = ETR_Traiteurs::creer_compte( $donnees );
+		$resultat = ETR_Traiteurs::creer_compte( $donnees, ! empty( $_POST['envoyer_invitation'] ) );
 		if ( is_wp_error( $resultat ) ) {
 			self::$erreurs_traiteur = array( $resultat->get_error_code() );
 			return;
@@ -432,7 +432,7 @@ class ETR_Gestion {
 			self::url(
 				array(
 					'vue'     => 'traiteurs',
-					'etr_msg' => $resultat['invitation'] ? 'cree' : 'cree_sans_mail',
+					'etr_msg' => ETR_Traiteurs::code_creation( $resultat ),
 				)
 			)
 		);
@@ -860,7 +860,8 @@ class ETR_Gestion {
 			'enregistre' => __( 'Message enregistré. Le statut n’a pas changé : aucun e-mail n’a été envoyé.', 'espace-traiteur' ),
 			'tarif'      => __( 'Remise et frais de livraison enregistrés.', 'espace-traiteur' ),
 			'cree'       => __( 'Traiteur ajouté. Il a reçu un e-mail pour choisir son mot de passe.', 'espace-traiteur' ),
-			'invite'     => __( 'Invitation renvoyée.', 'espace-traiteur' ),
+			'cree_sans_invitation' => __( 'Traiteur ajouté, sans invitation. Cliquez sur « Envoyer l’invitation » dans la liste quand vous êtes prêt.', 'espace-traiteur' ),
+			'invite'     => __( 'Invitation envoyée.', 'espace-traiteur' ),
 			'desactive'  => __( 'Accès désactivé : le traiteur est déconnecté et ne peut plus se connecter.', 'espace-traiteur' ),
 			'reactive'   => __( 'Accès réactivé.', 'espace-traiteur' ),
 		);
@@ -1640,7 +1641,7 @@ class ETR_Gestion {
 		if ( ! $traiteurs ) {
 			echo '<div class="etr-vide etr-vide--compact"><p>' . esc_html__( 'Aucun traiteur pour le moment. Ajoutez le premier avec le formulaire.', 'espace-traiteur' ) . '</p></div>';
 		} else {
-			echo '<div class="etr-table-cadre"><table class="etr-table etr-table--traiteurs">';
+			echo '<div class="etr-table-cadre" tabindex="0" role="region" aria-label="' . esc_attr__( 'Liste des traiteurs', 'espace-traiteur' ) . '"><table class="etr-table etr-table--traiteurs">';
 			echo '<thead><tr><th scope="col">' . esc_html__( 'Traiteur', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Coordonnées', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Demandes', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Accès', 'espace-traiteur' ) . '</th><th scope="col"><span class="screen-reader-text">' . esc_html__( 'Actions', 'espace-traiteur' ) . '</span></th></tr></thead><tbody>';
 			foreach ( $traiteurs as $user ) {
 				$desactive = ETR_Comptes::est_desactive( $user->ID );
@@ -1650,7 +1651,7 @@ class ETR_Gestion {
 				echo '<tr' . ( $desactive ? ' class="etr-table__passee"' : '' ) . '>';
 				echo '<td><strong>' . esc_html( etr_nom( $user ) ) . '</strong><small>' . esc_html( $contact ? $contact : $user->user_login ) . '</small></td>';
 				echo '<td><a class="etr-lien" href="mailto:' . esc_attr( $user->user_email ) . '">' . esc_html( $user->user_email ) . '</a>' . ( $tel ? '<small>' . esc_html( $tel ) . '</small>' : '' ) . '</td>';
-				echo '<td>';
+				echo '<td data-label="' . esc_attr__( 'Demandes', 'espace-traiteur' ) . '">';
 				if ( $nb ) {
 					echo '<a class="etr-lien" href="' . esc_url( self::url( array( 'vue' => 'demandes', 'traiteur' => $user->ID ) ) ) . '">' . esc_html( number_format_i18n( $nb ) ) . '</a>';
 					/* translators: %s : date. */
@@ -1659,10 +1660,11 @@ class ETR_Gestion {
 					echo '<span class="etr-muted">' . esc_html__( 'Aucune', 'espace-traiteur' ) . '</span>';
 				}
 				echo '</td>';
-				echo '<td>' . ( $desactive ? '<span class="etr-statut etr-statut--refusee">' . esc_html__( 'Désactivé', 'espace-traiteur' ) . '</span>' : '<span class="etr-statut etr-statut--validee">' . esc_html__( 'Actif', 'espace-traiteur' ) . '</span>' ) . '</td>';
+				$invite_le = ETR_Traiteurs::date_invitation( $user->ID );
+				echo '<td data-label="' . esc_attr__( 'Accès', 'espace-traiteur' ) . '">' . ETR_Traiteurs::badge_acces( $desactive, $invite_le ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans badge_acces().
 				echo '<td class="etr-table__actions">';
 				if ( ! $desactive ) {
-					self::bouton_compte( 'inviter', $user->ID, __( 'Renvoyer l’invitation', 'espace-traiteur' ) );
+					self::bouton_compte( 'inviter', $user->ID, $invite_le ? __( 'Renvoyer l’invitation', 'espace-traiteur' ) : __( 'Envoyer l’invitation', 'espace-traiteur' ), '', ! $invite_le );
 				}
 				self::bouton_compte( 'basculer', $user->ID, $desactive ? __( 'Réactiver', 'espace-traiteur' ) : __( 'Désactiver', 'espace-traiteur' ), $desactive ? '' : __( 'Désactiver l’accès de ce traiteur ? Il sera déconnecté immédiatement.', 'espace-traiteur' ) );
 				echo '</td></tr>';
@@ -1684,12 +1686,13 @@ class ETR_Gestion {
 	 * @param int    $user_id  Traiteur.
 	 * @param string $libelle  Libellé.
 	 * @param string $confirm  Confirmation (facultative).
+	 * @param bool   $avant    Mettre l'action en avant (bouton plein).
 	 */
-	private static function bouton_compte( $action, $user_id, $libelle, $confirm = '' ) {
+	private static function bouton_compte( $action, $user_id, $libelle, $confirm = '', $avant = false ) {
 		echo '<form method="post" action="' . esc_url( self::url( array( 'vue' => 'traiteurs' ) ) ) . '"' . ( $confirm ? ' onsubmit="return confirm(\'' . esc_js( $confirm ) . '\');"' : '' ) . '>';
 		wp_nonce_field( 'etr_gestion_' . $action . '_' . $user_id, 'etr_nonce', false );
 		echo '<input type="hidden" name="etr_gestion_action" value="' . esc_attr( $action ) . '"><input type="hidden" name="user" value="' . (int) $user_id . '">';
-		echo '<button type="submit" class="etr-btn-texte">' . esc_html( $libelle ) . '</button>';
+		echo '<button type="submit" class="' . ( $avant ? 'etr-btn etr-btn--plein etr-btn--petit' : 'etr-btn-texte' ) . '">' . esc_html( $libelle ) . '</button>';
 		echo '</form>';
 	}
 
@@ -1716,7 +1719,7 @@ class ETR_Gestion {
 
 		echo '<form class="etr-panneau etr-ajout" method="post" action="' . esc_url( self::url( array( 'vue' => 'traiteurs' ) ) ) . '" id="ajouter">';
 		echo '<h2 class="etr-panneau__titre">' . esc_html__( 'Ajouter un traiteur', 'espace-traiteur' ) . '</h2>';
-		echo '<p class="etr-muted">' . esc_html__( 'Il reçoit un e-mail pour choisir son mot de passe, puis se connecte à l’espace traiteur.', 'espace-traiteur' ) . '</p>';
+		echo '<p class="etr-muted">' . esc_html__( 'Le compte est créé tout de suite. L’invitation (e-mail pour choisir son mot de passe) part maintenant ou plus tard, depuis la liste.', 'espace-traiteur' ) . '</p>';
 		if ( $erreur[1] && '' === $erreur[0] ) {
 			echo '<div class="etr-notice etr-notice--erreur" role="alert"><p>' . esc_html( $erreur[1] ) . '</p></div>';
 		}
@@ -1734,7 +1737,9 @@ class ETR_Gestion {
 			}
 			echo '</div>';
 		}
-		echo '<button type="submit" class="etr-btn etr-btn--plein">' . esc_html__( 'Ajouter et envoyer l’invitation', 'espace-traiteur' ) . '</button>';
+		$cocher = $code && ! empty( $_POST['envoyer_invitation'] ); // phpcs:ignore WordPress.Security.NonceVerification -- formulaire réaffiché après vérification.
+		echo '<label class="etr-case"><input type="checkbox" name="envoyer_invitation" value="1"' . checked( $cocher, true, false ) . '><span>' . esc_html__( 'Envoyer l’invitation maintenant', 'espace-traiteur' ) . '<small>' . esc_html__( 'Sinon, vous l’enverrez plus tard depuis la liste.', 'espace-traiteur' ) . '</small></span></label>';
+		echo '<button type="submit" class="etr-btn etr-btn--plein">' . esc_html__( 'Ajouter le traiteur', 'espace-traiteur' ) . '</button>';
 		echo '</form>';
 	}
 
