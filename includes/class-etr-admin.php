@@ -24,6 +24,8 @@ class ETR_Admin {
 		add_action( 'woocommerce_admin_process_product_object', array( __CLASS__, 'enregistrer_produit' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ) );
 		add_action( 'add_meta_boxes_etr_demande', array( __CLASS__, 'metaboxes_demande' ) );
+		add_filter( 'get_user_option_meta-box-order_etr_demande', '__return_empty_array' );
+		add_filter( 'get_user_option_screen_layout_etr_demande', array( __CLASS__, 'deux_colonnes' ) );
 		add_action( 'add_meta_boxes_etr_article', array( __CLASS__, 'metaboxes_article' ) );
 		add_action( 'save_post_etr_demande', array( __CLASS__, 'enregistrer_demande' ) );
 		add_action( 'save_post_etr_article', array( __CLASS__, 'enregistrer_article' ) );
@@ -443,6 +445,17 @@ class ETR_Admin {
 		add_meta_box( 'etr_mb_details', __( 'Détails de la demande', 'espace-traiteur' ), array( __CLASS__, 'mb_details' ), 'etr_demande', 'normal', 'high' );
 		add_meta_box( 'etr_mb_lignes', __( 'Articles demandés', 'espace-traiteur' ), array( __CLASS__, 'mb_lignes' ), 'etr_demande', 'normal', 'default' );
 		add_meta_box( 'etr_mb_statut', __( 'Statut et réponse', 'espace-traiteur' ), array( __CLASS__, 'mb_statut' ), 'etr_demande', 'side', 'high' );
+	}
+
+	/**
+	 * Écran d'une demande toujours sur deux colonnes : les boxes larges (détails, articles)
+	 * ne doivent pas se retrouver dans la colonne latérale, quelle que soit la disposition
+	 * enregistrée par glisser-déposer (ignorée via get_user_option_meta-box-order_etr_demande).
+	 *
+	 * @return int
+	 */
+	public static function deux_colonnes() {
+		return 2;
 	}
 
 	/**
