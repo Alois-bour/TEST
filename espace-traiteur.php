@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Espace Traiteur
  * Description:       Espace privé pour les traiteurs : chaque traiteur se connecte à son espace et fait ses demandes de mobilier, vaisselle, linge et matériel, à partir des produits WooCommerce du site.
- * Version:           1.9.0
+ * Version:           2.0.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * License:           GPL-2.0-or-later
@@ -13,7 +13,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'ETR_VERSION', '1.9.0' );
+define( 'ETR_VERSION', '2.0.0' );
 define( 'ETR_FILE', __FILE__ );
 define( 'ETR_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ETR_URL', plugin_dir_url( __FILE__ ) );
@@ -31,6 +31,9 @@ require_once ETR_DIR . 'includes/class-etr-equipe-acces.php';
 require_once ETR_DIR . 'includes/class-etr-journal-liens.php';
 require_once ETR_DIR . 'includes/class-etr-pwa.php';
 require_once ETR_DIR . 'includes/class-etr-push.php';
+require_once ETR_DIR . 'includes/class-etr-fichiers.php';
+require_once ETR_DIR . 'includes/class-etr-operations.php';
+require_once ETR_DIR . 'includes/class-etr-terrain.php';
 require_once ETR_DIR . 'includes/class-etr-admin.php';
 require_once ETR_DIR . 'includes/class-etr-frontend.php';
 require_once ETR_DIR . 'includes/class-etr-statistiques.php';
@@ -55,6 +58,8 @@ add_action(
 		ETR_Journal_Liens::init();
 		ETR_PWA::init();
 		ETR_Push::init();
+		ETR_Fichiers::init();
+		ETR_Operations::init();
 		ETR_Admin::init();
 		ETR_Frontend::init();
 		ETR_Gestion::init();

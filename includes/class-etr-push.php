@@ -389,16 +389,20 @@ class ETR_Push {
 	/**
 	 * Met une notification en file pour un groupe (envoi en fin de requête).
 	 *
-	 * @param string $groupe     bureau | terrain.
+	 * @param string $groupe     bureau | terrain (préparateurs et livreurs) | preparateur | livreur.
 	 * @param string $titre      Titre.
 	 * @param string $texte      Texte.
 	 * @param int    $demande_id Demande ouverte au toucher.
+	 * @param string $url        Page ouverte au toucher (sinon la demande, ou l'accueil).
 	 */
-	public static function notifier( $groupe, $titre, $texte, $demande_id = 0 ) {
+	public static function notifier( $groupe, $titre, $texte, $demande_id = 0, $url = '' ) {
+		if ( '' === $url ) {
+			$url = $demande_id ? ETR_Gestion::url( array( 'vue' => 'demande', 'id' => (int) $demande_id ) ) : ETR_Gestion::url();
+		}
 		$message = array(
 			'title' => wp_strip_all_tags( $titre ),
 			'body'  => wp_strip_all_tags( $texte ),
-			'url'   => $demande_id ? ETR_Gestion::url( array( 'vue' => 'demande', 'id' => (int) $demande_id ) ) : ETR_Gestion::url(),
+			'url'   => $url,
 			'tag'   => $demande_id ? 'etr-demande-' . (int) $demande_id : 'etr',
 		);
 		$moi = get_current_user_id();
@@ -418,7 +422,7 @@ class ETR_Push {
 	 * La personne fait-elle partie du groupe ?
 	 *
 	 * @param int    $user_id Compte.
-	 * @param string $groupe  bureau | terrain.
+	 * @param string $groupe  bureau | terrain | preparateur | livreur.
 	 * @return bool
 	 */
 	private static function concerne( $user_id, $groupe ) {
@@ -429,8 +433,13 @@ class ETR_Push {
 			return ETR_Equipe::bureau( $user_id );
 		}
 		// Rôles réellement donnés (le bureau a aussi les droits du terrain, sans en recevoir les alertes).
-		$user = get_userdata( $user_id );
-		return $user && array_intersect( array( 'etr_preparateur', 'etr_livreur' ), ETR_Equipe::roles_equipe( $user ) );
+		$user     = get_userdata( $user_id );
+		$attendus = array(
+			'terrain'     => array( 'etr_preparateur', 'etr_livreur' ),
+			'preparateur' => array( 'etr_preparateur' ),
+			'livreur'     => array( 'etr_livreur' ),
+		);
+		return $user && isset( $attendus[ $groupe ] ) && array_intersect( $attendus[ $groupe ], ETR_Equipe::roles_equipe( $user ) );
 	}
 
 	/**
