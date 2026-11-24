@@ -622,3 +622,12 @@ td.etr-table__nombre .etr-manque { margin: 0; font-size: inherit; font-weight: 5
 	.etr-installee .etr-gestion .etr-gestion__pastille { position: absolute; top: 2px; left: calc(50% + 6px); margin: 0; }
 	.etr-installee .etr-gestion .etr-app__principal { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
 }
+
+/* Équipe : rôles cochés directement dans la liste (une personne peut en avoir plusieurs). */
+.etr-equipe__roles-liste fieldset { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; border: 0; }
+.etr-app .etr-case--compacte { gap: 6px; font-weight: 400; font-size: 14px; white-space: nowrap; }
+.etr-app .etr-case--compacte input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
+.etr-app .etr-equipe__roles { display: flex; flex-direction: column; gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.etr-app .etr-equipe__roles legend { margin: 0 0 4px; padding: 0; font-weight: 500; font-size: 14px; color: var(--etr-encre); }
+/* Les cases à cocher gardent leur mise en page dans un champ (la règle « .etr-champ label » les mettrait en bloc). */
+.etr-app .etr-champ .etr-case { display: flex; align-items: flex-start; gap: 10px; margin: 0; }

@@ -525,10 +525,11 @@ class ETR_Gestion {
 	private static function action_creer_membre() {
 		check_admin_referer( 'etr_gestion_creer_membre', 'etr_nonce' );
 		$donnees = array();
-		foreach ( array( 'nom', 'email', 'telephone', 'role' ) as $cle ) {
+		foreach ( array( 'nom', 'email', 'telephone' ) as $cle ) {
 			$donnees[ $cle ] = isset( $_POST[ $cle ] ) ? wp_unslash( $_POST[ $cle ] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- nettoyé par creer_membre().
 		}
-		$resultat = ETR_Equipe::creer_membre( $donnees, ! empty( $_POST['envoyer_invitation'] ) );
+		$donnees['roles'] = isset( $_POST['roles'] ) ? (array) wp_unslash( $_POST['roles'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- liste blanche dans creer_membre().
+		$resultat         = ETR_Equipe::creer_membre( $donnees, ! empty( $_POST['envoyer_invitation'] ) );
 		if ( is_wp_error( $resultat ) ) {
 			self::$erreurs_membre = array( $resultat->get_error_code() );
 			return;
@@ -537,7 +538,7 @@ class ETR_Gestion {
 			self::url(
 				array(
 					'vue'     => 'equipe',
-					'etr_msg' => ETR_Traiteurs::code_creation( $resultat ),
+					'etr_msg' => 'membre_' . ETR_Traiteurs::code_creation( $resultat ),
 				)
 			)
 		);
@@ -550,9 +551,9 @@ class ETR_Gestion {
 	private static function action_membre() {
 		$user_id = isset( $_POST['user'] ) ? absint( $_POST['user'] ) : 0;
 		check_admin_referer( 'etr_gestion_membre_' . $user_id, 'etr_nonce' );
-		$op   = isset( $_POST['op'] ) ? sanitize_key( wp_unslash( $_POST['op'] ) ) : '';
-		$role = isset( $_POST['role'] ) ? sanitize_key( wp_unslash( $_POST['role'] ) ) : '';
-		$msg  = ETR_Equipe::modifier_membre( $user_id, $op, $role );
+		$op    = isset( $_POST['op'] ) ? sanitize_key( wp_unslash( $_POST['op'] ) ) : '';
+		$roles = isset( $_POST['roles'] ) ? (array) wp_unslash( $_POST['roles'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- liste blanche dans modifier_membre().
+		$msg   = ETR_Equipe::modifier_membre( $user_id, $op, $roles );
 		if ( is_wp_error( $msg ) ) {
 			wp_die( esc_html( $msg->get_error_message() ), '', array( 'response' => 403 ) );
 		}
@@ -1095,7 +1096,9 @@ class ETR_Gestion {
 			'cree'       => __( 'Traiteur ajouté. Il a reçu un e-mail pour choisir son mot de passe.', 'espace-traiteur' ),
 			'cree_sans_invitation' => __( 'Traiteur ajouté, sans invitation. Cliquez sur « Envoyer l’invitation » dans la liste quand vous êtes prêt.', 'espace-traiteur' ),
 			'invite'     => __( 'Invitation envoyée.', 'espace-traiteur' ),
-			'role'       => __( 'Rôle modifié.', 'espace-traiteur' ),
+			'role'       => __( 'Rôles enregistrés.', 'espace-traiteur' ),
+			'membre_cree' => __( 'Personne ajoutée. Elle a reçu un e-mail pour choisir son mot de passe et installer l’application.', 'espace-traiteur' ),
+			'membre_cree_sans_invitation' => __( 'Personne ajoutée, sans invitation. Cliquez sur « Envoyer l’invitation » dans la liste quand vous êtes prêt.', 'espace-traiteur' ),
 			'retire'     => __( 'Accès retiré : la personne est déconnectée et ne peut plus entrer dans l’application.', 'espace-traiteur' ),
 			'rendu'      => __( 'Accès rendu.', 'espace-traiteur' ),
 			'desactive'  => __( 'Accès désactivé : le traiteur est déconnecté et ne peut plus se connecter.', 'espace-traiteur' ),
@@ -1104,6 +1107,8 @@ class ETR_Gestion {
 		$alertes = array(
 			'cree_sans_mail' => __( 'Traiteur ajouté, mais l’e-mail d’invitation n’est pas parti. Renvoyez l’invitation depuis la liste.', 'espace-traiteur' ),
 			'mail_echec'     => __( 'L’e-mail n’est pas parti. Vérifiez la configuration des e-mails du site.', 'espace-traiteur' ),
+			'membre_cree_sans_mail' => __( 'Personne ajoutée, mais l’e-mail d’invitation n’est pas parti. Vérifiez la configuration des e-mails du site, puis renvoyez l’invitation depuis la liste.', 'espace-traiteur' ),
+			'roles_vides'    => __( 'Une personne doit garder au moins un rôle. Pour lui fermer l’application, utilisez « Retirer l’accès ».', 'espace-traiteur' ),
 		);
 		if ( isset( $succes[ $msg ] ) ) {
 			echo '<div class="etr-notice etr-notice--succes" role="status">' . self::icone( 'coche' ) . '<p>' . esc_html( $succes[ $msg ] ) . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
@@ -2003,7 +2008,7 @@ class ETR_Gestion {
 		echo '<div class="etr-traiteurs-gestion"><div>';
 		echo '<p class="etr-muted etr-equipe__intro">' . esc_html__( 'Le bureau gère tout. Les préparateurs et les livreurs voient le planning, les demandes validées (sans prix) et les bons, sans accès à l’administration WordPress.', 'espace-traiteur' ) . '</p>';
 		echo '<div class="etr-table-cadre" tabindex="0" role="region" aria-label="' . esc_attr__( 'Membres de l’équipe', 'espace-traiteur' ) . '"><table class="etr-table etr-table--traiteurs">';
-		echo '<thead><tr><th scope="col">' . esc_html__( 'Personne', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Rôle', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Accès', 'espace-traiteur' ) . '</th><th scope="col"><span class="screen-reader-text">' . esc_html__( 'Actions', 'espace-traiteur' ) . '</span></th></tr></thead><tbody>';
+		echo '<thead><tr><th scope="col">' . esc_html__( 'Personne', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Rôles', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Accès', 'espace-traiteur' ) . '</th><th scope="col"><span class="screen-reader-text">' . esc_html__( 'Actions', 'espace-traiteur' ) . '</span></th></tr></thead><tbody>';
 		$moi = get_current_user_id();
 		foreach ( $membres as $user ) {
 			$modifiable = ETR_Equipe::modifiable( $user->ID );
@@ -2013,11 +2018,11 @@ class ETR_Gestion {
 			echo '<tr' . ( $retire ? ' class="etr-table__passee"' : '' ) . '>';
 			echo '<td><strong>' . esc_html( etr_nom( $user ) ) . ( $user->ID === $moi ? ' <small class="etr-muted">(' . esc_html__( 'vous', 'espace-traiteur' ) . ')</small>' : '' ) . '</strong>';
 			echo '<small><a class="etr-lien" href="mailto:' . esc_attr( $user->user_email ) . '">' . esc_html( $user->user_email ) . '</a>' . ( $tel ? ' · ' . esc_html( $tel ) : '' ) . '</small></td>';
-			echo '<td data-label="' . esc_attr__( 'Rôle', 'espace-traiteur' ) . '">';
+			echo '<td data-label="' . esc_attr__( 'Rôles', 'espace-traiteur' ) . '">';
 			if ( $modifiable && ! $retire ) {
-				self::formulaire_membre( $user->ID, 'role', '', '', ETR_Equipe::role_equipe( $user ) );
+				self::formulaire_roles( $user->ID, ETR_Equipe::roles_equipe( $user ) );
 			} else {
-				$libelle = $retire ? ETR_Equipe::libelle_role_slug( ETR_Equipe::role_retire( $user->ID ) ) : ETR_Equipe::libelle_role( $user );
+				$libelle = $retire ? ETR_Equipe::libelle_roles( ETR_Equipe::roles_retires( $user->ID ) ) : ETR_Equipe::libelle_role( $user );
 				echo esc_html( $libelle ? $libelle : '—' );
 			}
 			echo '</td>';
@@ -2034,7 +2039,7 @@ class ETR_Gestion {
 				if ( $retire ) {
 					self::formulaire_membre( $user->ID, 'rendre', __( 'Rendre l’accès', 'espace-traiteur' ) );
 				} else {
-					self::formulaire_membre( $user->ID, 'inviter', $invite_le ? __( 'Renvoyer l’invitation', 'espace-traiteur' ) : __( 'Envoyer l’invitation', 'espace-traiteur' ), '', '', ! $invite_le );
+					self::formulaire_membre( $user->ID, 'inviter', $invite_le ? __( 'Renvoyer l’invitation', 'espace-traiteur' ) : __( 'Envoyer l’invitation', 'espace-traiteur' ), '', ! $invite_le );
 					self::formulaire_membre( $user->ID, 'retirer', __( 'Retirer l’accès', 'espace-traiteur' ), __( 'Retirer l’accès de cette personne ? Elle sera déconnectée immédiatement.', 'espace-traiteur' ) );
 				}
 			}
@@ -2049,26 +2054,34 @@ class ETR_Gestion {
 	 * Petit formulaire d'action sur un membre.
 	 *
 	 * @param int    $user_id Membre.
-	 * @param string $op      role|inviter|retirer|rendre.
+	 * @param string $op      inviter|retirer|rendre.
 	 * @param string $libelle Libellé du bouton.
 	 * @param string $confirm Confirmation (facultative).
-	 * @param string $role    Rôle actuel (op « role »).
 	 * @param bool   $avant   Bouton mis en avant.
 	 */
-	private static function formulaire_membre( $user_id, $op, $libelle, $confirm = '', $role = '', $avant = false ) {
-		echo '<form method="post" action="' . esc_url( self::url( array( 'vue' => 'equipe' ) ) ) . '"' . ( $confirm ? ' onsubmit="return confirm(\'' . esc_js( $confirm ) . '\');"' : '' ) . ( 'role' === $op ? ' class="etr-equipe__role"' : '' ) . '>';
+	private static function formulaire_membre( $user_id, $op, $libelle, $confirm = '', $avant = false ) {
+		echo '<form method="post" action="' . esc_url( self::url( array( 'vue' => 'equipe' ) ) ) . '"' . ( $confirm ? ' onsubmit="return confirm(\'' . esc_js( $confirm ) . '\');"' : '' ) . '>';
 		wp_nonce_field( 'etr_gestion_membre_' . $user_id, 'etr_nonce', false );
 		echo '<input type="hidden" name="etr_gestion_action" value="membre"><input type="hidden" name="user" value="' . (int) $user_id . '"><input type="hidden" name="op" value="' . esc_attr( $op ) . '">';
-		if ( 'role' === $op ) {
-			echo '<label class="screen-reader-text" for="etr-role-' . (int) $user_id . '">' . esc_html__( 'Rôle', 'espace-traiteur' ) . '</label>';
-			echo '<select id="etr-role-' . (int) $user_id . '" name="role" onchange="this.form.submit()">';
-			foreach ( ETR_Equipe::roles() as $slug => $info ) {
-				echo '<option value="' . esc_attr( $slug ) . '"' . selected( $role, $slug, false ) . '>' . esc_html( ETR_Equipe::libelle_role_slug( $slug ) ) . '</option>';
-			}
-			echo '</select><noscript><button type="submit" class="etr-btn-texte">' . esc_html__( 'Changer', 'espace-traiteur' ) . '</button></noscript>';
-		} else {
-			echo '<button type="submit" class="' . ( $avant ? 'etr-btn etr-btn--plein etr-btn--petit' : 'etr-btn-texte' ) . '">' . esc_html( $libelle ) . '</button>';
+		echo '<button type="submit" class="' . ( $avant ? 'etr-btn etr-btn--plein etr-btn--petit' : 'etr-btn-texte' ) . '">' . esc_html( $libelle ) . '</button>';
+		echo '</form>';
+	}
+
+	/**
+	 * Rôles d'un membre : une case par rôle, enregistrée dès qu'on la coche ou la décoche.
+	 *
+	 * @param int      $user_id Membre.
+	 * @param string[] $roles   Rôles actuels.
+	 */
+	private static function formulaire_roles( $user_id, $roles ) {
+		echo '<form method="post" action="' . esc_url( self::url( array( 'vue' => 'equipe' ) ) ) . '" class="etr-equipe__roles-liste">';
+		wp_nonce_field( 'etr_gestion_membre_' . $user_id, 'etr_nonce', false );
+		echo '<input type="hidden" name="etr_gestion_action" value="membre"><input type="hidden" name="user" value="' . (int) $user_id . '"><input type="hidden" name="op" value="roles">';
+		echo '<fieldset><legend class="screen-reader-text">' . esc_html__( 'Rôles', 'espace-traiteur' ) . '</legend>';
+		foreach ( array_keys( ETR_Equipe::roles() ) as $slug ) {
+			echo '<label class="etr-case etr-case--compacte"><input type="checkbox" name="roles[]" value="' . esc_attr( $slug ) . '"' . checked( in_array( $slug, $roles, true ), true, false ) . ' onchange="this.form.submit()"><span>' . esc_html( ETR_Equipe::libelle_role_slug( $slug ) ) . '</span></label>';
 		}
+		echo '</fieldset><noscript><button type="submit" class="etr-btn-texte">' . esc_html__( 'Enregistrer', 'espace-traiteur' ) . '</button></noscript>';
 		echo '</form>';
 	}
 
@@ -2080,7 +2093,7 @@ class ETR_Gestion {
 			'nom'          => array( 'nom', __( 'Indiquez le nom.', 'espace-traiteur' ) ),
 			'email'        => array( 'email', __( 'Cette adresse e-mail n’est pas valide.', 'espace-traiteur' ) ),
 			'email_existe' => array( 'email', __( 'Un compte existe déjà avec cette adresse e-mail.', 'espace-traiteur' ) ),
-			'role'         => array( 'role', __( 'Choisissez un rôle.', 'espace-traiteur' ) ),
+			'role'         => array( 'roles', __( 'Choisissez au moins un rôle.', 'espace-traiteur' ) ),
 			'creation'     => array( '', __( 'Le compte n’a pas pu être créé. Réessayez.', 'espace-traiteur' ) ),
 		);
 		$code   = self::$erreurs_membre ? self::$erreurs_membre[0] : '';
@@ -2113,14 +2126,21 @@ class ETR_Gestion {
 			}
 			echo '</div>';
 		}
-		$role = $valeur( 'role' );
-		echo '<fieldset class="etr-champ etr-equipe__roles"><legend>' . esc_html__( 'Rôle', 'espace-traiteur' ) . '</legend>';
+		// phpcs:disable WordPress.Security.NonceVerification -- formulaire réaffiché après vérification.
+		$coches = $code ? ETR_Equipe::normaliser_roles( isset( $_POST['roles'] ) ? wp_unslash( $_POST['roles'] ) : array() ) : array( 'etr_preparateur' );
+		$inviter = $code ? ! empty( $_POST['envoyer_invitation'] ) : true; // Invitation envoyée à la création, sauf si on décoche.
+		// phpcs:enable
+		$fautif = 'roles' === $erreur[0];
+		echo '<fieldset class="etr-champ etr-equipe__roles' . ( $fautif ? ' etr-champ--erreur' : '' ) . '"><legend>' . esc_html__( 'Rôles', 'espace-traiteur' ) . ' <span class="etr-champ__option">' . esc_html__( '(un ou plusieurs)', 'espace-traiteur' ) . '</span></legend>';
+		if ( $fautif ) {
+			echo '<p class="etr-champ__erreur">' . esc_html( $erreur[1] ) . '</p>';
+		}
 		$aides = ETR_Equipe::descriptions();
-		foreach ( ETR_Equipe::roles() as $slug => $info ) {
-			echo '<label class="etr-case"><input type="radio" name="role" value="' . esc_attr( $slug ) . '"' . checked( $role ? $role : 'etr_preparateur', $slug, false ) . '><span>' . esc_html( ETR_Equipe::libelle_role_slug( $slug ) ) . '<small>' . esc_html( $aides[ $slug ] ) . '</small></span></label>';
+		foreach ( array_keys( ETR_Equipe::roles() ) as $slug ) {
+			echo '<label class="etr-case"><input type="checkbox" name="roles[]" value="' . esc_attr( $slug ) . '"' . checked( in_array( $slug, $coches, true ), true, false ) . '><span>' . esc_html( ETR_Equipe::libelle_role_slug( $slug ) ) . '<small>' . esc_html( $aides[ $slug ] ) . '</small></span></label>';
 		}
 		echo '</fieldset>';
-		echo '<label class="etr-case"><input type="checkbox" name="envoyer_invitation" value="1"' . checked( $code && ! empty( $_POST['envoyer_invitation'] ), true, false ) . '><span>' . esc_html__( 'Envoyer l’invitation maintenant', 'espace-traiteur' ) . '<small>' . esc_html__( 'Sinon, vous l’enverrez plus tard depuis la liste.', 'espace-traiteur' ) . '</small></span></label>'; // phpcs:ignore WordPress.Security.NonceVerification
+		echo '<label class="etr-case"><input type="checkbox" name="envoyer_invitation" value="1"' . checked( $inviter, true, false ) . '><span>' . esc_html__( 'Envoyer l’invitation maintenant', 'espace-traiteur' ) . '<small>' . esc_html__( 'Décochez pour l’envoyer plus tard depuis la liste.', 'espace-traiteur' ) . '</small></span></label>';
 		echo '<button type="submit" class="etr-btn etr-btn--plein">' . esc_html__( 'Ajouter', 'espace-traiteur' ) . '</button>';
 		echo '</form>';
 	}
