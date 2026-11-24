@@ -414,3 +414,61 @@ td.etr-table__nombre .etr-manque { margin: 0; font-size: inherit; font-weight: 5
 .etr-app .etr-mois-nav .etr-btn--discret { display: inline-flex; align-items: center; gap: 6px; }
 .etr-export .etr-icone,
 .etr-mois-nav .etr-icone { width: 18px; height: 18px; }
+
+/* Pilotage : vue d'ensemble et classements */
+.etr-stats { display: grid; gap: 36px; }
+.etr-stats__apercu {
+	display: grid;
+	grid-template-columns: minmax(180px, .8fr) minmax(0, 2fr);
+	gap: 32px;
+	align-items: center;
+	padding: 28px 32px;
+	border-radius: 12px;
+	background: var(--etr-nuit);
+	color: #fff;
+}
+.etr-app .etr-stats__apercu h2 { color: #fff; font: italic 400 28px/1.2 var(--etr-serif); }
+.etr-app .etr-stats__apercu-intro p { margin-top: 8px; color: #d9d4c9; font-size: 13px; }
+.etr-stats__indicateurs { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 0; }
+.etr-stats__indicateurs > div { min-width: 0; padding: 2px 20px; border-left: 1px solid var(--etr-nuit-trait); }
+.etr-stats__indicateurs dt { color: #d9d4c9; font-size: 13px; }
+.etr-stats__indicateurs dd { margin-top: 8px; color: #fff; font: 400 30px/1.15 var(--etr-serif); font-variant-numeric: lining-nums tabular-nums; overflow-wrap: anywhere; }
+.etr-app .etr-stats__note { max-width: 75ch; margin-top: -22px; color: var(--etr-gris); font-size: 13px; line-height: 1.5; }
+.etr-stats__section { min-width: 0; }
+.etr-stats__entete { margin-bottom: 16px; }
+.etr-app .etr-stats__entete p { margin-top: 5px; color: var(--etr-gris); font-size: 14px; }
+.etr-stats__section .etr-stats__note { margin-top: 12px; }
+.etr-stats__classements { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; align-items: start; }
+.etr-stats__colonne { display: grid; gap: 36px; min-width: 0; }
+.etr-app .etr-stats__table { font-size: 14px; }
+.etr-app .etr-stats__table td:first-child { overflow-wrap: anywhere; }
+.etr-stats__table time { white-space: nowrap; }
+.etr-app .etr-stats__montant { font-weight: 500; }
+.etr-stats__etat { color: var(--etr-olive-fonce); }
+.etr-stats__etat--attention { color: #7a4f05; font-weight: 500; }
+.etr-stats__article { display: block; }
+.etr-stats__barre { display: block; width: min(100%, 180px); height: 4px; margin-top: 8px; overflow: hidden; border-radius: 4px; background: var(--etr-olive-clair); }
+.etr-stats__barre > span { display: block; height: 100%; background: var(--etr-olive); }
+.etr-app .etr-stats__vide { padding: 22px 24px; border: 1px solid var(--etr-trait); border-radius: 12px; background: #fff; color: var(--etr-gris); font-size: 14px; }
+
+@media (max-width: 1180px) {
+	.etr-stats__apercu { grid-template-columns: 1fr; gap: 24px; }
+	.etr-stats__classements { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+	.etr-stats { gap: 30px; }
+	.etr-stats__apercu { padding: 24px 20px; }
+	.etr-stats__indicateurs { grid-template-columns: 1fr 1fr; row-gap: 20px; }
+	.etr-stats__indicateurs > div { padding: 0 12px; }
+	.etr-stats__indicateurs > div:first-child { grid-column: 1 / -1; }
+	.etr-stats__indicateurs dd { font-size: 26px; }
+	.etr-app .etr-stats__note { margin-top: -16px; }
+	.etr-stats__section .etr-stats__note { margin-top: 12px; }
+	.etr-stats__table--mois thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+	.etr-stats__table--mois tbody,
+	.etr-stats__table--mois tr { display: block; }
+	.etr-app .etr-stats__table--mois td { display: flex; justify-content: space-between; gap: 16px; text-align: right; white-space: normal; }
+	.etr-stats__table--mois td::before { content: attr(data-label); color: var(--etr-gris); font-weight: 400; text-align: left; }
+	.etr-app .etr-stats__table--mois tr:not(:last-child) td:last-child { border-bottom-color: var(--etr-trait); }
+}

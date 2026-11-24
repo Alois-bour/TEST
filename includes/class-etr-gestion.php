@@ -960,59 +960,81 @@ class ETR_Gestion {
 			__( 'Statistiques', 'espace-traiteur' ),
 			__( 'Demandes validées, livrées ou clôturées, regroupées par date d’événement.', 'espace-traiteur' )
 		);
-		echo '<p class="etr-muted">' . esc_html__( 'Montants indicatifs calculés avec les prix actuels, remises et frais renseignés : ce ne sont pas des encaissements. Les besoins hors catalogue et les prix manquants ne sont pas chiffrés.', 'espace-traiteur' ) . '</p>';
+		$total       = array_sum( array_column( $stats['mois'], 'total' ) );
+		$nb_demandes = array_sum( array_column( $stats['mois'], 'demandes' ) );
+		$incomplets  = array_sum( array_column( $stats['mois'], 'incomplets' ) );
 
-		echo '<section class="etr-file"><h2 class="etr-section-titre">' . esc_html__( 'Chiffre d’affaires indicatif par mois', 'espace-traiteur' ) . '</h2>';
+		echo '<div class="etr-stats">';
+		echo '<section class="etr-stats__apercu" aria-labelledby="etr-stats-apercu">';
+		echo '<div class="etr-stats__apercu-intro"><h2 id="etr-stats-apercu">' . esc_html__( 'Vue d’ensemble', 'espace-traiteur' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Toutes les demandes retenues, passées et à venir.', 'espace-traiteur' ) . '</p></div>';
+		echo '<dl class="etr-stats__indicateurs">';
+		echo '<div><dt>' . esc_html__( 'Total indicatif', 'espace-traiteur' ) . '</dt><dd>' . ( $stats['mois'] ? wp_kses_post( etr_format_prix( $total ) ) : '—' ) . '</dd></div>';
+		echo '<div><dt>' . esc_html__( 'Demandes retenues', 'espace-traiteur' ) . '</dt><dd>' . esc_html( number_format_i18n( $nb_demandes ) ) . '</dd></div>';
+		echo '<div><dt>' . esc_html__( 'Chiffrages à compléter', 'espace-traiteur' ) . '</dt><dd>' . esc_html( number_format_i18n( $incomplets ) ) . '</dd></div>';
+		echo '</dl></section>';
+		echo '<p class="etr-stats__note">' . esc_html__( 'Montants indicatifs calculés avec les prix actuels, les remises et les frais renseignés : ce ne sont pas des encaissements. Les besoins hors catalogue et les prix manquants ne sont pas chiffrés.', 'espace-traiteur' ) . '</p>';
+
+		echo '<section class="etr-stats__section" aria-labelledby="etr-stats-mois"><div class="etr-stats__entete"><div><h2 id="etr-stats-mois" class="etr-section-titre">' . esc_html__( 'Chiffre d’affaires indicatif par mois', 'espace-traiteur' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Répartition selon le mois de l’événement.', 'espace-traiteur' ) . '</p></div></div>';
 		if ( ! $stats['mois'] ) {
-			echo '<p class="etr-muted">' . esc_html__( 'Aucune demande à afficher.', 'espace-traiteur' ) . '</p>';
+			echo '<p class="etr-stats__vide">' . esc_html__( 'Aucune demande validée, livrée ou clôturée à afficher.', 'espace-traiteur' ) . '</p>';
 		} else {
-			echo '<div class="etr-table-cadre"><table class="etr-table"><thead><tr><th scope="col">' . esc_html__( 'Mois', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Demandes', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Total indicatif', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Chiffrages incomplets', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
+			echo '<div class="etr-table-cadre" tabindex="0" role="region" aria-labelledby="etr-stats-mois"><table class="etr-table etr-stats__table etr-stats__table--mois"><thead><tr><th scope="col">' . esc_html__( 'Mois', 'espace-traiteur' ) . '</th><th scope="col" class="etr-table__nombre">' . esc_html__( 'Demandes', 'espace-traiteur' ) . '</th><th scope="col" class="etr-table__nombre">' . esc_html__( 'Total indicatif', 'espace-traiteur' ) . '</th><th scope="col" class="etr-table__nombre">' . esc_html__( 'Chiffrages à compléter', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
 			foreach ( $stats['mois'] as $mois => $ligne ) {
-				echo '<tr><td>' . esc_html( $mois ) . '</td><td>' . esc_html( number_format_i18n( $ligne['demandes'] ) ) . '</td><td>' . wp_kses_post( etr_format_prix( $ligne['total'] ) ) . '</td><td>' . esc_html( number_format_i18n( $ligne['incomplets'] ) ) . '</td></tr>';
+				$libelle_mois = date_i18n( 'F Y', strtotime( $mois . '-01' ) );
+				$etat = $ligne['incomplets']
+					? sprintf( __( '%s à compléter', 'espace-traiteur' ), number_format_i18n( $ligne['incomplets'] ) )
+					: __( '0 — complet', 'espace-traiteur' );
+				echo '<tr><td data-label="' . esc_attr__( 'Mois', 'espace-traiteur' ) . '"><time datetime="' . esc_attr( $mois ) . '">' . esc_html( $libelle_mois ) . '</time></td><td data-label="' . esc_attr__( 'Demandes', 'espace-traiteur' ) . '" class="etr-table__nombre">' . esc_html( number_format_i18n( $ligne['demandes'] ) ) . '</td><td data-label="' . esc_attr__( 'Total indicatif', 'espace-traiteur' ) . '" class="etr-table__nombre etr-stats__montant">' . wp_kses_post( etr_format_prix( $ligne['total'] ) ) . '</td><td data-label="' . esc_attr__( 'Chiffrages à compléter', 'espace-traiteur' ) . '" class="etr-table__nombre"><span class="etr-stats__etat' . ( $ligne['incomplets'] ? ' etr-stats__etat--attention' : '' ) . '">' . esc_html( $etat ) . '</span></td></tr>';
 			}
 			echo '</tbody></table></div>';
-			echo '<p class="etr-muted">' . esc_html__( 'Un chiffrage est incomplet si un prix ou les frais de livraison manquent, ou si des besoins hors catalogue sont indiqués.', 'espace-traiteur' ) . '</p>';
+			echo '<p class="etr-stats__note">' . esc_html__( 'À compléter : prix ou frais de livraison manquants, ou besoins hors catalogue.', 'espace-traiteur' ) . '</p>';
 		}
 		echo '</section>';
 
-		echo '<section class="etr-file"><h2 class="etr-section-titre">' . esc_html__( 'Meilleurs traiteurs', 'espace-traiteur' ) . '</h2>';
+		echo '<div class="etr-stats__classements"><div class="etr-stats__colonne">';
+		echo '<section class="etr-stats__section" aria-labelledby="etr-stats-traiteurs"><div class="etr-stats__entete"><div><h2 id="etr-stats-traiteurs" class="etr-section-titre">' . esc_html__( 'Meilleurs traiteurs', 'espace-traiteur' ) . '</h2><p>' . esc_html__( 'Classés par total indicatif.', 'espace-traiteur' ) . '</p></div></div>';
 		if ( ! $stats['traiteurs'] ) {
-			echo '<p class="etr-muted">' . esc_html__( 'Aucun traiteur à afficher.', 'espace-traiteur' ) . '</p>';
+			echo '<p class="etr-stats__vide">' . esc_html__( 'Aucun traiteur à afficher.', 'espace-traiteur' ) . '</p>';
 		} else {
-			echo '<div class="etr-table-cadre"><table class="etr-table"><thead><tr><th scope="col">' . esc_html__( 'Traiteur', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Demandes', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Total indicatif', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
+			echo '<div class="etr-table-cadre" tabindex="0" role="region" aria-labelledby="etr-stats-traiteurs"><table class="etr-table etr-stats__table"><thead><tr><th scope="col">' . esc_html__( 'Traiteur', 'espace-traiteur' ) . '</th><th scope="col" class="etr-table__nombre">' . esc_html__( 'Demandes', 'espace-traiteur' ) . '</th><th scope="col" class="etr-table__nombre">' . esc_html__( 'Total indicatif', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
 			foreach ( array_slice( $stats['traiteurs'], 0, 10, true ) as $id => $ligne ) {
 				$user = get_userdata( $id );
 				$nom  = $user ? etr_nom( $user ) : sprintf( __( 'Compte supprimé #%d', 'espace-traiteur' ), $id );
-				echo '<tr><td>' . esc_html( $nom ) . '</td><td>' . esc_html( number_format_i18n( $ligne['demandes'] ) ) . '</td><td>' . wp_kses_post( etr_format_prix( $ligne['total'] ) ) . '</td></tr>';
+				echo '<tr><td>' . esc_html( $nom ) . '</td><td class="etr-table__nombre">' . esc_html( number_format_i18n( $ligne['demandes'] ) ) . '</td><td class="etr-table__nombre etr-stats__montant">' . wp_kses_post( etr_format_prix( $ligne['total'] ) ) . '</td></tr>';
 			}
 			echo '</tbody></table></div>';
 		}
 		echo '</section>';
 
-		echo '<section class="etr-file"><h2 class="etr-section-titre">' . esc_html__( 'Articles les plus demandés', 'espace-traiteur' ) . '</h2>';
-		if ( ! $stats['articles'] ) {
-			echo '<p class="etr-muted">' . esc_html__( 'Aucun article à afficher.', 'espace-traiteur' ) . '</p>';
-		} else {
-			echo '<div class="etr-table-cadre"><table class="etr-table"><thead><tr><th scope="col">' . esc_html__( 'Article', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Quantité demandée', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
-			foreach ( array_slice( $stats['articles'], 0, 10, true ) as $ligne ) {
-				echo '<tr><td>' . esc_html( $ligne['titre'] ) . '</td><td>' . esc_html( number_format_i18n( $ligne['quantite'] ) ) . '</td></tr>';
-			}
-			echo '</tbody></table></div>';
-		}
-		echo '</section>';
-
-		echo '<section class="etr-file"><h2 class="etr-section-titre">' . esc_html__( 'Articles complets sur les réservations actives', 'espace-traiteur' ) . '</h2>';
-		echo '<p class="etr-muted">' . esc_html__( 'Nombre de demandes actives dont la période atteint ou dépasse le stock actuel. Les chevauchements sont calculés prudemment ; ce n’est pas un historique des ruptures.', 'espace-traiteur' ) . '</p>';
+		echo '<section class="etr-stats__section" aria-labelledby="etr-stats-stock"><div class="etr-stats__entete"><div><h2 id="etr-stats-stock" class="etr-section-titre">' . esc_html__( 'Articles complets sur les réservations actives', 'espace-traiteur' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Demandes actives dont la période atteint ou dépasse le stock actuel.', 'espace-traiteur' ) . '</p></div></div>';
 		if ( ! $stats['ruptures'] ) {
-			echo '<p class="etr-muted">' . esc_html__( 'Aucun article complet sur les périodes actives.', 'espace-traiteur' ) . '</p>';
+			echo '<p class="etr-stats__vide">' . esc_html__( 'Aucun article à stock suivi n’est complet sur les périodes actives.', 'espace-traiteur' ) . '</p>';
 		} else {
-			echo '<div class="etr-table-cadre"><table class="etr-table"><thead><tr><th scope="col">' . esc_html__( 'Article', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Demandes concernées', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
+			echo '<div class="etr-table-cadre" tabindex="0" role="region" aria-labelledby="etr-stats-stock"><table class="etr-table etr-stats__table"><thead><tr><th scope="col">' . esc_html__( 'Article', 'espace-traiteur' ) . '</th><th scope="col" class="etr-table__nombre">' . esc_html__( 'Demandes concernées', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
 			foreach ( array_slice( $stats['ruptures'], 0, 10, true ) as $ligne ) {
-				echo '<tr><td>' . esc_html( $ligne['titre'] ) . '</td><td>' . esc_html( number_format_i18n( $ligne['demandes'] ) ) . '</td></tr>';
+				echo '<tr><td>' . esc_html( $ligne['titre'] ) . '</td><td class="etr-table__nombre">' . esc_html( number_format_i18n( $ligne['demandes'] ) ) . '</td></tr>';
 			}
 			echo '</tbody></table></div>';
 		}
-		echo '</section>';
+		echo '<p class="etr-stats__note">' . esc_html__( 'Les stocks non suivis sont exclus. Les chevauchements sont calculés prudemment ; ce n’est pas un historique des ruptures.', 'espace-traiteur' ) . '</p>';
+		echo '</section></div>';
+
+		echo '<section class="etr-stats__section" aria-labelledby="etr-stats-articles"><div class="etr-stats__entete"><div><h2 id="etr-stats-articles" class="etr-section-titre">' . esc_html__( 'Articles les plus demandés', 'espace-traiteur' ) . '</h2><p>' . esc_html__( 'Quantités cumulées sur les demandes retenues.', 'espace-traiteur' ) . '</p></div></div>';
+		if ( ! $stats['articles'] ) {
+			echo '<p class="etr-stats__vide">' . esc_html__( 'Aucun article à afficher.', 'espace-traiteur' ) . '</p>';
+		} else {
+			$maximum = max( array_column( $stats['articles'], 'quantite' ) );
+			echo '<div class="etr-table-cadre" tabindex="0" role="region" aria-labelledby="etr-stats-articles"><table class="etr-table etr-stats__table"><thead><tr><th scope="col">' . esc_html__( 'Article', 'espace-traiteur' ) . '</th><th scope="col" class="etr-table__nombre">' . esc_html__( 'Quantité', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
+			foreach ( array_slice( $stats['articles'], 0, 10, true ) as $ligne ) {
+				$largeur = $maximum > 0 ? max( 0, min( 100, 100 * $ligne['quantite'] / $maximum ) ) : 0;
+				echo '<tr><td><span class="etr-stats__article">' . esc_html( $ligne['titre'] ) . '</span><span class="etr-stats__barre" aria-hidden="true"><span style="width:' . esc_attr( number_format( $largeur, 2, '.', '' ) ) . '%"></span></span></td><td class="etr-table__nombre etr-stats__montant">' . esc_html( number_format_i18n( $ligne['quantite'] ) ) . '</td></tr>';
+			}
+			echo '</tbody></table></div>';
+		}
+		echo '</section></div></div>';
 	}
 
 	/**
