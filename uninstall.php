@@ -24,6 +24,7 @@ delete_option( 'etr_email_equipe' );
 delete_option( 'etr_logo' );
 delete_option( 'etr_image_connexion' );
 delete_option( 'etr_connexion_plein_ecran' );
+delete_option( 'etr_espace_plein_ecran' );
 delete_option( 'etr_journal_migrations' );
 delete_option( 'etr_migration_echec' );
 delete_option( 'etr_migration_verrou' );

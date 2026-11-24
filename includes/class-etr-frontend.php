@@ -33,16 +33,29 @@ class ETR_Frontend {
 	}
 
 	/**
-	 * Connexion en plein écran : page autonome, sans l'en-tête ni le pied de page du thème.
+	 * Connexion et espace connecté en plein écran : page autonome, sans l'en-tête
+	 * ni le pied de page du thème.
 	 *
 	 * @param string $gabarit Gabarit prévu par le thème.
 	 * @return string
 	 */
 	public static function gabarit_plein_ecran( $gabarit ) {
-		if ( is_user_logged_in() || ! self::sur_page_espace() || ! get_option( 'etr_connexion_plein_ecran', '1' ) ) {
-			return $gabarit;
+		return self::est_plein_ecran() ? ETR_DIR . 'templates/connexion.php' : $gabarit;
+	}
+
+	/**
+	 * La page courante s'affiche-t-elle en plein écran ?
+	 *
+	 * @return bool
+	 */
+	private static function est_plein_ecran() {
+		if ( ! self::sur_page_espace() ) {
+			return false;
 		}
-		return ETR_DIR . 'templates/connexion.php';
+		if ( ! is_user_logged_in() ) {
+			return (bool) get_option( 'etr_connexion_plein_ecran', '1' );
+		}
+		return etr_est_traiteur() && self::plein_ecran();
 	}
 
 	/**
@@ -61,23 +74,29 @@ class ETR_Frontend {
 	 * @return string[]
 	 */
 	public static function classe_body( $classes ) {
-		if ( ! is_user_logged_in() && self::sur_page_espace() ) {
+		if ( ! self::sur_page_espace() ) {
+			return $classes;
+		}
+		if ( ! is_user_logged_in() ) {
 			$classes[] = 'etr-page-connexion';
-			if ( get_option( 'etr_connexion_plein_ecran', '1' ) ) {
-				$classes[] = 'etr-plein-ecran';
-			}
+		} elseif ( etr_est_traiteur() ) {
+			$classes[] = 'etr-page-application';
+		}
+		if ( self::est_plein_ecran() ) {
+			$classes[] = 'etr-plein-ecran';
 		}
 		return $classes;
 	}
 
 	/**
-	 * Thème Hello Elementor : pas de titre de page au-dessus de l'écran de connexion.
+	 * Thème Hello Elementor : pas de titre de page au-dessus de la connexion ni de l'application
+	 * (chaque écran a son propre titre).
 	 *
 	 * @param bool $afficher Valeur par défaut.
 	 * @return bool
 	 */
 	public static function titre_theme( $afficher ) {
-		return ( ! is_user_logged_in() && self::sur_page_espace() ) ? false : $afficher;
+		return ( self::sur_page_espace() && ( ! is_user_logged_in() || etr_est_traiteur() ) ) ? false : $afficher;
 	}
 
 	/**
@@ -105,6 +124,14 @@ class ETR_Frontend {
 						'chargement' => __( 'Calcul des disponibilités…', 'espace-traiteur' ),
 						'erreur'     => __( 'Impossible de calculer les disponibilités pour le moment.', 'espace-traiteur' ),
 						'sansDate'   => __( 'Choisissez la date de l’événement pour voir les quantités disponibles.', 'espace-traiteur' ),
+						'aucun'      => __( 'Aucun article pour l’instant.', 'espace-traiteur' ),
+						/* translators: %s : nombre d'articles. */
+						'unArticle'  => __( '%s article sélectionné', 'espace-traiteur' ),
+						/* translators: %s : nombre d'articles. */
+						'articles'   => __( '%s articles sélectionnés', 'espace-traiteur' ),
+						'retirer'    => __( 'Retirer', 'espace-traiteur' ),
+						'moins'      => __( 'Diminuer la quantité', 'espace-traiteur' ),
+						'plus'       => __( 'Augmenter la quantité', 'espace-traiteur' ),
 					),
 				)
 			);
@@ -391,53 +418,154 @@ class ETR_Frontend {
 	/* ------------------------------------------------------------------ */
 
 	/**
+	 * Icône SVG (décorative).
+	 *
+	 * @param string $nom Nom de l'icône.
+	 * @return string
+	 */
+	private static function icone( $nom ) {
+		$traces = array(
+			'demandes'    => '<path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
+			'plus'        => '<path d="M12 5v14M5 12h14"/>',
+			'sortie'      => '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5M5 12h11"/>',
+			'site'        => '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
+			'retour'      => '<path d="M15 18l-6-6 6-6"/>',
+			'suite'       => '<path d="M9 18l6-6-6-6"/>',
+			'recherche'   => '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+			'calendrier'  => '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+			'lieu'        => '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+			'invites'     => '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/>',
+			'camion'      => '<path d="M2 6h12v10H2zM14 10h4l3 3v3h-7"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+			'message'     => '<path d="M4 5h16v11H8l-4 4z"/>',
+			'coche'       => '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+			'image'       => '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5.5-5.5L5 20"/>',
+		);
+		if ( ! isset( $traces[ $nom ] ) ) {
+			return '';
+		}
+		return '<svg class="etr-icone" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $traces[ $nom ] . '</svg>';
+	}
+
+	/**
 	 * Shortcode [espace_traiteur].
 	 *
 	 * @return string
 	 */
 	public static function shortcode() {
 		ob_start();
-		echo '<div class="etr-espace' . ( is_user_logged_in() ? '' : ' etr-espace--auth' ) . '">';
 
 		if ( ! is_user_logged_in() ) {
+			echo '<div class="etr-espace etr-espace--auth">';
 			ETR_Comptes::vue();
-		} elseif ( ! etr_est_traiteur() ) {
-			echo '<p class="etr-notice etr-notice--erreur">' . esc_html__( 'Cet espace est réservé aux traiteurs partenaires.', 'espace-traiteur' ) . '</p>';
-		} else {
-			$vue = isset( $_GET['etr_vue'] ) ? sanitize_key( wp_unslash( $_GET['etr_vue'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
-			if ( self::$erreurs ) {
-				$vue = 'nouvelle';
-			}
-
-			self::entete();
-			self::messages();
-
-			if ( 'nouvelle' === $vue ) {
-				self::vue_formulaire();
-			} elseif ( 'demande' === $vue && isset( $_GET['id'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
-				self::vue_demande( absint( $_GET['id'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
-			} else {
-				self::vue_tableau_de_bord();
-			}
+			echo '</div>';
+			return ob_get_clean();
 		}
 
-		echo '</div>';
+		if ( ! etr_est_traiteur() ) {
+			echo '<div class="etr-espace"><p class="etr-notice etr-notice--erreur">' . esc_html__( 'Cet espace est réservé aux traiteurs partenaires.', 'espace-traiteur' ) . '</p></div>';
+			return ob_get_clean();
+		}
+
+		$vue = isset( $_GET['etr_vue'] ) ? sanitize_key( wp_unslash( $_GET['etr_vue'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+		if ( self::$erreurs ) {
+			$vue = 'nouvelle';
+		}
+		if ( 'demande' === $vue && ! isset( $_GET['id'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			$vue = '';
+		}
+
+		echo '<div class="etr-espace etr-app' . ( self::plein_ecran() ? '' : ' etr-app--integre' ) . '">';
+		self::barre_laterale( 'nouvelle' === $vue ? 'nouvelle' : 'demandes' );
+		echo '<main class="etr-app__principal" id="etr-contenu">';
+		self::messages();
+
+		if ( 'nouvelle' === $vue ) {
+			self::vue_formulaire();
+		} elseif ( 'demande' === $vue ) {
+			self::vue_demande( absint( $_GET['id'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
+		} else {
+			self::vue_tableau_de_bord();
+		}
+
+		echo '</main></div>';
 		return ob_get_clean();
 	}
 
 	/**
-	 * En-tête de l'espace.
+	 * L'espace connecté s'affiche-t-il en plein écran (sans le thème) ?
+	 *
+	 * @return bool
 	 */
-	private static function entete() {
-		$user = wp_get_current_user();
-		echo '<div class="etr-entete">';
-		/* translators: %s : nom du traiteur. */
-		echo '<p class="etr-bonjour">' . esc_html( sprintf( __( 'Bonjour %s', 'espace-traiteur' ), etr_nom( $user ) ) ) . '</p>';
-		echo '<nav class="etr-nav">';
-		echo '<a class="etr-btn etr-btn--secondaire" href="' . esc_url( etr_url() ) . '">' . esc_html__( 'Mes demandes', 'espace-traiteur' ) . '</a>';
-		echo '<a class="etr-btn" href="' . esc_url( etr_url( array( 'etr_vue' => 'nouvelle' ) ) ) . '">' . esc_html__( 'Nouvelle demande', 'espace-traiteur' ) . '</a>';
-		echo '<a class="etr-lien" href="' . esc_url( wp_logout_url( etr_url() ) ) . '">' . esc_html__( 'Déconnexion', 'espace-traiteur' ) . '</a>';
-		echo '</nav></div>';
+	public static function plein_ecran() {
+		return (bool) get_option( 'etr_espace_plein_ecran', '1' );
+	}
+
+	/**
+	 * Barre latérale : logo, navigation, compte.
+	 *
+	 * @param string $actif Entrée de navigation active.
+	 */
+	private static function barre_laterale( $actif ) {
+		$user    = wp_get_current_user();
+		$logo_id = ETR_Comptes::logo_id();
+		$site    = get_bloginfo( 'name' );
+
+		echo '<header class="etr-app__barre">';
+		echo '<a class="etr-app__logo" href="' . esc_url( etr_url() ) . '">';
+		if ( $logo_id ) {
+			echo wp_get_attachment_image( $logo_id, 'medium', false, array( 'alt' => $site ) );
+		} else {
+			echo '<span class="etr-app__nom-site">' . esc_html( $site ) . '</span>';
+		}
+		echo '</a>';
+
+		echo '<nav class="etr-app__nav" aria-label="' . esc_attr__( 'Espace traiteur', 'espace-traiteur' ) . '"><ul>';
+		$liens = array(
+			'demandes' => array( etr_url(), __( 'Mes demandes', 'espace-traiteur' ), 'demandes' ),
+			'nouvelle' => array( etr_url( array( 'etr_vue' => 'nouvelle' ) ), __( 'Nouvelle demande', 'espace-traiteur' ), 'plus' ),
+		);
+		foreach ( $liens as $cle => $lien ) {
+			echo '<li><a href="' . esc_url( $lien[0] ) . '"' . ( $cle === $actif ? ' aria-current="page"' : '' ) . '>' . self::icone( $lien[2] ) . '<span>' . esc_html( $lien[1] ) . '</span></a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique.
+		}
+		echo '</ul></nav>';
+
+		echo '<div class="etr-app__compte">';
+		echo '<p class="etr-app__societe">' . esc_html( etr_nom( $user ) ) . '<span>' . esc_html( $user->user_email ) . '</span></p>';
+		echo '<ul class="etr-app__liens">';
+		echo '<li><a href="' . esc_url( home_url( '/' ) ) . '">' . self::icone( 'site' ) . '<span>' . esc_html__( 'Retour au site', 'espace-traiteur' ) . '</span></a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '<li><a href="' . esc_url( wp_logout_url( etr_url() ) ) . '">' . self::icone( 'sortie' ) . '<span>' . esc_html__( 'Se déconnecter', 'espace-traiteur' ) . '</span></a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '</ul></div>';
+		echo '</header>';
+	}
+
+	/**
+	 * En-tête d'une page de l'application.
+	 *
+	 * @param string $titre    Titre.
+	 * @param string $sous     Sous-titre (texte brut).
+	 * @param string $action   Bouton d'action (HTML échappé).
+	 * @param string $retour   Lien de retour (HTML échappé).
+	 */
+	private static function entete_page( $titre, $sous = '', $action = '', $retour = '' ) {
+		echo '<div class="etr-page-entete">';
+		echo '<div class="etr-page-entete__texte">';
+		echo $retour; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé par l'appelant.
+		echo '<h1 class="etr-page-entete__titre">' . esc_html( $titre ) . '</h1>';
+		if ( $sous ) {
+			echo '<p class="etr-page-entete__sous">' . esc_html( $sous ) . '</p>';
+		}
+		echo '</div>';
+		echo $action; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé par l'appelant.
+		echo '</div>';
+	}
+
+	/**
+	 * Bouton « Nouvelle demande ».
+	 *
+	 * @return string
+	 */
+	private static function bouton_nouvelle() {
+		return '<a class="etr-btn" href="' . esc_url( etr_url( array( 'etr_vue' => 'nouvelle' ) ) ) . '">' . self::icone( 'plus' ) . '<span>' . esc_html__( 'Nouvelle demande', 'espace-traiteur' ) . '</span></a>';
 	}
 
 	/**
@@ -450,82 +578,265 @@ class ETR_Frontend {
 			'annulee' => __( 'Votre demande a été annulée.', 'espace-traiteur' ),
 		);
 		if ( isset( $textes[ $msg ] ) && ! self::$erreurs ) {
-			echo '<p class="etr-notice etr-notice--succes">' . esc_html( $textes[ $msg ] ) . '</p>';
+			echo '<div class="etr-notice etr-notice--succes" role="status">' . self::icone( 'coche' ) . '<p>' . esc_html( $textes[ $msg ] ) . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
 		if ( self::$erreurs ) {
-			echo '<div class="etr-notice etr-notice--erreur"><ul>';
+			echo '<div class="etr-notice etr-notice--erreur" role="alert"><div><p><strong>' . esc_html__( 'La demande n’a pas été envoyée. Corrigez les points suivants :', 'espace-traiteur' ) . '</strong></p><ul>';
 			foreach ( self::$erreurs as $erreur ) {
 				echo '<li>' . esc_html( $erreur ) . '</li>';
 			}
-			echo '</ul></div>';
+			echo '</ul></div></div>';
 		}
 	}
 
 	/**
-	 * Liste des demandes du traiteur connecté.
+	 * Bloc date (jour, mois, année) d'un événement.
+	 *
+	 * @param string $date   Date AAAA-MM-JJ.
+	 * @param string $classe Classe supplémentaire.
+	 * @return string
+	 */
+	private static function bloc_date( $date, $classe = '' ) {
+		$ts = etr_date_valide( $date ) ? strtotime( $date ) : false;
+		if ( ! $ts ) {
+			return '<span class="etr-date ' . esc_attr( $classe ) . '" aria-hidden="true"><span class="etr-date__jour">–</span></span>';
+		}
+		$annee = date_i18n( 'Y', $ts );
+		$html  = '<time class="etr-date ' . esc_attr( $classe ) . '" datetime="' . esc_attr( $date ) . '">';
+		$html .= '<span class="etr-date__jour">' . esc_html( date_i18n( 'j', $ts ) ) . '</span>';
+		$html .= '<span class="etr-date__mois">' . esc_html( date_i18n( 'M', $ts ) ) . ( current_time( 'Y' ) !== $annee ? ' ' . esc_html( $annee ) : '' ) . '</span>';
+		$html .= '</time>';
+		return $html;
+	}
+
+	/**
+	 * Délai avant un événement (« Demain », « Dans 12 jours »…).
+	 *
+	 * @param string $date Date AAAA-MM-JJ.
+	 * @return string
+	 */
+	private static function texte_delai( $date ) {
+		$jours = (int) round( ( strtotime( $date ) - strtotime( current_time( 'Y-m-d' ) ) ) / DAY_IN_SECONDS );
+		if ( 0 === $jours ) {
+			return __( 'Aujourd’hui', 'espace-traiteur' );
+		}
+		if ( 1 === $jours ) {
+			return __( 'Demain', 'espace-traiteur' );
+		}
+		/* translators: %s : nombre de jours. */
+		return sprintf( _n( 'Dans %s jour', 'Dans %s jours', $jours, 'espace-traiteur' ), number_format_i18n( $jours ) );
+	}
+
+	/**
+	 * Première ligne d'une adresse.
+	 *
+	 * @param int $demande_id ID.
+	 * @return string
+	 */
+	private static function lieu_court( $demande_id ) {
+		$lignes = preg_split( '/\R/', trim( (string) get_post_meta( $demande_id, '_etr_lieu', true ) ) );
+		return $lignes ? $lignes[0] : '';
+	}
+
+	/**
+	 * Nombre d'articles d'une demande, en texte.
+	 *
+	 * @param int $demande_id ID.
+	 * @return string
+	 */
+	private static function texte_articles( $demande_id ) {
+		$nb = count( etr_get_lignes( $demande_id ) );
+		if ( ! $nb ) {
+			return __( 'Hors catalogue', 'espace-traiteur' );
+		}
+		/* translators: %s : nombre d'articles. */
+		return sprintf( _n( '%s article', '%s articles', $nb, 'espace-traiteur' ), number_format_i18n( $nb ) );
+	}
+
+	/**
+	 * Tableau de bord : prochain événement, filtres par statut, liste des demandes.
 	 */
 	private static function vue_tableau_de_bord() {
+		$user_id = get_current_user_id();
+		$statuts = etr_statuts();
+		$filtre  = isset( $_GET['etr_statut'] ) ? sanitize_key( wp_unslash( $_GET['etr_statut'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+		if ( ! isset( $statuts[ $filtre ] ) ) {
+			$filtre = '';
+		}
+
+		// Toutes les demandes du traiteur : compteurs par statut et prochain événement.
+		$toutes = get_posts(
+			array(
+				'post_type'   => 'etr_demande',
+				'post_status' => 'publish',
+				'author'      => $user_id,
+				'numberposts' => -1,
+				'fields'      => 'ids',
+			)
+		);
+		update_meta_cache( 'post', $toutes );
+
+		$compteurs  = array_fill_keys( array_keys( $statuts ), 0 );
+		$prochain   = 0;
+		$date_proch = '';
+		$aujourdhui = current_time( 'Y-m-d' );
+		foreach ( $toutes as $id ) {
+			$statut = etr_get_statut( $id );
+			++$compteurs[ $statut ];
+			$date = (string) get_post_meta( $id, '_etr_date_evenement', true );
+			if ( in_array( $statut, etr_statuts_reservant(), true ) && 'livree' !== $statut && $date >= $aujourdhui && ( ! $date_proch || $date < $date_proch ) ) {
+				$prochain   = $id;
+				$date_proch = $date;
+			}
+		}
+
+		$sous = '';
+		if ( $compteurs['en_attente'] ?? 0 ) {
+			/* translators: %s : nombre de demandes. */
+			$sous = sprintf( _n( '%s demande en attente de réponse de notre équipe.', '%s demandes en attente de réponse de notre équipe.', $compteurs['en_attente'], 'espace-traiteur' ), number_format_i18n( $compteurs['en_attente'] ) );
+		} elseif ( $toutes ) {
+			$sous = __( 'Toutes vos demandes ont reçu une réponse.', 'espace-traiteur' );
+		}
+		self::entete_page( __( 'Mes demandes', 'espace-traiteur' ), $sous, $toutes ? self::bouton_nouvelle() : '' );
+
+		if ( ! $toutes ) {
+			echo '<div class="etr-vide">';
+			echo '<div class="etr-vide__date" aria-hidden="true">' . self::icone( 'calendrier' ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			echo '<h2 class="etr-vide__titre">' . esc_html__( 'Préparez votre première réception', 'espace-traiteur' ) . '</h2>';
+			echo '<p>' . esc_html__( 'Indiquez la date et le lieu de l’événement, puis choisissez le mobilier, l’art de la table et la décoration. Les quantités disponibles s’affichent pour vos dates.', 'espace-traiteur' ) . '</p>';
+			echo self::bouton_nouvelle(); // phpcs:ignore WordPress.Security.EscapeOutput
+			echo '</div>';
+			return;
+		}
+
+		if ( $prochain && ! $filtre ) {
+			self::carte_prochain( $prochain );
+		}
+
+		// Filtres par statut.
+		echo '<div class="etr-liste-entete">';
+		echo '<nav class="etr-filtres" aria-label="' . esc_attr__( 'Filtrer par statut', 'espace-traiteur' ) . '"><ul>';
+		echo '<li><a href="' . esc_url( etr_url() ) . '"' . ( '' === $filtre ? ' aria-current="true"' : '' ) . '>' . esc_html__( 'Toutes', 'espace-traiteur' ) . ' <span>' . esc_html( number_format_i18n( count( $toutes ) ) ) . '</span></a></li>';
+		foreach ( $statuts as $cle => $libelle ) {
+			if ( ! $compteurs[ $cle ] && $cle !== $filtre ) {
+				continue;
+			}
+			echo '<li><a href="' . esc_url( etr_url( array( 'etr_statut' => $cle ) ) ) . '"' . ( $cle === $filtre ? ' aria-current="true"' : '' ) . '>' . esc_html( $libelle ) . ' <span>' . esc_html( number_format_i18n( $compteurs[ $cle ] ) ) . '</span></a></li>';
+		}
+		echo '</ul></nav></div>';
+
+		// Liste paginée.
 		$page = isset( $_GET['etr_page'] ) ? max( 1, absint( $_GET['etr_page'] ) ) : 1; // phpcs:ignore WordPress.Security.NonceVerification
+		// Tri par date d'événement (les demandes sans date restent listées, en dernier).
 		$args = array(
 			'post_type'      => 'etr_demande',
 			'post_status'    => 'publish',
-			'author'         => get_current_user_id(),
+			'author'         => $user_id,
 			'posts_per_page' => 20,
 			'paged'          => $page,
-			'orderby'        => 'date',
-			'order'          => 'DESC',
+			'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+				'relation'        => 'OR',
+				'date_evenement'  => array(
+					'key'     => '_etr_date_evenement',
+					'compare' => 'EXISTS',
+				),
+				array(
+					'key'     => '_etr_date_evenement',
+					'compare' => 'NOT EXISTS',
+				),
+			),
+			'orderby'        => array(
+				'date_evenement' => 'DESC',
+				'date'           => 'DESC',
+			),
 		);
+		if ( $filtre ) {
+			$condition = array(
+				'key'   => '_etr_statut',
+				'value' => $filtre,
+			);
+			// Une demande sans statut enregistré est « En attente » (voir etr_get_statut()).
+			$args['meta_query'] = array( // phpcs:ignore WordPress.DB.SlowDBQuery
+				'relation' => 'AND',
+				$args['meta_query'],
+				'en_attente' === $filtre
+					? array(
+						'relation' => 'OR',
+						$condition,
+						array(
+							'key'     => '_etr_statut',
+							'compare' => 'NOT EXISTS',
+						),
+					)
+					: $condition,
+			);
+		}
 		$demandes = new WP_Query( $args );
 
 		// Page au-delà de la dernière : WordPress ne calcule pas le nombre de pages quand
 		// la page demandée est vide, on revient donc sur la dernière page existante.
 		if ( ! $demandes->posts && $page > 1 ) {
-			$total         = (int) count_user_posts( get_current_user_id(), 'etr_demande' );
+			$total         = $filtre ? $compteurs[ $filtre ] : count( $toutes );
 			$page          = max( 1, (int) ceil( $total / $args['posts_per_page'] ) );
 			$args['paged'] = $page;
 			$demandes      = new WP_Query( $args );
 		}
 
-		echo '<h2>' . esc_html__( 'Mes demandes', 'espace-traiteur' ) . '</h2>';
-
 		if ( ! $demandes->posts ) {
-			echo '<p>' . esc_html__( 'Vous n’avez encore fait aucune demande.', 'espace-traiteur' ) . '</p>';
+			echo '<div class="etr-vide etr-vide--compact"><p>';
+			/* translators: %s : statut. */
+			echo esc_html( sprintf( __( 'Aucune demande « %s ».', 'espace-traiteur' ), $statuts[ $filtre ] ?? '' ) );
+			echo '</p><a class="etr-lien" href="' . esc_url( etr_url() ) . '">' . esc_html__( 'Voir toutes les demandes', 'espace-traiteur' ) . '</a></div>';
 			return;
 		}
 
-		echo '<div class="etr-table-wrap"><table class="etr-table"><thead><tr>';
-		echo '<th>' . esc_html__( 'Réf.', 'espace-traiteur' ) . '</th>';
-		echo '<th>' . esc_html__( 'Événement', 'espace-traiteur' ) . '</th>';
-		echo '<th>' . esc_html__( 'Date', 'espace-traiteur' ) . '</th>';
-		echo '<th>' . esc_html__( 'Statut', 'espace-traiteur' ) . '</th>';
-		echo '<th></th></tr></thead><tbody>';
+		echo '<ul class="etr-agenda">';
 		foreach ( $demandes->posts as $demande ) {
-			$url = etr_url(
+			$date   = (string) get_post_meta( $demande->ID, '_etr_date_evenement', true );
+			$statut = etr_get_statut( $demande->ID );
+			$lieu   = self::lieu_court( $demande->ID );
+			$url    = etr_url(
 				array(
 					'etr_vue' => 'demande',
 					'id'      => $demande->ID,
 				)
 			);
-			echo '<tr>';
-			echo '<td>#' . (int) $demande->ID . '</td>';
-			echo '<td>' . esc_html( get_the_title( $demande ) ) . '</td>';
-			echo '<td>' . esc_html( etr_format_date( get_post_meta( $demande->ID, '_etr_date_evenement', true ) ) ) . '</td>';
-			echo '<td>' . etr_statut_badge( etr_get_statut( $demande->ID ) ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput
-			echo '<td><a href="' . esc_url( $url ) . '">' . esc_html__( 'Voir', 'espace-traiteur' ) . '</a></td>';
-			echo '</tr>';
+			$passe  = $date && $date < $aujourdhui;
+
+			echo '<li class="etr-agenda__item' . ( $passe ? ' etr-agenda__item--passe' : '' ) . '">';
+			echo '<a class="etr-agenda__lien" href="' . esc_url( $url ) . '">';
+			echo self::bloc_date( $date ); // phpcs:ignore WordPress.Security.EscapeOutput
+			echo '<span class="etr-agenda__corps">';
+			echo '<span class="etr-agenda__titre">' . esc_html( get_the_title( $demande ) ) . '</span>';
+			echo '<span class="etr-agenda__meta">';
+			if ( $lieu ) {
+				echo '<span>' . esc_html( $lieu ) . '</span>';
+			}
+			echo '<span>' . esc_html( self::texte_articles( $demande->ID ) ) . '</span>';
+			/* translators: %d : numéro de la demande. */
+			echo '<span>' . esc_html( sprintf( __( 'Demande n° %d', 'espace-traiteur' ), $demande->ID ) ) . '</span>';
+			echo '</span></span>';
+			echo etr_statut_badge( $statut ); // phpcs:ignore WordPress.Security.EscapeOutput
+			echo '<span class="etr-agenda__chevron">' . self::icone( 'suite' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			echo '</a></li>';
 		}
-		echo '</tbody></table></div>';
+		echo '</ul>';
+
 		if ( $demandes->max_num_pages > 1 ) {
 			$grand = 999999999;
+			$base  = array( 'etr_page' => $grand );
+			if ( $filtre ) {
+				$base['etr_statut'] = $filtre;
+			}
 			$liens = paginate_links(
 				array(
-					'base'      => str_replace( $grand, '%#%', esc_url( etr_url( array( 'etr_page' => $grand ) ) ) ),
+					'base'      => str_replace( $grand, '%#%', esc_url( etr_url( $base ) ) ),
 					'format'    => '',
 					'current'   => $page,
 					'total'     => $demandes->max_num_pages,
 					'type'      => 'list',
-					'prev_text' => __( '« Précédent', 'espace-traiteur' ),
-					'next_text' => __( 'Suivant »', 'espace-traiteur' ),
+					'prev_text' => __( 'Précédent', 'espace-traiteur' ),
+					'next_text' => __( 'Suivant', 'espace-traiteur' ),
 				)
 			);
 			if ( $liens ) {
@@ -535,41 +846,181 @@ class ETR_Frontend {
 	}
 
 	/**
+	 * Carte du prochain événement.
+	 *
+	 * @param int $demande_id ID.
+	 */
+	private static function carte_prochain( $demande_id ) {
+		$date      = (string) get_post_meta( $demande_id, '_etr_date_evenement', true );
+		$invites   = (string) get_post_meta( $demande_id, '_etr_nb_invites', true );
+		$livraison = (string) get_post_meta( $demande_id, '_etr_date_livraison', true );
+		$reprise   = (string) get_post_meta( $demande_id, '_etr_date_reprise', true );
+		$lieu      = self::lieu_court( $demande_id );
+		$url       = etr_url(
+			array(
+				'etr_vue' => 'demande',
+				'id'      => $demande_id,
+			)
+		);
+
+		echo '<section class="etr-prochain" aria-labelledby="etr-prochain-titre">';
+		echo self::bloc_date( $date, 'etr-date--grande' ); // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '<div class="etr-prochain__corps">';
+		echo '<p class="etr-prochain__delai">' . esc_html__( 'Prochain événement', 'espace-traiteur' ) . ' <strong>' . esc_html( self::texte_delai( $date ) ) . '</strong></p>';
+		echo '<h2 class="etr-prochain__titre" id="etr-prochain-titre"><a href="' . esc_url( $url ) . '">' . esc_html( get_the_title( $demande_id ) ) . '</a></h2>';
+		echo '<ul class="etr-prochain__faits">';
+		if ( $lieu ) {
+			echo '<li>' . self::icone( 'lieu' ) . esc_html( $lieu ) . '</li>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		}
+		if ( '' !== $invites ) {
+			/* translators: %s : nombre d'invités. */
+			echo '<li>' . self::icone( 'invites' ) . esc_html( sprintf( _n( '%s invité', '%s invités', (int) $invites, 'espace-traiteur' ), number_format_i18n( (int) $invites ) ) ) . '</li>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		}
+		if ( $livraison || $reprise ) {
+			$texte = $livraison && $reprise
+				/* translators: 1 : date de livraison, 2 : date de reprise. */
+				? sprintf( __( 'Livraison le %1$s, reprise le %2$s', 'espace-traiteur' ), etr_format_date( $livraison ), etr_format_date( $reprise ) )
+				: ( $livraison
+					/* translators: %s : date. */
+					? sprintf( __( 'Livraison le %s', 'espace-traiteur' ), etr_format_date( $livraison ) )
+					/* translators: %s : date. */
+					: sprintf( __( 'Reprise le %s', 'espace-traiteur' ), etr_format_date( $reprise ) ) );
+			echo '<li>' . self::icone( 'camion' ) . esc_html( $texte ) . '</li>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		}
+		echo '</ul></div>';
+		echo '<div class="etr-prochain__statut">' . etr_statut_badge( etr_get_statut( $demande_id ) ) . '<span class="etr-muted">' . esc_html( self::texte_articles( $demande_id ) ) . '</span></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '</section>';
+	}
+
+	/**
+	 * Étapes de suivi d'une demande.
+	 *
+	 * @param string $statut Statut courant.
+	 */
+	private static function suivi( $statut ) {
+		$etapes = array(
+			'en_attente' => __( 'Envoyée', 'espace-traiteur' ),
+			'validee'    => __( 'Validée', 'espace-traiteur' ),
+			'livree'     => __( 'Livrée', 'espace-traiteur' ),
+			'cloturee'   => __( 'Reprise et clôturée', 'espace-traiteur' ),
+		);
+		$explications = array(
+			'en_attente' => __( 'Notre équipe étudie votre demande. Vous serez prévenu par e-mail dès qu’elle sera traitée.', 'espace-traiteur' ),
+			'validee'    => __( 'Le matériel est réservé pour votre événement.', 'espace-traiteur' ),
+			'livree'     => __( 'Le matériel a été livré. Il sera repris à la date prévue.', 'espace-traiteur' ),
+			'cloturee'   => __( 'Le matériel a été repris. Cette demande est terminée.', 'espace-traiteur' ),
+			'refusee'    => __( 'Notre équipe n’a pas pu donner suite à cette demande.', 'espace-traiteur' ),
+			'annulee'    => __( 'Vous avez annulé cette demande. Le matériel a été libéré.', 'espace-traiteur' ),
+		);
+
+		echo '<div class="etr-suivi">';
+		if ( isset( $etapes[ $statut ] ) ) {
+			$position = array_search( $statut, array_keys( $etapes ), true );
+			echo '<ol class="etr-suivi__etapes">';
+			$i = 0;
+			foreach ( $etapes as $libelle ) {
+				$etat = $i < $position ? 'faite' : ( $i === $position ? 'actuelle' : 'a-venir' );
+				echo '<li class="etr-suivi__etape etr-suivi__etape--' . esc_attr( $etat ) . '"' . ( 'actuelle' === $etat ? ' aria-current="step"' : '' ) . '><span class="etr-suivi__point">' . ( $i <= $position ? self::icone( 'coche' ) : '' ) . '</span><span>' . esc_html( $libelle ) . '</span></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
+				++$i;
+			}
+			echo '</ol>';
+		}
+		if ( isset( $explications[ $statut ] ) ) {
+			echo '<p class="etr-suivi__texte">' . esc_html( $explications[ $statut ] ) . '</p>';
+		}
+		echo '</div>';
+	}
+
+	/**
 	 * Détail d'une demande.
 	 *
 	 * @param int $demande_id ID.
 	 */
 	private static function vue_demande( $demande_id ) {
 		$demande = get_post( $demande_id );
+		$retour  = '<a class="etr-retour" href="' . esc_url( etr_url() ) . '">' . self::icone( 'retour' ) . '<span>' . esc_html__( 'Mes demandes', 'espace-traiteur' ) . '</span></a>';
+
 		if ( ! $demande || 'etr_demande' !== $demande->post_type || ( (int) $demande->post_author !== get_current_user_id() && ! etr_est_gestionnaire() ) ) {
-			echo '<p class="etr-notice etr-notice--erreur">' . esc_html__( 'Demande introuvable.', 'espace-traiteur' ) . '</p>';
+			echo $retour; // phpcs:ignore WordPress.Security.EscapeOutput
+			echo '<div class="etr-vide etr-vide--compact"><p>' . esc_html__( 'Cette demande n’existe pas ou n’est pas liée à votre compte.', 'espace-traiteur' ) . '</p></div>';
 			return;
 		}
 
 		$statut = etr_get_statut( $demande_id );
-		/* translators: 1 : numéro, 2 : nom de l'événement. */
-		echo '<h2>' . esc_html( sprintf( __( 'Demande #%1$d — %2$s', 'espace-traiteur' ), $demande_id, get_the_title( $demande ) ) ) . '</h2>';
-		echo '<p>' . etr_statut_badge( $statut ) . ' <span class="etr-muted">' . esc_html( sprintf( /* translators: %s : date. */ __( 'envoyée le %s', 'espace-traiteur' ), get_the_date( '', $demande ) ) ) . '</span></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		/* translators: 1 : numéro, 2 : date d'envoi. */
+		$sous = sprintf( __( 'Demande n° %1$d, envoyée le %2$s', 'espace-traiteur' ), $demande_id, get_the_date( '', $demande ) );
+		self::entete_page( get_the_title( $demande ), $sous, '<div class="etr-page-entete__statut">' . etr_statut_badge( $statut ) . '</div>', $retour );
+
+		self::suivi( $statut );
 
 		$reponse = get_post_meta( $demande_id, '_etr_reponse', true );
 		if ( $reponse ) {
-			echo '<div class="etr-reponse"><strong>' . esc_html__( 'Message de notre équipe', 'espace-traiteur' ) . '</strong><p>' . nl2br( esc_html( $reponse ) ) . '</p></div>';
+			echo '<section class="etr-reponse">' . self::icone( 'message' ) . '<div><h2>' . esc_html__( 'Message de notre équipe', 'espace-traiteur' ) . '</h2><p>' . nl2br( esc_html( $reponse ) ) . '</p></div></section>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
 
-		echo '<dl class="etr-details">';
-		foreach ( etr_champs_demande() as $cle => $champ ) {
-			echo '<dt>' . esc_html( $champ['label'] ) . '</dt><dd>' . etr_valeur_affichee( $demande_id, $cle, $champ['type'] ) . '</dd>'; // phpcs:ignore WordPress.Security.EscapeOutput
-		}
-		echo '</dl>';
+		$champs     = etr_champs_demande();
+		$groupes    = array(
+			__( 'Événement', 'espace-traiteur' )           => array( 'evenement', 'date_evenement', 'nb_invites', 'lieu', 'contact' ),
+			__( 'Livraison et reprise', 'espace-traiteur' ) => array( 'date_livraison', 'date_reprise' ),
+		);
+		$deja       = array_merge( ...array_values( $groupes ) );
+		$complement = array_diff( array_keys( $champs ), $deja );
 
-		echo '<h3>' . esc_html__( 'Articles demandés', 'espace-traiteur' ) . '</h3>';
-		echo '<div class="etr-table-wrap">' . etr_lignes_html( $demande_id ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '<div class="etr-detail">';
+		echo '<div class="etr-detail__infos">';
+		foreach ( $groupes as $titre => $cles ) {
+			echo '<section class="etr-panneau"><h2 class="etr-panneau__titre">' . esc_html( $titre ) . '</h2><dl class="etr-details">';
+			foreach ( $cles as $cle ) {
+				if ( isset( $champs[ $cle ] ) && 'evenement' !== $cle ) {
+					echo '<div><dt>' . esc_html( $champs[ $cle ]['label'] ) . '</dt><dd>' . etr_valeur_affichee( $demande_id, $cle, $champs[ $cle ]['type'] ) . '</dd></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
+				}
+			}
+			echo '</dl></section>';
+		}
+		$remplis = array_filter(
+			$complement,
+			function ( $cle ) use ( $demande_id ) {
+				return '' !== (string) get_post_meta( $demande_id, '_etr_' . $cle, true );
+			}
+		);
+		if ( $remplis ) {
+			echo '<section class="etr-panneau"><h2 class="etr-panneau__titre">' . esc_html__( 'Compléments', 'espace-traiteur' ) . '</h2><dl class="etr-details etr-details--empile">';
+			foreach ( $remplis as $cle ) {
+				echo '<div><dt>' . esc_html( $champs[ $cle ]['label'] ) . '</dt><dd>' . etr_valeur_affichee( $demande_id, $cle, $champs[ $cle ]['type'] ) . '</dd></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			}
+			echo '</dl></section>';
+		}
+		echo '</div>';
+
+		$lignes = etr_get_lignes( $demande_id );
+		echo '<section class="etr-panneau etr-detail__materiel"><h2 class="etr-panneau__titre">' . esc_html__( 'Matériel demandé', 'espace-traiteur' ) . ' <span class="etr-compteur">' . esc_html( number_format_i18n( count( $lignes ) ) ) . '</span></h2>';
+		if ( ! $lignes ) {
+			echo '<p class="etr-muted">' . esc_html__( 'Aucun article du catalogue : voir les besoins hors catalogue.', 'espace-traiteur' ) . '</p>';
+		} else {
+			echo '<ul class="etr-lignes">';
+			foreach ( $lignes as $ligne ) {
+				$article = etr_get_article( $ligne['article_id'] );
+				echo '<li class="etr-ligne">';
+				echo ( $article && $article['image'] ) ? wp_kses_post( $article['image'] ) : '<span class="etr-article__img etr-article__img--vide">' . self::icone( 'image' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput
+				echo '<span class="etr-ligne__nom">' . esc_html( $ligne['titre'] );
+				if ( $article && $article['reference'] ) {
+					echo '<span class="etr-muted">' . esc_html( $article['reference'] ) . '</span>';
+				}
+				echo '</span>';
+				echo '<span class="etr-ligne__qte">' . esc_html( number_format_i18n( $ligne['quantite'] ) ) . ( ! empty( $ligne['unite'] ) ? '<small>' . esc_html( $ligne['unite'] ) . '</small>' : '' ) . '</span>';
+				echo '</li>';
+			}
+			echo '</ul>';
+		}
+		echo '</section>';
+		echo '</div>';
 
 		if ( 'en_attente' === $statut && (int) $demande->post_author === get_current_user_id() ) {
-			echo '<form method="post" class="etr-annuler" onsubmit="return confirm(\'' . esc_js( __( 'Annuler cette demande ?', 'espace-traiteur' ) ) . '\');">';
+			echo '<form method="post" class="etr-annuler" onsubmit="return confirm(\'' . esc_js( __( 'Annuler cette demande ? Le matériel sera libéré.', 'espace-traiteur' ) ) . '\');">';
 			wp_nonce_field( 'etr_annuler_' . $demande_id, 'etr_nonce' );
 			echo '<input type="hidden" name="etr_action" value="annuler_demande">';
 			echo '<input type="hidden" name="demande_id" value="' . (int) $demande_id . '">';
+			echo '<p class="etr-muted">' . esc_html__( 'Vous pouvez annuler tant que la demande n’est pas validée.', 'espace-traiteur' ) . '</p>';
 			echo '<button type="submit" class="etr-btn etr-btn--danger">' . esc_html__( 'Annuler la demande', 'espace-traiteur' ) . '</button>';
 			echo '</form>';
 		}
@@ -579,38 +1030,73 @@ class ETR_Frontend {
 	 * Formulaire de nouvelle demande.
 	 */
 	private static function vue_formulaire() {
-		echo '<h2>' . esc_html__( 'Nouvelle demande', 'espace-traiteur' ) . '</h2>';
+		self::entete_page(
+			__( 'Nouvelle demande', 'espace-traiteur' ),
+			__( 'Décrivez votre réception, puis choisissez le matériel. Notre équipe vous répond par e-mail.', 'espace-traiteur' ),
+			'',
+			'<a class="etr-retour" href="' . esc_url( etr_url() ) . '">' . self::icone( 'retour' ) . '<span>' . esc_html__( 'Mes demandes', 'espace-traiteur' ) . '</span></a>'
+		);
+
 		echo '<form method="post" class="etr-form" action="' . esc_url( etr_url( array( 'etr_vue' => 'nouvelle' ) ) ) . '">';
 		wp_nonce_field( 'etr_nouvelle_demande', 'etr_nonce' );
 		echo '<input type="hidden" name="etr_action" value="nouvelle_demande">';
+		echo '<div class="etr-form__etapes">';
 
 		$champs   = etr_champs_demande();
 		$sections = array(
-			__( 'Votre événement', 'espace-traiteur' ) => array( 'evenement', 'date_evenement', 'nb_invites', 'lieu', 'date_livraison', 'date_reprise', 'contact' ),
+			array( __( 'Votre événement', 'espace-traiteur' ), '', array( 'evenement', 'date_evenement', 'nb_invites', 'lieu', 'contact' ) ),
+			array( __( 'Livraison et reprise', 'espace-traiteur' ), __( 'Le matériel vous est réservé de la livraison à la reprise. Sans date, il l’est pour le jour de l’événement.', 'espace-traiteur' ), array( 'date_livraison', 'date_reprise' ) ),
 		);
+		$places   = array();
+		$numero   = 0;
 
-		foreach ( $sections as $titre => $cles ) {
-			echo '<fieldset class="etr-fieldset"><legend>' . esc_html( $titre ) . '</legend><div class="etr-grille">';
-			foreach ( $cles as $cle ) {
+		foreach ( $sections as $section ) {
+			self::ouvrir_etape( ++$numero, $section[0], $section[1] );
+			echo '<div class="etr-grille">';
+			foreach ( $section[2] as $cle ) {
 				if ( isset( $champs[ $cle ] ) ) {
 					self::champ( $cle, $champs[ $cle ] );
 				}
+				$places[] = $cle;
 			}
 			echo '</div></fieldset>';
 		}
 
-		self::catalogue();
+		self::catalogue( ++$numero );
 
-		echo '<fieldset class="etr-fieldset"><legend>' . esc_html__( 'Compléments', 'espace-traiteur' ) . '</legend><div class="etr-grille">';
+		self::ouvrir_etape( ++$numero, __( 'Compléments', 'espace-traiteur' ), __( 'Un besoin hors catalogue, une contrainte d’accès, un horaire de livraison : précisez-le ici.', 'espace-traiteur' ) );
+		echo '<div class="etr-grille">';
 		foreach ( $champs as $cle => $champ ) {
-			if ( ! in_array( $cle, $sections[ __( 'Votre événement', 'espace-traiteur' ) ], true ) ) {
+			if ( ! in_array( $cle, $places, true ) ) {
 				self::champ( $cle, $champ );
 			}
 		}
 		echo '</div></fieldset>';
+		echo '</div>';
 
-		echo '<p><button type="submit" class="etr-btn">' . esc_html__( 'Envoyer la demande', 'espace-traiteur' ) . '</button></p>';
+		// Récapitulatif (rempli par le script ; sans script, seul le bouton d'envoi est utile).
+		echo '<aside class="etr-recap-commande" aria-labelledby="etr-recap-titre">';
+		echo '<h2 class="etr-recap-commande__titre" id="etr-recap-titre">' . esc_html__( 'Votre sélection', 'espace-traiteur' ) . '</h2>';
+		echo '<p class="etr-recap-commande__resume" aria-live="polite">' . esc_html__( 'Aucun article pour l’instant.', 'espace-traiteur' ) . '</p>';
+		echo '<ul class="etr-recap-commande__liste"></ul>';
+		echo '<button type="submit" class="etr-btn etr-btn--plein">' . esc_html__( 'Envoyer la demande', 'espace-traiteur' ) . '</button>';
+		echo '<p class="etr-recap-commande__note">' . esc_html__( 'Rien n’est facturé à l’envoi : notre équipe valide d’abord la demande avec vous.', 'espace-traiteur' ) . '</p>';
+		echo '</aside>';
 		echo '</form>';
+	}
+
+	/**
+	 * Ouvre une étape numérotée du formulaire.
+	 *
+	 * @param int    $numero Numéro de l'étape.
+	 * @param string $titre  Titre.
+	 * @param string $aide   Texte d'aide.
+	 */
+	private static function ouvrir_etape( $numero, $titre, $aide = '' ) {
+		echo '<fieldset class="etr-etape"><legend class="etr-etape__titre"><span class="etr-etape__numero" aria-hidden="true">' . (int) $numero . '</span>' . esc_html( $titre ) . '</legend>';
+		if ( $aide ) {
+			echo '<p class="etr-etape__aide">' . esc_html( $aide ) . '</p>';
+		}
 	}
 
 	/**
@@ -623,16 +1109,17 @@ class ETR_Frontend {
 		$id     = 'etr-' . $cle;
 		$requis = ! empty( $champ['requis'] );
 		$valeur = self::ancienne_valeur( $cle );
-		$classe = 'textarea' === $champ['type'] ? 'etr-champ etr-champ--large' : 'etr-champ';
+		$large  = 'textarea' === $champ['type'] || 'evenement' === $cle;
+		$classe = $large ? 'etr-champ etr-champ--large' : 'etr-champ';
 
-		echo '<p class="' . esc_attr( $classe ) . '"><label for="' . esc_attr( $id ) . '">' . esc_html( $champ['label'] ) . ( $requis ? ' <abbr title="' . esc_attr__( 'obligatoire', 'espace-traiteur' ) . '">*</abbr>' : '' ) . '</label>';
+		echo '<p class="' . esc_attr( $classe ) . '"><label for="' . esc_attr( $id ) . '">' . esc_html( $champ['label'] ) . ( $requis ? '' : ' <span class="etr-champ__option">' . esc_html__( 'facultatif', 'espace-traiteur' ) . '</span>' ) . '</label>';
 
 		if ( 'textarea' === $champ['type'] ) {
 			printf( '<textarea id="%1$s" name="etr[%2$s]" rows="3"%3$s>%4$s</textarea>', esc_attr( $id ), esc_attr( $cle ), $requis ? ' required' : '', esc_textarea( $valeur ) );
 		} else {
 			$extra = '';
 			if ( 'number' === $champ['type'] ) {
-				$extra = ' min="0" step="1"';
+				$extra = ' min="0" step="1" inputmode="numeric"';
 			} elseif ( 'date' === $champ['type'] ) {
 				$extra = ' min="' . esc_attr( current_time( 'Y-m-d' ) ) . '"';
 			}
@@ -651,18 +1138,20 @@ class ETR_Frontend {
 
 	/**
 	 * Catalogue groupé par famille puis sous-catégorie, avec champ quantité.
+	 *
+	 * @param int $numero Numéro de l'étape.
 	 */
-	private static function catalogue() {
+	private static function catalogue( $numero ) {
 		$articles = etr_catalogue();
 
 		// Après une erreur, les dates sont connues : on affiche directement les disponibilités.
 		list( $debut, $fin ) = etr_periode( self::ancienne_valeur( 'date_evenement' ), self::ancienne_valeur( 'date_livraison' ), self::ancienne_valeur( 'date_reprise' ) );
 		$reservees           = $debut ? etr_quantites_reservees( $debut, $fin ) : null;
 
-		echo '<fieldset class="etr-fieldset etr-catalogue"><legend>' . esc_html__( 'Mobilier, art de la table et décoration', 'espace-traiteur' ) . '</legend>';
+		echo '<fieldset class="etr-etape etr-catalogue"><legend class="etr-etape__titre"><span class="etr-etape__numero" aria-hidden="true">' . (int) $numero . '</span>' . esc_html__( 'Mobilier, art de la table et décoration', 'espace-traiteur' ) . '</legend>';
 
 		if ( ! $articles ) {
-			echo '<p>' . esc_html__( 'Le catalogue est vide pour le moment : décrivez vos besoins dans « Autres besoins ».', 'espace-traiteur' ) . '</p></fieldset>';
+			echo '<p class="etr-etape__aide">' . esc_html__( 'Le catalogue est vide pour le moment : décrivez vos besoins dans « Autres besoins ».', 'espace-traiteur' ) . '</p></fieldset>';
 			return;
 		}
 
@@ -675,21 +1164,32 @@ class ETR_Frontend {
 			$familles[ $famille ][ $sous ][] = $article;
 		}
 
-		echo '<p class="etr-dispo-info" aria-live="polite">' . esc_html( $debut ? self::texte_periode( $debut, $fin ) : __( 'Choisissez la date de l’événement pour voir les quantités disponibles.', 'espace-traiteur' ) ) . '</p>';
+		echo '<p class="etr-dispo-info' . ( $debut ? ' etr-dispo-info--dates' : '' ) . '" aria-live="polite">' . self::icone( 'calendrier' ) . '<span class="etr-dispo-info__texte">' . esc_html( $debut ? self::texte_periode( $debut, $fin ) : __( 'Choisissez la date de l’événement pour voir les quantités disponibles.', 'espace-traiteur' ) ) . '</span></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
 
+		// Outils de recherche et de filtre (activés par le script).
+		echo '<div class="etr-outils" hidden>';
+		echo '<label class="etr-recherche">' . self::icone( 'recherche' ) . '<span class="screen-reader-text">' . esc_html__( 'Rechercher un article', 'espace-traiteur' ) . '</span><input type="search" class="etr-recherche__champ" placeholder="' . esc_attr__( 'Rechercher un article ou une référence', 'espace-traiteur' ) . '" autocomplete="off"></label>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		if ( count( $familles ) > 1 ) {
+			echo '<div class="etr-familles" role="group" aria-label="' . esc_attr__( 'Familles', 'espace-traiteur' ) . '">';
+			echo '<button type="button" class="etr-familles__btn" data-famille="" aria-pressed="true">' . esc_html__( 'Tout', 'espace-traiteur' ) . '</button>';
+			foreach ( array_keys( $familles ) as $index => $famille ) {
+				echo '<button type="button" class="etr-familles__btn" data-famille="' . (int) $index . '" aria-pressed="false">' . esc_html( $famille ) . '</button>';
+			}
+			echo '</div>';
+		}
+		echo '</div>';
+		echo '<p class="etr-catalogue__aucun" hidden>' . esc_html__( 'Aucun article ne correspond à votre recherche.', 'espace-traiteur' ) . '</p>';
+
+		$index = 0;
 		foreach ( $familles as $famille => $sous_categories ) {
-			$total  = 0;
-			$ouvert = false;
+			$total = 0;
 			foreach ( $sous_categories as $liste ) {
 				$total += count( $liste );
-				foreach ( $liste as $article ) {
-					if ( '' !== self::ancienne_quantite( $article['id'] ) ) {
-						$ouvert = true;
-					}
-				}
 			}
-			echo '<details class="etr-categorie"' . ( $ouvert ? ' open' : '' ) . '><summary>' . esc_html( $famille ) . ' <span class="etr-muted">(' . (int) $total . ')</span></summary>';
+			echo '<section class="etr-famille" data-famille="' . (int) $index++ . '">';
+			echo '<h3 class="etr-famille__titre">' . esc_html( $famille ) . ' <span class="etr-compteur">' . (int) $total . '</span></h3>';
 			foreach ( $sous_categories as $sous => $liste ) {
+				echo '<div class="etr-sous">';
 				if ( '' !== $sous ) {
 					echo '<h4 class="etr-sous-categorie">' . esc_html( $sous ) . '</h4>';
 				}
@@ -697,9 +1197,9 @@ class ETR_Frontend {
 				foreach ( $liste as $article ) {
 					self::ligne_article( $article, $reservees );
 				}
-				echo '</ul>';
+				echo '</ul></div>';
 			}
-			echo '</details>';
+			echo '</section>';
 		}
 		echo '</fieldset>';
 	}
@@ -715,6 +1215,7 @@ class ETR_Frontend {
 		$stock   = etr_stock_total( $article['id'] );
 		$dispo   = etr_disponibilite( $article['id'], $reservees );
 		$indispo = 0 === $dispo;
+		$qte     = $indispo ? '' : self::ancienne_quantite( $article['id'] );
 
 		if ( null !== $reservees || $indispo ) {
 			$texte_dispo = etr_texte_disponibilite( $article['id'], $dispo );
@@ -725,36 +1226,38 @@ class ETR_Frontend {
 			$texte_dispo = '';
 		}
 
-		echo '<li class="etr-article' . ( $indispo ? ' etr-article--indispo' : '' ) . '" data-article="' . (int) $article['id'] . '">';
-		echo wp_kses_post( $article['image'] );
-		echo '<div class="etr-article__infos"><label for="' . esc_attr( $id ) . '"><strong>' . esc_html( $article['titre'] ) . '</strong></label>';
+		$recherche = remove_accents( strtolower( $article['titre'] . ' ' . $article['reference'] ) );
+		echo '<li class="etr-article' . ( $indispo ? ' etr-article--indispo' : '' ) . ( '' !== $qte ? ' etr-article--choisi' : '' ) . '" data-article="' . (int) $article['id'] . '" data-titre="' . esc_attr( $article['titre'] ) . '" data-unite="' . esc_attr( $article['unite'] ) . '" data-recherche="' . esc_attr( $recherche ) . '">';
+		echo $article['image'] ? wp_kses_post( $article['image'] ) : '<span class="etr-article__img etr-article__img--vide">' . self::icone( 'image' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '<div class="etr-article__infos"><label for="' . esc_attr( $id ) . '" class="etr-article__nom">' . esc_html( $article['titre'] ) . '</label>';
+		echo '<p class="etr-article__meta">';
 		if ( $article['reference'] ) {
-			echo ' <span class="etr-muted">' . esc_html( $article['reference'] ) . '</span>';
+			echo '<span class="etr-article__ref">' . esc_html( $article['reference'] ) . '</span>';
 		}
+		if ( $article['prix_html'] ) {
+			echo '<span class="etr-article__prix">' . wp_kses_post( $article['prix_html'] ) . '</span>';
+		}
+		if ( $article['url'] ) {
+			echo '<a href="' . esc_url( $article['url'] ) . '" target="_blank" rel="noopener">' . esc_html__( 'Voir la fiche', 'espace-traiteur' ) . '<span class="screen-reader-text"> ' . esc_html__( '(nouvel onglet)', 'espace-traiteur' ) . '</span></a>';
+		}
+		echo '</p>';
 		if ( $article['description'] ) {
 			echo '<p class="etr-article__desc">' . esc_html( $article['description'] ) . '</p>';
 		}
-		if ( $article['prix_html'] || $article['url'] ) {
-			echo '<p class="etr-article__meta">';
-			if ( $article['prix_html'] ) {
-				echo '<span class="etr-article__prix">' . wp_kses_post( $article['prix_html'] ) . '</span> ';
-			}
-			if ( $article['url'] ) {
-				echo '<a href="' . esc_url( $article['url'] ) . '" target="_blank" rel="noopener">' . esc_html__( 'Voir la fiche', 'espace-traiteur' ) . '</a>';
-			}
-			echo '</p>';
-		}
-		echo '<p class="etr-muted etr-dispo">' . esc_html( $texte_dispo ) . '</p>';
 		echo '</div>';
+		echo '<div class="etr-article__action">';
+		echo '<p class="etr-dispo">' . esc_html( $texte_dispo ) . '</p>';
+		echo '<div class="etr-qte">';
 		printf(
-			'<input type="number" class="etr-article__qte" id="%1$s" name="quantites[%2$d]" min="0" step="1"%3$s value="%4$s" placeholder="0" aria-label="%5$s">',
+			'<input type="number" class="etr-article__qte" id="%1$s" name="quantites[%2$d]" min="0" step="1" inputmode="numeric"%3$s value="%4$s" placeholder="0" aria-label="%5$s">',
 			esc_attr( $id ),
 			(int) $article['id'],
 			( null !== $dispo ? ' max="' . (int) $dispo . '"' : '' ) . ( $indispo ? ' disabled' : '' ), // phpcs:ignore WordPress.Security.EscapeOutput -- entiers.
-			esc_attr( $indispo ? '' : self::ancienne_quantite( $article['id'] ) ),
+			esc_attr( $qte ),
 			/* translators: %s : article. */
 			esc_attr( sprintf( __( 'Quantité pour %s', 'espace-traiteur' ), $article['titre'] ) )
 		);
+		echo '</div></div>';
 		echo '</li>';
 	}
 }

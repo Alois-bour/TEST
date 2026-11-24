@@ -1,6 +1,6 @@
 <?php
 /**
- * Gabarit plein écran de la connexion à l'espace traiteur
+ * Gabarit plein écran de l'espace traiteur : connexion et application
  * (sans l'en-tête ni le pied de page du thème).
  *
  * @package EspaceTraiteur

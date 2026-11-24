@@ -93,6 +93,17 @@ class ETR_Admin {
 		);
 		register_setting(
 			'etr_reglages',
+			'etr_espace_plein_ecran',
+			array(
+				'type'              => 'string',
+				'default'           => '1',
+				'sanitize_callback' => function ( $valeur ) {
+					return $valeur ? '1' : '0';
+				},
+			)
+		);
+		register_setting(
+			'etr_reglages',
 			'etr_connexion_plein_ecran',
 			array(
 				'type'              => 'string',
@@ -167,6 +178,8 @@ class ETR_Admin {
 		echo '<tr><th scope="row"><label for="etr_email_equipe">' . esc_html__( 'E-mail de l’équipe', 'espace-traiteur' ) . '</label></th><td>';
 		echo '<input type="email" class="regular-text" id="etr_email_equipe" name="etr_email_equipe" value="' . esc_attr( get_option( 'etr_email_equipe' ) ) . '" placeholder="' . esc_attr( get_option( 'admin_email' ) ) . '">';
 		echo '<p class="description">' . esc_html__( 'Reçoit les nouvelles demandes et les annulations. Vide = e-mail d’administration du site.', 'espace-traiteur' ) . '</p></td></tr>';
+
+		echo '<tr><th scope="row">' . esc_html__( 'Espace des traiteurs', 'espace-traiteur' ) . '</th><td><input type="hidden" name="etr_espace_plein_ecran" value="0"><label><input type="checkbox" name="etr_espace_plein_ecran" value="1"' . checked( get_option( 'etr_espace_plein_ecran', '1' ), '1', false ) . '> ' . esc_html__( 'Application plein écran une fois connecté (sans l’en-tête ni le pied de page du site)', 'espace-traiteur' ) . '</label></td></tr>';
 
 		echo '<tr><th scope="row" colspan="2"><h2 style="margin:16px 0 0">' . esc_html__( 'Page de connexion', 'espace-traiteur' ) . '</h2></th></tr>';
 		echo '<tr><th scope="row">' . esc_html__( 'Affichage', 'espace-traiteur' ) . '</th><td><input type="hidden" name="etr_connexion_plein_ecran" value="0"><label><input type="checkbox" name="etr_connexion_plein_ecran" value="1"' . checked( get_option( 'etr_connexion_plein_ecran', '1' ), '1', false ) . '> ' . esc_html__( 'Plein écran (sans l’en-tête ni le pied de page du site)', 'espace-traiteur' ) . '</label></td></tr>';

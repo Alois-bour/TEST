@@ -35,7 +35,7 @@ Sans WooCommerce, le plugin utilise son propre catalogue (menu *Espace traiteur 
 
 - **Espace traiteur › Traiteurs** : créer un traiteur (société, contact, e-mail, téléphone). Il reçoit une invitation par e-mail pour choisir son mot de passe. Depuis cette page : renvoyer l'invitation, désactiver ou réactiver un accès, voir ses demandes.
 - **Produits WooCommerce** : renseigner la « Quantité possédée » des articles à limiter (voir ci-dessus).
-- **Espace traiteur › Réglages** : catégories proposées, prix, e-mail de l'équipe.
+- **Espace traiteur › Réglages** : catégories proposées, prix, e-mail de l'équipe, affichage de l'espace des traiteurs (application plein écran ou intégrée au site).
 - **Espace traiteur › Demandes** : voir les demandes, filtrer par statut, changer le statut et écrire un message au traiteur.
 
 Statuts : En attente, Validée, Refusée, Livrée, Clôturée, Annulée.
@@ -45,17 +45,25 @@ Statuts : En attente, Validée, Refusée, Livrée, Clôturée, Annulée.
 Sur la page **Espace traiteur**, le traiteur :
 
 - se connecte avec son identifiant (ou son e-mail) et son mot de passe, sur la page Espace traiteur uniquement ;
-- voit la liste de **ses** demandes et leur statut (il ne voit jamais celles des autres) ;
-- crée une demande : événement, date, nombre d'invités, lieu, dates de livraison et de reprise, contact sur place, articles du catalogue avec quantités, besoins hors catalogue ;
-- choisit parmi le mobilier et la vaisselle **disponibles à ses dates** : dès qu'il saisit la date, chaque article affiche la quantité encore libre et les articles complets sont grisés ;
-- consulte le détail et la réponse de l'équipe ;
+- arrive sur un tableau de bord : son **prochain événement** mis en avant (date, lieu, délai, statut), puis toutes **ses** demandes classées par date d'événement, filtrables par statut (il ne voit jamais celles des autres) ;
+- crée une demande en quatre étapes : événement (nom, date, invités, lieu, contact), livraison et reprise, catalogue, compléments (besoins hors catalogue, commentaire). Un récapitulatif « Votre sélection » reste visible à côté du formulaire ;
+- choisit parmi le mobilier et la vaisselle **disponibles à ses dates** : dès qu'il saisit la date, chaque article affiche la quantité encore libre et les articles complets sont grisés. Recherche par nom ou référence, filtre par famille, boutons − / + pour les quantités ;
+- consulte le détail : suivi de la demande (Envoyée, Validée, Livrée, Reprise et clôturée), réponse de l'équipe, informations et matériel demandé ;
 - peut annuler une demande tant qu'elle est « En attente ».
+
+### Présentation de l'espace
+
+Une fois connecté, le traiteur utilise l'espace comme une application : barre latérale (logo, navigation, compte, retour au site, déconnexion), contenu en pleine largeur, sans l'en-tête ni le pied de page du thème. Sur mobile, la barre latérale devient une barre en haut de l'écran.
+
+- *Espace traiteur › Réglages › Espace des traiteurs* : décocher « Afficher l'espace en plein écran » pour l'afficher dans la mise en page du site (navigation en bandeau au-dessus du contenu).
+- Mêmes polices que le site (serif italique pour les titres et les dates, Roboto pour le texte), couleurs sobres, un seul accent vert olive.
+- Clavier, lecteurs d'écran (`aria-current`, libellés) et réglage « réduire les animations » pris en compte.
 
 ## Page de connexion
 
 Écran en deux panneaux, dans l'esprit du site : à gauche une grande photo d'ambiance avec une accroche, à droite le logo, un titre en serif italique et un formulaire épuré (bouton « Afficher » le mot de passe, état de chargement, messages clairs). Les écrans « Mot de passe oublié » et « Choisir votre mot de passe » reprennent la même présentation. Adapté au mobile (la photo devient un bandeau).
 
-- **Plein écran** par défaut : la page de connexion occupe toute la fenêtre, sans l'en-tête ni le pied de page du site, avec un lien « Retour au site ». Une fois connecté, le traiteur retrouve son espace dans la mise en page habituelle du site. Désactivable dans les réglages.
+- **Plein écran** par défaut : la page de connexion occupe toute la fenêtre, sans l'en-tête ni le pied de page du site, avec un lien « Retour au site ». Désactivable dans les réglages (l'espace connecté a son propre réglage, voir ci-dessus).
 - **Logo et photo automatiques** : sans choix dans les réglages, le plugin utilise le logo du site (logo du thème, logo Elementor, ou fichier `maison-aname-logo1` de la médiathèque) et une photo d'ambiance du site (`location-art-de-la-table-mariage-nancy`, puis d'autres photos de la page d'accueil, l'image d'une catégorie de produits ou l'image de la page d'accueil). Filtres `etr_logos_par_defaut` et `etr_photos_par_defaut`.
 - *Espace traiteur › Réglages › Page de connexion* : choisir un autre **logo** ou une autre **photo** dans la médiathèque ; l'image utilisée par défaut y est affichée.
 - Polices : celles du site si elles sont chargées par le thème (Ethic Serif, Cormorant Garamond, Roboto), sinon des polices proches.
@@ -127,7 +135,7 @@ assets/js/connexion.js              Écran de connexion (afficher le mot de pass
 assets/js/admin-reglages.js         Choix du logo et de la photo dans la médiathèque
 includes/class-etr-migrations.php   Migrations de la base après mise à jour
 includes/class-etr-cli.php          Commandes WP-CLI (wp espace-traiteur …)
-templates/connexion.php             Gabarit plein écran de la connexion
+templates/connexion.php             Gabarit plein écran (connexion et espace connecté)
 .github/workflows/deployer.yml      Déploiement automatique (GitHub Actions)
 docs/DEPLOIEMENT.md                 Mise en place du déploiement, retour arrière
 uninstall.php                       Nettoyage à la désinstallation
