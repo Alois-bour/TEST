@@ -40,7 +40,7 @@ Sans WooCommerce, le plugin utilise son propre catalogue (menu *Espace traiteur 
 - **Fiche d'une demande** : matériel et disponibilités sur la période, prix de chaque ligne et prix final indicatif (tarifs actuels du site, hors livraison et reprise), informations de l'événement, coordonnées du traiteur ; choix du statut et message au traiteur (e-mail envoyé si le statut change).
 - **Planning** : calendrier du mois avec livraisons, événements et reprises (en pointillés : demandes encore en attente).
 - **Traiteurs** : liste, nombre de demandes, ajout d'un traiteur, renvoi d'invitation, désactivation et réactivation.
-- **Catalogue** : stock, quantités sorties et disponibles aujourd'hui, lien vers la fiche produit.
+- **Catalogue** : stock, quantités sorties et disponibles aujourd'hui, lien vers la fiche produit ; recherche instantanée (nom, référence, catégorie) pendant la frappe.
 
 Sans permaliens, l'adresse est `/?etr_gestion=1`. Filtre `etr_gestion_slug` pour changer `gestion-traiteur`.
 

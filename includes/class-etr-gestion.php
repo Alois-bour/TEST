@@ -226,7 +226,7 @@ class ETR_Gestion {
 	}
 
 	/**
-	 * Styles.
+	 * Styles et scripts.
 	 */
 	public static function assets() {
 		if ( ! self::actif() ) {
@@ -234,6 +234,7 @@ class ETR_Gestion {
 		}
 		wp_enqueue_style( 'espace-traiteur', ETR_URL . 'assets/css/espace-traiteur.css', array(), ETR_VERSION );
 		wp_enqueue_style( 'espace-traiteur-gestion', ETR_URL . 'assets/css/gestion.css', array( 'espace-traiteur' ), ETR_VERSION );
+		wp_enqueue_script( 'espace-traiteur-gestion', ETR_URL . 'assets/js/gestion.js', array(), ETR_VERSION, true );
 	}
 
 	/**
@@ -1334,14 +1335,7 @@ class ETR_Gestion {
 		$q        = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$articles = etr_catalogue();
 		$total    = count( $articles );
-		if ( '' !== $q ) {
-			$articles = array_filter(
-				$articles,
-				function ( $a ) use ( $q ) {
-					return false !== stripos( remove_accents( $a['titre'] . ' ' . $a['reference'] . ' ' . $a['categorie'] ), remove_accents( $q ) );
-				}
-			);
-		}
+		$cle      = self::cle_recherche( $q );
 		$jour      = self::aujourdhui();
 		$dehors    = etr_quantites_reservees( $jour, $jour );
 		$woo       = etr_source_woocommerce();
@@ -1361,22 +1355,40 @@ class ETR_Gestion {
 		echo '<button type="submit" class="screen-reader-text">' . esc_html__( 'Rechercher', 'espace-traiteur' ) . '</button></form></div>';
 
 		if ( ! $articles ) {
-			echo '<div class="etr-vide etr-vide--compact"><p>' . esc_html( '' !== $q ? __( 'Aucun article ne correspond à cette recherche.', 'espace-traiteur' ) : __( 'Le catalogue est vide. Ajoutez des articles depuis l’administration.', 'espace-traiteur' ) ) . '</p></div>';
+			echo '<div class="etr-vide etr-vide--compact"><p>' . esc_html__( 'Le catalogue est vide. Ajoutez des articles depuis l’administration.', 'espace-traiteur' ) . '</p></div>';
 			return;
 		}
 
-		echo '<div class="etr-table-cadre"><table class="etr-table etr-table--catalogue">';
+		// Toutes les lignes sont rendues ; la recherche masque celles qui ne correspondent pas (filtrage instantané en JS).
+		$lignes = array();
+		foreach ( $articles as $article ) {
+			$texte    = self::cle_recherche( $article['titre'] . ' ' . $article['reference'] . ' ' . $article['categorie'] );
+			$lignes[] = array( $article, $texte, self::correspond( $texte, $cle ) );
+		}
+		$visibles = count( array_filter( array_column( $lignes, 2 ) ) );
+
+		echo '<p class="etr-vide etr-vide--compact" id="etr-cat-vide"' . ( $visibles ? ' hidden' : '' ) . '>' . esc_html__( 'Aucun article ne correspond à cette recherche.', 'espace-traiteur' ) . '</p>';
+		echo '<div class="etr-table-cadre" id="etr-cat-table"' . ( $visibles ? '' : ' hidden' ) . '><table class="etr-table etr-table--catalogue">';
 		echo '<thead><tr><th scope="col">' . esc_html__( 'Article', 'espace-traiteur' ) . '</th><th scope="col" class="etr-table__nombre">' . esc_html__( 'Stock', 'espace-traiteur' ) . '</th><th scope="col" class="etr-table__nombre">' . esc_html__( 'Sorti aujourd’hui', 'espace-traiteur' ) . '</th><th scope="col" class="etr-table__nombre">' . esc_html__( 'Disponible aujourd’hui', 'espace-traiteur' ) . '</th><th scope="col"><span class="screen-reader-text">' . esc_html__( 'Modifier', 'espace-traiteur' ) . '</span></th></tr></thead><tbody>';
 		$categorie = null;
-		foreach ( $articles as $article ) {
+		$groupe    = 0;
+		foreach ( $lignes as $ligne ) {
+			list( $article, $texte, $visible ) = $ligne;
 			if ( $article['categorie'] !== $categorie ) {
 				$categorie = $article['categorie'];
-				echo '<tr class="etr-table__groupe"><th scope="rowgroup" colspan="5">' . esc_html( $categorie ? $categorie : __( 'Sans catégorie', 'espace-traiteur' ) ) . '</th></tr>';
+				++$groupe;
+				$groupe_visible = (bool) array_filter(
+					$lignes,
+					function ( $l ) use ( $categorie ) {
+						return $l[2] && $l[0]['categorie'] === $categorie;
+					}
+				);
+				echo '<tr class="etr-table__groupe" data-groupe="' . (int) $groupe . '"' . ( $groupe_visible ? '' : ' hidden' ) . '><th scope="rowgroup" colspan="5">' . esc_html( $categorie ? $categorie : __( 'Sans catégorie', 'espace-traiteur' ) ) . '</th></tr>';
 			}
 			$stock = etr_stock_total( $article['id'] );
 			$sorti = isset( $dehors[ $article['id'] ] ) ? (int) $dehors[ $article['id'] ] : 0;
 			$dispo = etr_disponibilite( $article['id'], $dehors );
-			echo '<tr>';
+			echo '<tr class="etr-cat-ligne" data-groupe="' . (int) $groupe . '" data-recherche="' . esc_attr( $texte ) . '"' . ( $visible ? '' : ' hidden' ) . '>';
 			echo '<td><span class="etr-table__article">' . ( $article['image'] ? wp_kses_post( $article['image'] ) : '<span class="etr-article__img etr-article__img--vide">' . self::icone( 'image' ) . '</span>' ) . '<span><strong>' . esc_html( $article['titre'] ) . '</strong>' . ( $article['reference'] ? '<small>' . esc_html( $article['reference'] ) . '</small>' : '' ) . '</span></span></td>'; // phpcs:ignore WordPress.Security.EscapeOutput
 			echo '<td class="etr-table__nombre">' . ( null === $stock ? '<span class="etr-muted">' . esc_html__( 'Non suivi', 'espace-traiteur' ) . '</span>' : esc_html( number_format_i18n( $stock ) ) ) . '</td>';
 			echo '<td class="etr-table__nombre">' . ( $sorti ? esc_html( number_format_i18n( $sorti ) ) : '<span class="etr-muted">–</span>' ) . '</td>';
@@ -1386,5 +1398,33 @@ class ETR_Gestion {
 			echo '</tr>';
 		}
 		echo '</tbody></table></div>';
+	}
+
+	/**
+	 * Tous les mots de la recherche figurent-ils dans le texte ?
+	 *
+	 * @param string $texte Texte normalisé.
+	 * @param string $cle   Recherche normalisée.
+	 * @return bool
+	 */
+	private static function correspond( $texte, $cle ) {
+		foreach ( array_filter( explode( ' ', $cle ), 'strlen' ) as $mot ) {
+			if ( false === strpos( $texte, $mot ) ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Texte normalisé pour la recherche (minuscules, sans accents, espaces simples).
+	 * Doit rester identique à la normalisation de assets/js/gestion.js.
+	 *
+	 * @param string $texte Texte.
+	 * @return string
+	 */
+	private static function cle_recherche( $texte ) {
+		$texte = strtolower( remove_accents( wp_strip_all_tags( (string) $texte ) ) );
+		return trim( preg_replace( '/\s+/', ' ', $texte ) );
 	}
 }

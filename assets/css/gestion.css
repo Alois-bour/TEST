@@ -386,3 +386,8 @@ td.etr-table__nombre .etr-manque { margin: 0; font-size: inherit; font-weight: 5
 	.etr-filtres li { flex: none; }
 	.etr-table__logistique { display: none; }
 }
+
+/* Recherche instantanée du catalogue */
+.etr-table--catalogue tr[hidden],
+.etr-table-cadre[hidden],
+.etr-vide[hidden] { display: none; }
