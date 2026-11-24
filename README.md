@@ -72,6 +72,35 @@ Une fois connecté, le traiteur utilise l'espace comme une application : barre l
 - Mêmes polices que le site (serif italique pour les titres et les dates, Roboto pour le texte), couleurs sobres, un seul accent vert olive.
 - Clavier, lecteurs d'écran (`aria-current`, libellés) et réglage « réduire les animations » pris en compte.
 
+## Application de l'équipe (iPhone)
+
+L'espace de gestion (`/gestion-traiteur/`) s'installe comme une application sur l'iPhone : icône sur l'écran d'accueil, plein écran, barre d'onglets en bas.
+
+- **Installer** : ouvrir `/gestion-traiteur/` dans Safari, touchez « Partager » puis « Sur l'écran d'accueil ». Un encart l'explique dans l'application tant qu'elle n'est pas installée.
+- **Connexion dans l'application** (identifiant ou e-mail, « Rester connecté » 14 jours). Indispensable sur iPhone : une application installée a ses propres cookies. Les traiteurs y sont refusés (ils ont leur espace).
+- **Icône** : l'« Icône du site » de WordPress (Réglages › Général), sinon une icône fournie par le plugin.
+- **Toujours à jour** : les pages ne sont jamais stockées sur le téléphone ; sans réseau, une page « Pas de connexion » propose de réessayer. Seuls les fichiers CSS/JS du plugin sont gardés en cache pour un démarrage rapide.
+- Fichiers servis par le plugin : `manifest.webmanifest`, `sw.js` (service worker, limité à `/gestion-traiteur`) et `hors-ligne`.
+
+### Rôles de l'équipe
+
+| Rôle | Ce qu'il voit et fait |
+|---|---|
+| **Bureau** | Tout l'espace de gestion : demandes et décisions, prix et tarification, exports, traiteurs, statistiques, équipe. Accès à l'administration WordPress pour les demandes et les réglages du plugin. |
+| **Préparateur** | Planning, demandes validées, livrées ou clôturées (sans prix), catalogue, bons de préparation et de retour. Pas d'administration WordPress. |
+| **Livreur** | Planning, demandes validées, livrées ou clôturées (sans prix), bons. Pas d'administration WordPress. |
+
+- *Gestion › Équipe* (bureau) : ajouter une personne (nom, e-mail, téléphone, rôle ; invitation envoyée maintenant ou plus tard), changer son rôle, envoyer l'invitation, **retirer l'accès** (déconnexion immédiate) ou le rendre. Les administrateurs et son propre compte ne sont pas modifiables ici.
+- Les droits sont vérifiés côté serveur : une demande en attente est introuvable pour le terrain (fiche, bons), toute action de gestion est refusée hors bureau.
+- Les administrateurs WordPress ont tous les droits.
+
+### Feuille de route
+
+1. ✅ Rôles et application installable (1.8.0).
+2. Notifications sur l'iPhone : nouvelle demande, modification, rappels de la veille.
+3. Préparation : bon à cocher sur le téléphone, étiquettes QR, scan à la sortie et au retour.
+4. Tournées : livraisons et reprises du jour, itinéraire, signature, photos, comptage des retours.
+
 ## Page de connexion
 
 Écran en deux panneaux, dans l'esprit du site : à gauche une grande photo d'ambiance avec une accroche, à droite le logo, un titre en serif italique et un formulaire épuré (bouton « Afficher » le mot de passe, état de chargement, messages clairs). Les écrans « Mot de passe oublié » et « Choisir votre mot de passe » reprennent la même présentation. Adapté au mobile (la photo devient un bandeau).
@@ -135,6 +164,7 @@ Les articles complets sont classés par nombre de demandes actives, présentes o
 - `etr_catalogue` : filtrer la liste des articles proposés.
 - `etr_routes_api_traiteurs` : routes de l'API REST autorisées aux traiteurs connectés.
 - `etr_migrations` : étapes de migration (par version).
+- `etr_app_nom`, `etr_app_nom_court` : nom de l'application installée (« Gestion » sous l'icône).
 - `etr_gestion_slug` : adresse de l'espace de gestion (`gestion-traiteur` par défaut).
 - `etr_prix_unitaire` : prix unitaire utilisé pour le chiffrage indicatif d'une demande (`$prix, $article_id`).
 - Actions : `etr_demande_creee`, `etr_demande_annulee`, `etr_statut_change` (`$id, $ancien, $nouveau`), `etr_reponse_modifiee` (`$id, $message`), `etr_tarif_change` (`$id, $tarif`).
@@ -153,6 +183,8 @@ includes/class-etr-post-types.php   Types de contenus (demandes, catalogue, cat�
 includes/class-etr-access.php       Accès : traiteurs tenus hors de wp-admin, WooCommerce et API
 includes/class-etr-comptes.php      Connexion, mot de passe oublié, choix du mot de passe
 includes/class-etr-traiteurs.php    Page « Traiteurs » : création, invitation, désactivation
+includes/class-etr-equipe.php       Rôles de l'équipe (bureau, préparateur, livreur), page Équipe
+includes/class-etr-pwa.php          Application installable : manifeste, service worker, hors ligne
 includes/class-etr-admin.php        Écrans d'administration
 includes/class-etr-frontend.php     Espace traiteur (shortcode)
 includes/class-etr-gestion.php      Espace de gestion de l'équipe (/gestion-traiteur/)
@@ -163,6 +195,9 @@ assets/css/espace-traiteur.css      Styles
 assets/css/gestion.css              Styles de l'espace de gestion
 assets/js/espace-traiteur.js        Mise à jour des disponibilités selon les dates
 assets/js/connexion.js              Écran de connexion (afficher le mot de passe, envoi)
+assets/js/app.js                    Application : service worker, aide à l'installation sur iPhone
+assets/js/sw.js                     Service worker (servi par ETR_PWA)
+assets/img/app-icone-*.png          Icônes de secours de l'application
 assets/js/admin-reglages.js         Choix du logo et de la photo dans la médiathèque
 includes/class-etr-migrations.php   Migrations de la base après mise à jour
 includes/class-etr-cli.php          Commandes WP-CLI (wp espace-traiteur …)

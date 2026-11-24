@@ -107,7 +107,7 @@ class ETR_Traiteurs {
 	 */
 	public static function creer() {
 		check_admin_referer( 'etr_creer_traiteur' );
-		if ( ! current_user_can( 'gerer_espace_traiteur' ) || ! current_user_can( 'create_users' ) ) {
+		if ( ! current_user_can( 'gerer_espace_traiteur' ) ) {
 			wp_die( esc_html__( 'Vous n’avez pas le droit de créer des comptes.', 'espace-traiteur' ) );
 		}
 
@@ -304,7 +304,7 @@ class ETR_Traiteurs {
 		echo '<p>' . esc_html__( 'Les traiteurs se connectent uniquement sur la page « Espace traiteur » avec leur identifiant et leur mot de passe. Ils n’ont accès ni à l’administration, ni au compte client de la boutique.', 'espace-traiteur' ) . ' <a href="' . esc_url( etr_url() ) . '" target="_blank" rel="noopener">' . esc_html__( 'Voir l’espace traiteur', 'espace-traiteur' ) . '</a></p>';
 
 		self::liste();
-		if ( current_user_can( 'create_users' ) ) {
+		if ( current_user_can( 'gerer_espace_traiteur' ) ) {
 			self::formulaire();
 		}
 		echo '</div>';

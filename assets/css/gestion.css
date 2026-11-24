@@ -515,3 +515,110 @@ td.etr-table__nombre .etr-manque { margin: 0; font-size: inherit; font-weight: 5
 	.etr-app .etr-table--traiteurs .etr-table__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding-top: 10px; }
 	.etr-table--traiteurs .etr-table__actions form + form { margin-top: 0; }
 }
+
+/* ==================================================================
+   Application installable (iPhone)
+   ================================================================== */
+
+/* Écran de connexion de l'application : une seule colonne, centrée. */
+.etr-page-gestion .etr-auth--app {
+	grid-template-columns: minmax(0, 1fr);
+	max-width: none;
+	min-height: 100vh;
+	min-height: 100dvh;
+	margin: 0;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+	background: var(--etr-voile, #f8f5f2);
+}
+.etr-page-gestion .etr-auth--app .etr-auth__panneau {
+	padding: max(40px, env(safe-area-inset-top)) 24px max(40px, env(safe-area-inset-bottom));
+	background: transparent;
+}
+.etr-page-gestion .etr-auth--app .etr-auth__contenu {
+	max-width: 400px;
+	padding: 40px 32px;
+	border: 1px solid var(--etr-trait);
+	border-radius: 16px;
+	background: #fff;
+}
+@media (max-width: 480px) {
+	.etr-page-gestion .etr-auth--app .etr-auth__contenu { padding: 32px 22px; }
+}
+
+/* Aide à l'installation (Safari sur iPhone). */
+.etr-installer {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	margin: 0 0 24px;
+	padding: 14px 16px;
+	border: 1px solid var(--etr-trait);
+	border-radius: 14px;
+	background: #fff;
+}
+.etr-installer[hidden] { display: none; }
+.etr-installer__icone img { display: block; width: 44px; height: 44px; border-radius: 10px; }
+.etr-installer p { flex: 1; margin: 0; font-size: 14px; line-height: 1.4; }
+.etr-installer strong { display: block; font-weight: 600; }
+.etr-installer span { color: var(--etr-gris); }
+.etr-app .etr-installer__fermer {
+	flex: none;
+	width: 36px;
+	height: 36px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: var(--etr-voile, #f2eee8);
+	color: var(--etr-encre);
+	font-size: 22px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+/* Libellé court : seulement dans la barre d'onglets de l'application installée. */
+.etr-app__nav-court { display: none; }
+
+/* Application lancée depuis l'écran d'accueil : encoche et barre d'onglets en bas. */
+@media (max-width: 900px) {
+	.etr-installee .etr-gestion .etr-app__barre { padding-top: max(10px, env(safe-area-inset-top)); }
+	.etr-installee .etr-gestion .etr-app__nav {
+		position: fixed;
+		z-index: 20;
+		right: 0;
+		bottom: 0;
+		left: 0;
+		order: 0;
+		width: auto;
+		margin: 0;
+		padding: 6px max(8px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+		overflow-x: auto;
+		background: var(--etr-nuit);
+		border-top: 1px solid var(--etr-nuit-trait);
+	}
+	.etr-installee .etr-gestion .etr-app__nav ul { display: flex; flex-wrap: nowrap; gap: 2px; }
+	/* Le bureau a 7 onglets : la barre défile plutôt que de tronquer les libellés. */
+	.etr-installee .etr-gestion .etr-app__nav li { flex: 1 0 56px; }
+	.etr-installee .etr-gestion .etr-app__nav-libelle { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+	.etr-installee .etr-gestion .etr-app__nav-court { display: block; }
+	.etr-installee .etr-gestion .etr-app__nav a {
+		position: relative;
+		flex-direction: column;
+		justify-content: center;
+		gap: 3px;
+		min-height: 52px;
+		padding: 6px 2px;
+		border-radius: 10px;
+		font-size: 11px;
+		line-height: 1.1;
+		text-align: center;
+		white-space: nowrap;
+		box-shadow: none;
+	}
+	.etr-installee .etr-gestion .etr-app__nav a .etr-icone { width: 22px; height: 22px; }
+	.etr-installee .etr-gestion .etr-app__nav a[aria-current="page"] { background: rgba(255, 255, 255, .1); color: #fff; }
+	.etr-installee .etr-gestion .etr-app__nav a[aria-current="page"] .etr-icone { color: #fff; }
+	.etr-installee .etr-gestion .etr-gestion__pastille { position: absolute; top: 2px; left: calc(50% + 6px); margin: 0; }
+	.etr-installee .etr-gestion .etr-app__principal { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+}

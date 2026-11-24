@@ -35,7 +35,8 @@ class ETR_Bons {
 	 */
 	public static function afficher( $id, $type, $retour ) {
 		$demande = get_post( $id );
-		if ( ! $demande || 'etr_demande' !== $demande->post_type || ! current_user_can( 'edit_post', $id ) ) {
+		// Même règle que l'application : le bureau voit tout, le terrain les demandes validées, livrées ou clôturées.
+		if ( ! $demande || ! ETR_Gestion::demande_visible( $id ) ) {
 			wp_die( esc_html__( 'Demande introuvable.', 'espace-traiteur' ), '', array( 'response' => 404 ) );
 		}
 		$types = self::types();

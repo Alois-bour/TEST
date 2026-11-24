@@ -23,6 +23,20 @@ class ETR_Gestion {
 	private static $erreurs_traiteur = array();
 
 	/**
+	 * Erreurs du formulaire d'ajout d'un membre de l'équipe.
+	 *
+	 * @var array
+	 */
+	private static $erreurs_membre = array();
+
+	/**
+	 * Erreur de l'écran de connexion.
+	 *
+	 * @var string
+	 */
+	private static $erreur_connexion = '';
+
+	/**
 	 * Cache des demandes.
 	 *
 	 * @var int[]|null
@@ -108,23 +122,28 @@ class ETR_Gestion {
 		nocache_headers();
 
 		if ( ! is_user_logged_in() ) {
-			wp_safe_redirect( wp_login_url( self::url() ) );
-			exit;
+			// Connexion dans l'application même : une app installée sur iPhone a ses propres
+			// cookies, une connexion faite hors de l'app (wp-login.php) n'y serait pas reconnue.
+			if ( isset( $_POST['etr_gestion_action'] ) && 'connexion' === $_POST['etr_gestion_action'] ) { // phpcs:ignore WordPress.Security.NonceVerification -- formulaire de connexion public.
+				self::action_connexion();
+			}
+			self::page_trouvee();
+			return;
 		}
 		if ( ETR_Access::traiteur_seulement( get_current_user_id() ) ) {
 			wp_safe_redirect( etr_url() );
 			exit;
 		}
-		if ( ! etr_est_gestionnaire() ) {
+		if ( ! ETR_Equipe::acces() ) {
 			wp_die( esc_html__( 'L’espace de gestion est réservé à l’équipe.', 'espace-traiteur' ), '', array( 'response' => 403 ) );
 		}
 
-		global $wp_query;
-		$wp_query->is_home = false;
-		$wp_query->is_404  = false;
-		status_header( 200 );
+		self::page_trouvee();
 
 		$action = isset( $_REQUEST['etr_gestion_action'] ) ? sanitize_key( wp_unslash( $_REQUEST['etr_gestion_action'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification -- vérifié par action.
+		if ( $action && ! ETR_Equipe::bureau() ) {
+			wp_die( esc_html__( 'Cette action est réservée au bureau.', 'espace-traiteur' ), '', array( 'response' => 403 ) );
+		}
 		if ( 'decision' === $action ) {
 			self::action_decision();
 		} elseif ( 'tarif' === $action ) {
@@ -135,13 +154,74 @@ class ETR_Gestion {
 			self::action_compte( $action );
 		} elseif ( 'export' === $action ) {
 			self::action_export();
+		} elseif ( 'creer_membre' === $action ) {
+			self::action_creer_membre();
+		} elseif ( 'membre' === $action ) {
+			self::action_membre();
 		}
 
 		// Bons imprimables : page autonome, hors application.
 		if ( isset( $_GET['vue'], $_GET['id'] ) && 'bon' === $_GET['vue'] ) { // phpcs:ignore WordPress.Security.NonceVerification
 			$id = absint( $_GET['id'] ); // phpcs:ignore WordPress.Security.NonceVerification
+			if ( ! self::demande_visible( $id ) ) {
+				wp_die( esc_html__( 'Demande introuvable.', 'espace-traiteur' ), '', array( 'response' => 404 ) );
+			}
 			ETR_Bons::afficher( $id, isset( $_GET['type'] ) ? sanitize_key( wp_unslash( $_GET['type'] ) ) : '', self::url_demande( $id ) ); // phpcs:ignore WordPress.Security.NonceVerification
 		}
+	}
+
+	/**
+	 * L'espace de gestion est une vraie page (ni accueil, ni « introuvable »).
+	 */
+	private static function page_trouvee() {
+		global $wp_query;
+		$wp_query->is_home = false;
+		$wp_query->is_404  = false;
+		status_header( 200 );
+	}
+
+	/**
+	 * Connexion d'un membre de l'équipe depuis l'application.
+	 */
+	private static function action_connexion() {
+		// phpcs:disable WordPress.Security.NonceVerification -- formulaire de connexion public, comme wp-login.php.
+		$login = isset( $_POST['log'] ) ? sanitize_text_field( wp_unslash( $_POST['log'] ) ) : '';
+		$mdp   = isset( $_POST['pwd'] ) ? (string) wp_unslash( $_POST['pwd'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- mot de passe : jamais modifié.
+		$garde = ! empty( $_POST['rememberme'] );
+		// phpcs:enable
+		$cle = 'equipe|' . $login;
+
+		if ( '' === $login || '' === $mdp ) {
+			self::$erreur_connexion = __( 'Saisissez votre identifiant et votre mot de passe.', 'espace-traiteur' );
+			return;
+		}
+		if ( ETR_Comptes::est_bloque( $cle ) ) {
+			self::$erreur_connexion = __( 'Trop de tentatives de connexion. Réessayez dans 15 minutes.', 'espace-traiteur' );
+			return;
+		}
+		$user = wp_signon(
+			array(
+				'user_login'    => $login,
+				'user_password' => $mdp,
+				'remember'      => $garde,
+			),
+			is_ssl()
+		);
+		if ( is_wp_error( $user ) ) {
+			ETR_Comptes::compter_echec( $cle );
+			self::$erreur_connexion = 'etr_hors_espace' === $user->get_error_code()
+				? __( 'Les traiteurs se connectent depuis l’espace traiteur, pas depuis l’application de l’équipe.', 'espace-traiteur' )
+				: __( 'Identifiant ou mot de passe incorrect.', 'espace-traiteur' );
+			return;
+		}
+		if ( ! ETR_Equipe::acces( $user->ID ) ) {
+			wp_logout();
+			self::$erreur_connexion = __( 'Cette application est réservée à l’équipe. Si votre accès a été retiré, contactez le bureau.', 'espace-traiteur' );
+			return;
+		}
+		delete_transient( ETR_Comptes::cle_echecs( $cle ) );
+		wp_safe_redirect( self::url() );
+		exit;
 	}
 
 	/**
@@ -416,7 +496,7 @@ class ETR_Gestion {
 	 */
 	private static function action_creer_traiteur() {
 		check_admin_referer( 'etr_gestion_creer_traiteur', 'etr_nonce' );
-		if ( ! current_user_can( 'create_users' ) ) {
+		if ( ! ETR_Equipe::bureau() ) {
 			wp_die( esc_html__( 'Vous n’avez pas le droit de créer des comptes.', 'espace-traiteur' ), '', array( 'response' => 403 ) );
 		}
 		$donnees = array();
@@ -433,6 +513,54 @@ class ETR_Gestion {
 				array(
 					'vue'     => 'traiteurs',
 					'etr_msg' => ETR_Traiteurs::code_creation( $resultat ),
+				)
+			)
+		);
+		exit;
+	}
+
+	/**
+	 * Ajout d'un membre de l'équipe : redirection si réussi, sinon formulaire réaffiché.
+	 */
+	private static function action_creer_membre() {
+		check_admin_referer( 'etr_gestion_creer_membre', 'etr_nonce' );
+		$donnees = array();
+		foreach ( array( 'nom', 'email', 'telephone', 'role' ) as $cle ) {
+			$donnees[ $cle ] = isset( $_POST[ $cle ] ) ? wp_unslash( $_POST[ $cle ] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- nettoyé par creer_membre().
+		}
+		$resultat = ETR_Equipe::creer_membre( $donnees, ! empty( $_POST['envoyer_invitation'] ) );
+		if ( is_wp_error( $resultat ) ) {
+			self::$erreurs_membre = array( $resultat->get_error_code() );
+			return;
+		}
+		wp_safe_redirect(
+			self::url(
+				array(
+					'vue'     => 'equipe',
+					'etr_msg' => ETR_Traiteurs::code_creation( $resultat ),
+				)
+			)
+		);
+		exit;
+	}
+
+	/**
+	 * Action sur un membre de l'équipe : changer de rôle, inviter, retirer ou rendre l'accès.
+	 */
+	private static function action_membre() {
+		$user_id = isset( $_POST['user'] ) ? absint( $_POST['user'] ) : 0;
+		check_admin_referer( 'etr_gestion_membre_' . $user_id, 'etr_nonce' );
+		$op   = isset( $_POST['op'] ) ? sanitize_key( wp_unslash( $_POST['op'] ) ) : '';
+		$role = isset( $_POST['role'] ) ? sanitize_key( wp_unslash( $_POST['role'] ) ) : '';
+		$msg  = ETR_Equipe::modifier_membre( $user_id, $op, $role );
+		if ( is_wp_error( $msg ) ) {
+			wp_die( esc_html( $msg->get_error_message() ), '', array( 'response' => 403 ) );
+		}
+		wp_safe_redirect(
+			self::url(
+				array(
+					'vue'     => 'equipe',
+					'etr_msg' => $msg,
 				)
 			)
 		);
@@ -487,6 +615,11 @@ class ETR_Gestion {
 		wp_enqueue_style( 'espace-traiteur', ETR_URL . 'assets/css/espace-traiteur.css', array(), ETR_VERSION );
 		wp_enqueue_style( 'espace-traiteur-gestion', ETR_URL . 'assets/css/gestion.css', array( 'espace-traiteur' ), ETR_VERSION );
 		wp_enqueue_script( 'espace-traiteur-gestion', ETR_URL . 'assets/js/gestion.js', array(), ETR_VERSION, true );
+		wp_enqueue_script( 'espace-traiteur-app', ETR_URL . 'assets/js/app.js', array(), ETR_VERSION, true );
+		wp_localize_script( 'espace-traiteur-app', 'etrApp', ETR_PWA::config_script() );
+		if ( ! is_user_logged_in() ) {
+			wp_enqueue_script( 'espace-traiteur-connexion', ETR_URL . 'assets/js/connexion.js', array(), ETR_VERSION, true );
+		}
 	}
 
 	/**
@@ -567,7 +700,29 @@ class ETR_Gestion {
 	/* ------------------------------------------------------------------ */
 
 	/**
-	 * Toutes les demandes publiées (méta préchargées).
+	 * Statuts visibles par le préparateur et le livreur (le bureau voit tout).
+	 *
+	 * @return string[]
+	 */
+	private static function statuts_terrain() {
+		return array( 'validee', 'livree', 'cloturee' );
+	}
+
+	/**
+	 * La demande est-elle visible par l'utilisateur courant ?
+	 *
+	 * @param int $id Demande.
+	 * @return bool
+	 */
+	public static function demande_visible( $id ) {
+		return $id && 'etr_demande' === get_post_type( $id ) && 'publish' === get_post_status( $id )
+			&& ( ETR_Equipe::bureau() || in_array( etr_get_statut( $id ), self::statuts_terrain(), true ) );
+	}
+
+	/**
+	 * Demandes publiées visibles par l'utilisateur courant (méta préchargées).
+	 * Préparateurs et livreurs ne voient que les demandes validées, livrées ou clôturées :
+	 * planning, liste, fiche et bons en découlent.
 	 *
 	 * @return int[]
 	 */
@@ -588,6 +743,9 @@ class ETR_Gestion {
 			if ( self::$demandes ) {
 				update_meta_cache( 'post', self::$demandes );
 				_prime_post_caches( self::$demandes, false, false );
+			}
+			if ( ! ETR_Equipe::bureau() ) {
+				self::$demandes = array_values( array_filter( self::$demandes, array( __CLASS__, 'demande_visible' ) ) );
 			}
 		}
 		return self::$demandes;
@@ -711,14 +869,28 @@ class ETR_Gestion {
 	 * @return array
 	 */
 	private static function vues() {
-		return array(
-			'tableau'   => array( __( 'Tableau de bord', 'espace-traiteur' ), 'accueil' ),
-			'demandes'  => array( __( 'Demandes', 'espace-traiteur' ), 'demandes' ),
-			'planning'  => array( __( 'Planning', 'espace-traiteur' ), 'calendrier' ),
-			'traiteurs' => array( __( 'Traiteurs', 'espace-traiteur' ), 'invites' ),
-			'catalogue' => array( __( 'Catalogue', 'espace-traiteur' ), 'catalogue' ),
+		$toutes = array(
+			'tableau'      => array( __( 'Tableau de bord', 'espace-traiteur' ), 'accueil' ),
+			'demandes'     => array( __( 'Demandes', 'espace-traiteur' ), 'demandes' ),
+			'planning'     => array( __( 'Planning', 'espace-traiteur' ), 'calendrier' ),
+			'traiteurs'    => array( __( 'Traiteurs', 'espace-traiteur' ), 'invites' ),
+			'catalogue'    => array( __( 'Catalogue', 'espace-traiteur' ), 'catalogue' ),
 			'statistiques' => array( __( 'Statistiques', 'espace-traiteur' ), 'demandes' ),
+			'equipe'       => array( __( 'Équipe', 'espace-traiteur' ), 'invites' ),
 		);
+		if ( ETR_Equipe::bureau() ) {
+			return $toutes;
+		}
+		// Préparateur et livreur : le planning d'abord, sans prix ni gestion.
+		$cles = array( 'planning', 'demandes' );
+		if ( ETR_Equipe::preparateur() ) {
+			$cles[] = 'catalogue';
+		}
+		$vues = array();
+		foreach ( $cles as $cle ) {
+			$vues[ $cle ] = $toutes[ $cle ];
+		}
+		return $vues;
 	}
 
 	/**
@@ -727,26 +899,36 @@ class ETR_Gestion {
 	 * @return string
 	 */
 	private static function vue_courante() {
-		$vue = isset( $_GET['vue'] ) ? sanitize_key( wp_unslash( $_GET['vue'] ) ) : 'tableau'; // phpcs:ignore WordPress.Security.NonceVerification
+		$vues   = self::vues();
+		$defaut = isset( $vues['tableau'] ) ? 'tableau' : (string) key( $vues );
+		$vue    = isset( $_GET['vue'] ) ? sanitize_key( wp_unslash( $_GET['vue'] ) ) : $defaut; // phpcs:ignore WordPress.Security.NonceVerification
 		if ( self::$erreurs_traiteur ) {
 			return 'traiteurs';
+		}
+		if ( self::$erreurs_membre ) {
+			return 'equipe';
 		}
 		if ( 'demande' === $vue ) {
 			return isset( $_GET['id'] ) ? 'demande' : 'demandes'; // phpcs:ignore WordPress.Security.NonceVerification
 		}
-		return array_key_exists( $vue, self::vues() ) ? $vue : 'tableau';
+		return array_key_exists( $vue, $vues ) ? $vue : $defaut;
 	}
 
 	/**
 	 * Affiche l'application.
 	 */
 	public static function rendu() {
+		if ( ! is_user_logged_in() ) {
+			self::vue_connexion();
+			return;
+		}
 		$vue   = self::vue_courante();
 		$actif = 'demande' === $vue ? 'demandes' : $vue;
 
 		echo '<div class="etr-app etr-gestion">';
 		self::barre_laterale( $actif );
 		echo '<main class="etr-app__principal" id="etr-contenu">';
+		self::aide_installation();
 		self::messages();
 
 		switch ( $vue ) {
@@ -768,11 +950,54 @@ class ETR_Gestion {
 			case 'statistiques':
 				self::vue_statistiques();
 				break;
+			case 'equipe':
+				self::vue_equipe();
+				break;
 			default:
 				self::vue_tableau();
 		}
 
 		echo '</main></div>';
+	}
+
+	/**
+	 * Écran de connexion de l'application.
+	 */
+	private static function vue_connexion() {
+		$login   = isset( $_POST['log'] ) ? sanitize_text_field( wp_unslash( $_POST['log'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+		$logo_id = ETR_Comptes::logo_id();
+		$site    = get_bloginfo( 'name' );
+
+		echo '<div class="etr-auth etr-auth--app"><div class="etr-auth__panneau"><div class="etr-auth__contenu">';
+		echo '<span class="etr-auth__logo">' . ( $logo_id ? wp_get_attachment_image( $logo_id, 'medium', false, array( 'alt' => $site ) ) : '<span class="etr-auth__nom-site">' . esc_html( $site ) . '</span>' ) . '</span>';
+		echo '<p class="etr-auth__surtitre">' . esc_html__( 'Application de l’équipe', 'espace-traiteur' ) . '</p>';
+		echo '<h1 class="etr-auth__titre">' . esc_html__( 'Bonjour', 'espace-traiteur' ) . '</h1>';
+		echo '<p class="etr-auth__intro">' . esc_html__( 'Connectez-vous pour voir le planning, les demandes et les livraisons.', 'espace-traiteur' ) . '</p>';
+		if ( self::$erreur_connexion ) {
+			echo '<div class="etr-auth__message etr-auth__message--erreur" role="alert"><p>' . esc_html( self::$erreur_connexion ) . '</p></div>';
+		}
+		echo '<form method="post" action="' . esc_url( self::url() ) . '" class="etr-auth__form" novalidate>';
+		echo '<input type="hidden" name="etr_gestion_action" value="connexion">';
+		echo '<div class="etr-auth__champ"><label for="user_login">' . esc_html__( 'Identifiant ou e-mail', 'espace-traiteur' ) . '</label><div class="etr-auth__saisie"><input type="text" name="log" id="user_login" value="' . esc_attr( $login ) . '" autocomplete="username" autocapitalize="none" spellcheck="false" required' . ( $login ? '' : ' autofocus' ) . '></div></div>';
+		echo '<div class="etr-auth__champ"><label for="user_pass">' . esc_html__( 'Mot de passe', 'espace-traiteur' ) . '</label><div class="etr-auth__saisie etr-auth__saisie--mdp"><input type="password" name="pwd" id="user_pass" autocomplete="current-password" required' . ( $login ? ' autofocus' : '' ) . '>';
+		echo '<button type="button" class="etr-auth__oeil" aria-controls="user_pass" aria-pressed="false" data-afficher="' . esc_attr__( 'Afficher', 'espace-traiteur' ) . '" data-masquer="' . esc_attr__( 'Masquer', 'espace-traiteur' ) . '">' . esc_html__( 'Afficher', 'espace-traiteur' ) . '</button></div></div>';
+		echo '<div class="etr-auth__ligne"><label class="etr-auth__case"><input type="checkbox" name="rememberme" value="1" checked> <span>' . esc_html__( 'Rester connecté', 'espace-traiteur' ) . '</span></label>';
+		echo '<a href="' . esc_url( wp_lostpassword_url( self::url() ) ) . '">' . esc_html__( 'Mot de passe oublié ?', 'espace-traiteur' ) . '</a></div>';
+		echo '<button type="submit" id="wp-submit" class="etr-auth__bouton" data-chargement="' . esc_attr__( 'Un instant…', 'espace-traiteur' ) . '"><span>' . esc_html__( 'Se connecter', 'espace-traiteur' ) . '</span></button>';
+		echo '</form></div></div></div>';
+	}
+
+	/**
+	 * Aide à l'installation sur iPhone (affichée par app.js dans Safari, si l'app n'est pas installée).
+	 */
+	private static function aide_installation() {
+		echo '<aside class="etr-installer" id="etr-installer" hidden>';
+		echo '<span class="etr-installer__icone" aria-hidden="true"><img src="' . esc_url( ETR_PWA::icone( 180 ) ) . '" alt="" width="44" height="44"></span>';
+		echo '<p><strong>' . esc_html__( 'Installer l’application sur l’iPhone', 'espace-traiteur' ) . '</strong>';
+		/* translators: Les guillemets désignent les boutons de Safari. */
+		echo '<span>' . esc_html__( 'Dans Safari, touchez « Partager » (carré avec une flèche), puis « Sur l’écran d’accueil ».', 'espace-traiteur' ) . '</span></p>';
+		echo '<button type="button" class="etr-installer__fermer" aria-label="' . esc_attr__( 'Fermer', 'espace-traiteur' ) . '">×</button>';
+		echo '</aside>';
 	}
 
 	/**
@@ -794,7 +1019,7 @@ class ETR_Gestion {
 		$user      = wp_get_current_user();
 		$logo_id   = ETR_Comptes::logo_id();
 		$site      = get_bloginfo( 'name' );
-		$a_traiter = count( self::filtrer_statut( 'en_attente' ) );
+		$a_traiter = ETR_Equipe::bureau() ? count( self::filtrer_statut( 'en_attente' ) ) : 0;
 
 		echo '<header class="etr-app__barre">';
 		echo '<a class="etr-app__logo" href="' . esc_url( self::url() ) . '">';
@@ -806,22 +1031,30 @@ class ETR_Gestion {
 		echo '<span class="etr-gestion__marque">' . esc_html__( 'Gestion des traiteurs', 'espace-traiteur' ) . '</span>';
 		echo '</a>';
 
+		// Libellés courts de la barre d'onglets (application installée sur téléphone).
+		$courts = array(
+			'tableau'      => __( 'Accueil', 'espace-traiteur' ),
+			'statistiques' => __( 'Stats', 'espace-traiteur' ),
+		);
 		echo '<nav class="etr-app__nav" aria-label="' . esc_attr__( 'Gestion', 'espace-traiteur' ) . '"><ul>';
 		foreach ( self::vues() as $cle => $vue ) {
 			$badge = ( 'demandes' === $cle && $a_traiter ) ? '<span class="etr-gestion__pastille" title="' . esc_attr__( 'À traiter', 'espace-traiteur' ) . '">' . esc_html( number_format_i18n( $a_traiter ) ) . '</span>' : '';
-			echo '<li><a href="' . esc_url( self::url( 'tableau' === $cle ? array() : array( 'vue' => $cle ) ) ) . '"' . ( $cle === $actif ? ' aria-current="page"' : '' ) . '>' . self::icone( $vue[1] ) . '<span>' . esc_html( $vue[0] ) . '</span>' . $badge . '</a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique, badge échappé.
+			$court = isset( $courts[ $cle ] ) ? $courts[ $cle ] : $vue[0];
+			echo '<li><a href="' . esc_url( self::url( 'tableau' === $cle ? array() : array( 'vue' => $cle ) ) ) . '"' . ( $cle === $actif ? ' aria-current="page"' : '' ) . '>' . self::icone( $vue[1] ) . '<span class="etr-app__nav-libelle">' . esc_html( $vue[0] ) . '</span><span class="etr-app__nav-court" aria-hidden="true">' . esc_html( $court ) . '</span>' . $badge . '</a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique, badge échappé.
 		}
 		echo '</ul></nav>';
 
 		echo '<div class="etr-app__compte">';
-		echo '<p class="etr-app__societe">' . esc_html( etr_nom( $user ) ) . '<span>' . esc_html( $user->user_email ) . '</span></p>';
+		$role = ETR_Equipe::libelle_role( $user );
+		echo '<p class="etr-app__societe">' . esc_html( etr_nom( $user ) ) . '<span>' . esc_html( $role ? $role : $user->user_email ) . '</span></p>';
 		echo '<ul class="etr-app__liens">';
-		$liens = array(
-			array( etr_url(), __( 'Voir l’espace traiteur', 'espace-traiteur' ), 'site' ),
-			array( admin_url( 'edit.php?post_type=etr_demande&page=etr-reglages' ), __( 'Réglages', 'espace-traiteur' ), 'reglages' ),
-			array( admin_url(), __( 'Administration WordPress', 'espace-traiteur' ), 'externe' ),
-			array( wp_logout_url( self::url() ), __( 'Se déconnecter', 'espace-traiteur' ), 'sortie' ),
-		);
+		$liens = array();
+		if ( ETR_Equipe::bureau() ) {
+			$liens[] = array( etr_url(), __( 'Voir l’espace traiteur', 'espace-traiteur' ), 'site' );
+			$liens[] = array( admin_url( 'edit.php?post_type=etr_demande&page=etr-reglages' ), __( 'Réglages', 'espace-traiteur' ), 'reglages' );
+			$liens[] = array( admin_url(), __( 'Administration WordPress', 'espace-traiteur' ), 'externe' );
+		}
+		$liens[] = array( wp_logout_url( self::url() ), __( 'Se déconnecter', 'espace-traiteur' ), 'sortie' );
 		foreach ( $liens as $lien ) {
 			echo '<li><a href="' . esc_url( $lien[0] ) . '">' . self::icone( $lien[2] ) . '<span>' . esc_html( $lien[1] ) . '</span></a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
@@ -862,6 +1095,9 @@ class ETR_Gestion {
 			'cree'       => __( 'Traiteur ajouté. Il a reçu un e-mail pour choisir son mot de passe.', 'espace-traiteur' ),
 			'cree_sans_invitation' => __( 'Traiteur ajouté, sans invitation. Cliquez sur « Envoyer l’invitation » dans la liste quand vous êtes prêt.', 'espace-traiteur' ),
 			'invite'     => __( 'Invitation envoyée.', 'espace-traiteur' ),
+			'role'       => __( 'Rôle modifié.', 'espace-traiteur' ),
+			'retire'     => __( 'Accès retiré : la personne est déconnectée et ne peut plus entrer dans l’application.', 'espace-traiteur' ),
+			'rendu'      => __( 'Accès rendu.', 'espace-traiteur' ),
 			'desactive'  => __( 'Accès désactivé : le traiteur est déconnecté et ne peut plus se connecter.', 'espace-traiteur' ),
 			'reactive'   => __( 'Accès réactivé.', 'espace-traiteur' ),
 		);
@@ -1230,7 +1466,7 @@ class ETR_Gestion {
 				'q'        => $q,
 			)
 		);
-		$action = '<div class="etr-export">'
+		$action = ! ETR_Equipe::bureau() ? '' : '<div class="etr-export">'
 			. '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_export( 'demandes', $export ) ) . '">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Exporter les demandes', 'espace-traiteur' ) . '</span></a>'
 			. '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_export( 'articles', $export ) ) . '">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Détail des articles', 'espace-traiteur' ) . '</span></a>'
 			. '</div>';
@@ -1311,7 +1547,7 @@ class ETR_Gestion {
 	private static function vue_demande( $id ) {
 		$demande = get_post( $id );
 		$retour  = '<a class="etr-retour" href="' . esc_url( self::url( array( 'vue' => 'demandes' ) ) ) . '">' . self::icone( 'retour' ) . '<span>' . esc_html__( 'Demandes', 'espace-traiteur' ) . '</span></a>';
-		if ( ! $demande || 'etr_demande' !== $demande->post_type || 'publish' !== $demande->post_status ) {
+		if ( ! $demande || ! self::demande_visible( $id ) ) {
 			echo $retour; // phpcs:ignore WordPress.Security.EscapeOutput
 			echo '<div class="etr-vide etr-vide--compact"><p>' . esc_html__( 'Cette demande n’existe pas ou a été supprimée.', 'espace-traiteur' ) . '</p></div>';
 			return;
@@ -1331,8 +1567,10 @@ class ETR_Gestion {
 		echo '</div>';
 
 		echo '<aside class="etr-dossier__cote">';
-		self::panneau_decision( $id, $statut );
-		self::panneau_tarif( $id );
+		if ( ETR_Equipe::bureau() ) {
+			self::panneau_decision( $id, $statut );
+			self::panneau_tarif( $id );
+		}
 		self::panneau_documents( $id );
 		self::panneau_traiteur( $auteur );
 		if ( current_user_can( 'edit_post', $id ) ) {
@@ -1361,8 +1599,9 @@ class ETR_Gestion {
 			echo '<p class="etr-muted etr-materiel__periode">' . esc_html( $debut === $fin ? sprintf( __( 'Disponibilités calculées pour le %s, hors cette demande.', 'espace-traiteur' ), etr_format_date( $debut ) ) : sprintf( __( 'Disponibilités calculées du %1$s au %2$s, hors cette demande.', 'espace-traiteur' ), etr_format_date( $debut ), etr_format_date( $fin ) ) ) . '</p>';
 		}
 		$manques   = 0;
-		$chiffrage = etr_chiffrage( $id );
-		echo '<ul class="etr-lignes etr-lignes--prix">';
+		$avec_prix = ETR_Equipe::bureau(); // Prix réservés au bureau.
+		$chiffrage = $avec_prix ? etr_chiffrage( $id ) : array();
+		echo '<ul class="etr-lignes' . ( $avec_prix ? ' etr-lignes--prix' : '' ) . '">';
 		foreach ( $lignes as $index => $ligne ) {
 			$article = etr_get_article( $ligne['article_id'] );
 			$dispo   = etr_disponibilite( (int) $ligne['article_id'], $reservees );
@@ -1382,11 +1621,15 @@ class ETR_Gestion {
 			}
 			echo '</span>';
 			echo '<span class="etr-ligne__qte">' . esc_html( number_format_i18n( $ligne['quantite'] ) ) . ( ! empty( $ligne['unite'] ) ? '<small>' . esc_html( $ligne['unite'] ) . '</small>' : '' ) . '</span>';
-			echo etr_prix_ligne_html( $chiffrage['lignes'][ $index ], (int) $ligne['quantite'] ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans etr_prix_ligne_html().
+			if ( $avec_prix ) {
+				echo etr_prix_ligne_html( $chiffrage['lignes'][ $index ], (int) $ligne['quantite'] ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans etr_prix_ligne_html().
+			}
 			echo '</li>';
 		}
 		echo '</ul>';
-		echo etr_total_indicatif_html( $chiffrage ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans etr_total_indicatif_html().
+		if ( $avec_prix ) {
+			echo etr_total_indicatif_html( $chiffrage ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans etr_total_indicatif_html().
+		}
 		if ( $manques ) {
 			echo '<p class="etr-materiel__bilan etr-materiel__bilan--manque">' . self::icone( 'alerte' ) . esc_html(
 				/* translators: %s : nombre d'articles. */
@@ -1563,7 +1806,9 @@ class ETR_Gestion {
 		$nav .= '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url( array( 'vue' => 'planning' ) ) ) . '">' . esc_html__( 'Ce mois-ci', 'espace-traiteur' ) . '</a>';
 		$nav .= '<a class="etr-btn etr-btn--icone" href="' . esc_url( self::url( array( 'vue' => 'planning', 'mois' => $precedent ) ) ) . '" aria-label="' . esc_attr__( 'Mois précédent', 'espace-traiteur' ) . '">' . self::icone( 'retour' ) . '</a>';
 		$nav .= '<a class="etr-btn etr-btn--icone" href="' . esc_url( self::url( array( 'vue' => 'planning', 'mois' => $suivant ) ) ) . '" aria-label="' . esc_attr__( 'Mois suivant', 'espace-traiteur' ) . '">' . self::icone( 'suite' ) . '</a>';
-		$nav .= '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_export( 'planning', array( 'mois' => $mois ) ) ) . '">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Exporter', 'espace-traiteur' ) . '</span></a>';
+		if ( ETR_Equipe::bureau() ) {
+			$nav .= '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_export( 'planning', array( 'mois' => $mois ) ) ) . '">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Exporter', 'espace-traiteur' ) . '</span></a>';
+		}
 		$nav .= '</div>';
 		self::entete( ucfirst( date_i18n( 'F Y', $ts ) ), __( 'Livraisons, événements et reprises des demandes en cours.', 'espace-traiteur' ), $nav );
 
@@ -1673,7 +1918,7 @@ class ETR_Gestion {
 		}
 		echo '</div>';
 
-		if ( current_user_can( 'create_users' ) ) {
+		if ( ETR_Equipe::bureau() ) {
 			self::formulaire_traiteur();
 		}
 		echo '</div>';
@@ -1744,6 +1989,143 @@ class ETR_Gestion {
 	}
 
 	/* ------------------------------------------------------------------ */
+	/* Équipe                                                             */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Membres de l'équipe : bureau, préparateurs, livreurs.
+	 */
+	private static function vue_equipe() {
+		$membres = ETR_Equipe::membres();
+		/* translators: %s : nombre de personnes. */
+		self::entete( __( 'Équipe', 'espace-traiteur' ), sprintf( _n( '%s personne', '%s personnes', count( $membres ), 'espace-traiteur' ), number_format_i18n( count( $membres ) ) ) );
+
+		echo '<div class="etr-traiteurs-gestion"><div>';
+		echo '<p class="etr-muted etr-equipe__intro">' . esc_html__( 'Le bureau gère tout. Les préparateurs et les livreurs voient le planning, les demandes validées (sans prix) et les bons, sans accès à l’administration WordPress.', 'espace-traiteur' ) . '</p>';
+		echo '<div class="etr-table-cadre" tabindex="0" role="region" aria-label="' . esc_attr__( 'Membres de l’équipe', 'espace-traiteur' ) . '"><table class="etr-table etr-table--traiteurs">';
+		echo '<thead><tr><th scope="col">' . esc_html__( 'Personne', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Rôle', 'espace-traiteur' ) . '</th><th scope="col">' . esc_html__( 'Accès', 'espace-traiteur' ) . '</th><th scope="col"><span class="screen-reader-text">' . esc_html__( 'Actions', 'espace-traiteur' ) . '</span></th></tr></thead><tbody>';
+		$moi = get_current_user_id();
+		foreach ( $membres as $user ) {
+			$modifiable = ETR_Equipe::modifiable( $user->ID );
+			$retire     = ETR_Equipe::acces_retire( $user->ID );
+			$tel        = (string) get_user_meta( $user->ID, 'etr_telephone', true );
+			$invite_le  = ETR_Traiteurs::date_invitation( $user->ID );
+			echo '<tr' . ( $retire ? ' class="etr-table__passee"' : '' ) . '>';
+			echo '<td><strong>' . esc_html( etr_nom( $user ) ) . ( $user->ID === $moi ? ' <small class="etr-muted">(' . esc_html__( 'vous', 'espace-traiteur' ) . ')</small>' : '' ) . '</strong>';
+			echo '<small><a class="etr-lien" href="mailto:' . esc_attr( $user->user_email ) . '">' . esc_html( $user->user_email ) . '</a>' . ( $tel ? ' · ' . esc_html( $tel ) : '' ) . '</small></td>';
+			echo '<td data-label="' . esc_attr__( 'Rôle', 'espace-traiteur' ) . '">';
+			if ( $modifiable && ! $retire ) {
+				self::formulaire_membre( $user->ID, 'role', '', '', ETR_Equipe::role_equipe( $user ) );
+			} else {
+				$libelle = $retire ? ETR_Equipe::libelle_role_slug( ETR_Equipe::role_retire( $user->ID ) ) : ETR_Equipe::libelle_role( $user );
+				echo esc_html( $libelle ? $libelle : '—' );
+			}
+			echo '</td>';
+			if ( $retire ) {
+				$acces = '<span class="etr-statut etr-statut--refusee">' . esc_html__( 'Retiré', 'espace-traiteur' ) . '</span>';
+			} elseif ( ! $modifiable && ! $invite_le ) {
+				$acces = '<span class="etr-statut etr-statut--validee">' . esc_html__( 'Actif', 'espace-traiteur' ) . '</span>'; // Administrateur, ou soi-même.
+			} else {
+				$acces = ETR_Traiteurs::badge_acces( false, $invite_le );
+			}
+			echo '<td data-label="' . esc_attr__( 'Accès', 'espace-traiteur' ) . '">' . $acces . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé ci-dessus et dans badge_acces().
+			echo '<td class="etr-table__actions">';
+			if ( $modifiable ) {
+				if ( $retire ) {
+					self::formulaire_membre( $user->ID, 'rendre', __( 'Rendre l’accès', 'espace-traiteur' ) );
+				} else {
+					self::formulaire_membre( $user->ID, 'inviter', $invite_le ? __( 'Renvoyer l’invitation', 'espace-traiteur' ) : __( 'Envoyer l’invitation', 'espace-traiteur' ), '', '', ! $invite_le );
+					self::formulaire_membre( $user->ID, 'retirer', __( 'Retirer l’accès', 'espace-traiteur' ), __( 'Retirer l’accès de cette personne ? Elle sera déconnectée immédiatement.', 'espace-traiteur' ) );
+				}
+			}
+			echo '</td></tr>';
+		}
+		echo '</tbody></table></div></div>';
+		self::formulaire_ajout_membre();
+		echo '</div>';
+	}
+
+	/**
+	 * Petit formulaire d'action sur un membre.
+	 *
+	 * @param int    $user_id Membre.
+	 * @param string $op      role|inviter|retirer|rendre.
+	 * @param string $libelle Libellé du bouton.
+	 * @param string $confirm Confirmation (facultative).
+	 * @param string $role    Rôle actuel (op « role »).
+	 * @param bool   $avant   Bouton mis en avant.
+	 */
+	private static function formulaire_membre( $user_id, $op, $libelle, $confirm = '', $role = '', $avant = false ) {
+		echo '<form method="post" action="' . esc_url( self::url( array( 'vue' => 'equipe' ) ) ) . '"' . ( $confirm ? ' onsubmit="return confirm(\'' . esc_js( $confirm ) . '\');"' : '' ) . ( 'role' === $op ? ' class="etr-equipe__role"' : '' ) . '>';
+		wp_nonce_field( 'etr_gestion_membre_' . $user_id, 'etr_nonce', false );
+		echo '<input type="hidden" name="etr_gestion_action" value="membre"><input type="hidden" name="user" value="' . (int) $user_id . '"><input type="hidden" name="op" value="' . esc_attr( $op ) . '">';
+		if ( 'role' === $op ) {
+			echo '<label class="screen-reader-text" for="etr-role-' . (int) $user_id . '">' . esc_html__( 'Rôle', 'espace-traiteur' ) . '</label>';
+			echo '<select id="etr-role-' . (int) $user_id . '" name="role" onchange="this.form.submit()">';
+			foreach ( ETR_Equipe::roles() as $slug => $info ) {
+				echo '<option value="' . esc_attr( $slug ) . '"' . selected( $role, $slug, false ) . '>' . esc_html( ETR_Equipe::libelle_role_slug( $slug ) ) . '</option>';
+			}
+			echo '</select><noscript><button type="submit" class="etr-btn-texte">' . esc_html__( 'Changer', 'espace-traiteur' ) . '</button></noscript>';
+		} else {
+			echo '<button type="submit" class="' . ( $avant ? 'etr-btn etr-btn--plein etr-btn--petit' : 'etr-btn-texte' ) . '">' . esc_html( $libelle ) . '</button>';
+		}
+		echo '</form>';
+	}
+
+	/**
+	 * Formulaire d'ajout d'un membre.
+	 */
+	private static function formulaire_ajout_membre() {
+		$erreurs = array(
+			'nom'          => array( 'nom', __( 'Indiquez le nom.', 'espace-traiteur' ) ),
+			'email'        => array( 'email', __( 'Cette adresse e-mail n’est pas valide.', 'espace-traiteur' ) ),
+			'email_existe' => array( 'email', __( 'Un compte existe déjà avec cette adresse e-mail.', 'espace-traiteur' ) ),
+			'role'         => array( 'role', __( 'Choisissez un rôle.', 'espace-traiteur' ) ),
+			'creation'     => array( '', __( 'Le compte n’a pas pu être créé. Réessayez.', 'espace-traiteur' ) ),
+		);
+		$code   = self::$erreurs_membre ? self::$erreurs_membre[0] : '';
+		$erreur = isset( $erreurs[ $code ] ) ? $erreurs[ $code ] : array( '', '' );
+		// phpcs:disable WordPress.Security.NonceVerification -- formulaire réaffiché après vérification.
+		$valeur = function ( $cle ) use ( $code ) {
+			return ( $code && isset( $_POST[ $cle ] ) ) ? sanitize_text_field( wp_unslash( $_POST[ $cle ] ) ) : '';
+		};
+		// phpcs:enable
+
+		echo '<form class="etr-panneau etr-ajout" method="post" action="' . esc_url( self::url( array( 'vue' => 'equipe' ) ) ) . '" id="ajouter">';
+		echo '<h2 class="etr-panneau__titre">' . esc_html__( 'Ajouter une personne', 'espace-traiteur' ) . '</h2>';
+		echo '<p class="etr-muted">' . esc_html__( 'Elle reçoit un e-mail pour choisir son mot de passe, puis se connecte à l’application.', 'espace-traiteur' ) . '</p>';
+		if ( $erreur[1] && '' === $erreur[0] ) {
+			echo '<div class="etr-notice etr-notice--erreur" role="alert"><p>' . esc_html( $erreur[1] ) . '</p></div>';
+		}
+		wp_nonce_field( 'etr_gestion_creer_membre', 'etr_nonce' );
+		echo '<input type="hidden" name="etr_gestion_action" value="creer_membre">';
+		$champs = array(
+			'nom'       => array( __( 'Prénom et nom', 'espace-traiteur' ), 'text', true, 'name' ),
+			'email'     => array( __( 'E-mail', 'espace-traiteur' ), 'email', true, 'email' ),
+			'telephone' => array( __( 'Téléphone', 'espace-traiteur' ), 'tel', false, 'tel' ),
+		);
+		foreach ( $champs as $cle => $champ ) {
+			$fautif = $erreur[0] === $cle;
+			echo '<div class="etr-champ' . ( $fautif ? ' etr-champ--erreur' : '' ) . '"><label for="etr-m-' . esc_attr( $cle ) . '">' . esc_html( $champ[0] ) . ( $champ[2] ? '' : ' <span class="etr-champ__option">' . esc_html__( '(facultatif)', 'espace-traiteur' ) . '</span>' ) . '</label>';
+			echo '<input type="' . esc_attr( $champ[1] ) . '" id="etr-m-' . esc_attr( $cle ) . '" name="' . esc_attr( $cle ) . '" value="' . esc_attr( $valeur( $cle ) ) . '" autocomplete="' . esc_attr( $champ[3] ) . '"' . ( $champ[2] ? ' required' : '' ) . ( $fautif ? ' aria-invalid="true" aria-describedby="etr-m-' . esc_attr( $cle ) . '-erreur"' : '' ) . '>';
+			if ( $fautif ) {
+				echo '<p class="etr-champ__erreur" id="etr-m-' . esc_attr( $cle ) . '-erreur">' . esc_html( $erreur[1] ) . '</p>';
+			}
+			echo '</div>';
+		}
+		$role = $valeur( 'role' );
+		echo '<fieldset class="etr-champ etr-equipe__roles"><legend>' . esc_html__( 'Rôle', 'espace-traiteur' ) . '</legend>';
+		$aides = ETR_Equipe::descriptions();
+		foreach ( ETR_Equipe::roles() as $slug => $info ) {
+			echo '<label class="etr-case"><input type="radio" name="role" value="' . esc_attr( $slug ) . '"' . checked( $role ? $role : 'etr_preparateur', $slug, false ) . '><span>' . esc_html( ETR_Equipe::libelle_role_slug( $slug ) ) . '<small>' . esc_html( $aides[ $slug ] ) . '</small></span></label>';
+		}
+		echo '</fieldset>';
+		echo '<label class="etr-case"><input type="checkbox" name="envoyer_invitation" value="1"' . checked( $code && ! empty( $_POST['envoyer_invitation'] ), true, false ) . '><span>' . esc_html__( 'Envoyer l’invitation maintenant', 'espace-traiteur' ) . '<small>' . esc_html__( 'Sinon, vous l’enverrez plus tard depuis la liste.', 'espace-traiteur' ) . '</small></span></label>'; // phpcs:ignore WordPress.Security.NonceVerification
+		echo '<button type="submit" class="etr-btn etr-btn--plein">' . esc_html__( 'Ajouter', 'espace-traiteur' ) . '</button>';
+		echo '</form>';
+	}
+
+	/* ------------------------------------------------------------------ */
 	/* Catalogue                                                          */
 	/* ------------------------------------------------------------------ */
 
@@ -1759,7 +2141,7 @@ class ETR_Gestion {
 		$dehors    = etr_quantites_reservees( $jour, $jour );
 		$woo       = etr_source_woocommerce();
 		$gerer_url = $woo ? admin_url( 'edit.php?post_type=product' ) : admin_url( 'edit.php?post_type=etr_article' );
-		$action    = '<a class="etr-btn etr-btn--discret" href="' . esc_url( $gerer_url ) . '">' . self::icone( 'externe' ) . '<span>' . esc_html( $woo ? __( 'Gérer les produits', 'espace-traiteur' ) : __( 'Gérer les articles', 'espace-traiteur' ) ) . '</span></a>';
+		$action    = ! ETR_Equipe::bureau() ? '' : '<a class="etr-btn etr-btn--discret" href="' . esc_url( $gerer_url ) . '">' . self::icone( 'externe' ) . '<span>' . esc_html( $woo ? __( 'Gérer les produits', 'espace-traiteur' ) : __( 'Gérer les articles', 'espace-traiteur' ) ) . '</span></a>';
 
 		/* translators: %s : nombre d'articles. */
 		self::entete( __( 'Catalogue', 'espace-traiteur' ), sprintf( _n( '%s article proposé aux traiteurs', '%s articles proposés aux traiteurs', $total, 'espace-traiteur' ), number_format_i18n( $total ) ), $action );

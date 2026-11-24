@@ -65,8 +65,26 @@ class ETR_Migrations {
 				'description' => __( 'Traiteurs existants marqués comme déjà invités (l’invitation partait automatiquement à la création).', 'espace-traiteur' ),
 				'callback'    => array( __CLASS__, 'migrer_1_7_0' ),
 			),
+			'1.8.0' => array(
+				'description' => __( 'Rôles de l’équipe (Bureau, Préparateur, Livreur) et adresses de l’application installable.', 'espace-traiteur' ),
+				'callback'    => array( __CLASS__, 'migrer_1_8_0' ),
+			),
 		);
 		return (array) apply_filters( 'etr_migrations', $etapes );
+	}
+
+	/**
+	 * Migration 1.8.0 : rôles de l'équipe.
+	 *
+	 * @return true
+	 */
+	public static function migrer_1_8_0() {
+		ETR_Equipe::installer_roles();
+		// Adresses de l'application installable (manifeste, service worker, page hors ligne).
+		ETR_Gestion::regle_reecriture();
+		ETR_PWA::regle_reecriture();
+		flush_rewrite_rules( false );
+		return true;
 	}
 
 	/**

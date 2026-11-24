@@ -236,7 +236,7 @@ class ETR_Comptes {
 	 * @param string $login Identifiant ou e-mail saisi.
 	 * @return string
 	 */
-	private static function cle_echecs( $login ) {
+	public static function cle_echecs( $login ) {
 		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
 		return 'etr_echecs_' . md5( $ip . '|' . strtolower( trim( $login ) ) );
 	}
@@ -247,7 +247,7 @@ class ETR_Comptes {
 	 * @param string $login Identifiant saisi.
 	 * @return bool
 	 */
-	private static function est_bloque( $login ) {
+	public static function est_bloque( $login ) {
 		return (int) get_transient( self::cle_echecs( $login ) ) >= self::MAX_ECHECS;
 	}
 
@@ -256,7 +256,7 @@ class ETR_Comptes {
 	 *
 	 * @param string $login Identifiant saisi.
 	 */
-	private static function compter_echec( $login ) {
+	public static function compter_echec( $login ) {
 		set_transient( self::cle_echecs( $login ), (int) get_transient( self::cle_echecs( $login ) ) + 1, self::DUREE_BLOCAGE );
 	}
 
