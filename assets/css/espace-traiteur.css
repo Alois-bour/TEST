@@ -500,6 +500,9 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 .etr-chiffrage__libelle { font-size: 15px; font-weight: 500; color: var(--etr-encre); }
 .etr-chiffrage__total { font: 400 24px/1 var(--etr-serif); color: var(--etr-encre); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .etr-chiffrage__note { grid-column: 1 / -1; font-size: 13px; color: var(--etr-gris); }
+.etr-chiffrage__detail { font-size: 14px; color: var(--etr-gris); }
+.etr-chiffrage__montant { font-size: 14px; color: var(--etr-texte); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.etr-chiffrage__sep { grid-column: 1 / -1; height: 1px; margin: 6px 0 4px; background: var(--etr-trait-doux); }
 
 .etr-annuler {
 	display: flex;

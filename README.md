@@ -37,7 +37,7 @@ Sans WooCommerce, le plugin utilise son propre catalogue (menu *Espace traiteur 
 
 - **Tableau de bord** : compteurs (demandes à traiter, événements validés, livraisons et reprises des 7 jours), agenda des 7 prochains jours, file « À traiter » avec alerte sur le matériel insuffisant.
 - **Demandes** : liste classée par date d'événement, filtres par statut et par traiteur, recherche.
-- **Fiche d'une demande** : matériel et disponibilités sur la période, prix de chaque ligne et prix final indicatif (tarifs actuels du site, hors livraison et reprise), informations de l'événement, coordonnées du traiteur ; choix du statut et message au traiteur (e-mail envoyé si le statut change) ; **historique** de la demande (envoi, changements de statut, messages, modifications et annulation : qui, quoi, quand), aussi visible dans l'administration WordPress.
+- **Fiche d'une demande** : matériel et disponibilités sur la période, prix de chaque ligne et prix final indicatif (tarifs actuels du site) ; **tarification** : remise en % (ex. traiteur partenaire) et frais de livraison et reprise, intégrés au prix final (sous-total, remise, livraison, total), aussi modifiables dans l'administration WordPress, informations de l'événement, coordonnées du traiteur ; choix du statut et message au traiteur (e-mail envoyé si le statut change) ; **historique** de la demande (envoi, changements de statut, messages, modifications et annulation : qui, quoi, quand), aussi visible dans l'administration WordPress.
 - **Planning** : calendrier du mois avec livraisons, événements et reprises (en pointillés : demandes encore en attente).
 - **Traiteurs** : liste, nombre de demandes, ajout d'un traiteur, renvoi d'invitation, désactivation et réactivation.
 - **Catalogue** : stock, quantités sorties et disponibles aujourd'hui, lien vers la fiche produit ; recherche instantanée (nom, référence, catégorie) pendant la frappe.
@@ -128,7 +128,7 @@ add_filter( 'etr_email_equipe', fn() => 'logistique@exemple.fr' );
 - `etr_migrations` : étapes de migration (par version).
 - `etr_gestion_slug` : adresse de l'espace de gestion (`gestion-traiteur` par défaut).
 - `etr_prix_unitaire` : prix unitaire utilisé pour le chiffrage indicatif d'une demande (`$prix, $article_id`).
-- Actions : `etr_demande_creee`, `etr_demande_annulee`, `etr_statut_change` (`$id, $ancien, $nouveau`), `etr_reponse_modifiee` (`$id, $message`).
+- Actions : `etr_demande_creee`, `etr_demande_annulee`, `etr_statut_change` (`$id, $ancien, $nouveau`), `etr_reponse_modifiee` (`$id, $message`), `etr_tarif_change` (`$id, $tarif`).
 - Historique : `ETR_Historique::ajouter( $id, $type, $texte )` pour journaliser un événement personnalisé.
 
 ## Structure

@@ -546,6 +546,10 @@ class ETR_Admin {
 		echo '<p><label for="etr_reponse"><strong>' . esc_html__( 'Message au traiteur', 'espace-traiteur' ) . '</strong></label>';
 		echo '<textarea name="etr_reponse" id="etr_reponse" rows="5" class="widefat">' . esc_textarea( get_post_meta( $post->ID, '_etr_reponse', true ) ) . '</textarea></p>';
 		echo '<p class="description">' . esc_html__( 'Visible dans l’espace du traiteur. Un e-mail lui est envoyé à chaque changement de statut.', 'espace-traiteur' ) . '</p>';
+		$tarif = etr_tarif( $post->ID );
+		echo '<p><label for="etr_remise_pct"><strong>' . esc_html__( 'Remise (%)', 'espace-traiteur' ) . '</strong></label><br><input type="text" inputmode="decimal" name="etr_remise_pct" id="etr_remise_pct" class="widefat" value="' . esc_attr( $tarif['remise_pct'] ? (string) $tarif['remise_pct'] : '' ) . '" placeholder="0"></p>';
+		echo '<p><label for="etr_frais_livraison"><strong>' . esc_html__( 'Livraison et reprise (€)', 'espace-traiteur' ) . '</strong></label><br><input type="text" inputmode="decimal" name="etr_frais_livraison" id="etr_frais_livraison" class="widefat" value="' . esc_attr( null === $tarif['livraison'] ? '' : (string) $tarif['livraison'] ) . '"></p>';
+		echo '<p class="description">' . esc_html__( 'Ajoutés au prix final indicatif. Livraison vide = non chiffrée, 0 = offerte.', 'espace-traiteur' ) . '</p>';
 	}
 
 	/**
@@ -564,6 +568,52 @@ class ETR_Admin {
 		$statut  = isset( $_POST['etr_statut'] ) ? sanitize_key( wp_unslash( $_POST['etr_statut'] ) ) : '';
 		$reponse = isset( $_POST['etr_reponse'] ) ? sanitize_textarea_field( wp_unslash( $_POST['etr_reponse'] ) ) : '';
 		self::appliquer_decision( $post_id, $statut, $reponse );
+		if ( isset( $_POST['etr_remise_pct'], $_POST['etr_frais_livraison'] ) ) {
+			self::appliquer_tarif( $post_id, sanitize_text_field( wp_unslash( $_POST['etr_remise_pct'] ) ), sanitize_text_field( wp_unslash( $_POST['etr_frais_livraison'] ) ) );
+		}
+	}
+
+	/**
+	 * Enregistre la remise et les frais de livraison d'une demande (journalisés s'ils changent).
+	 *
+	 * @param int    $post_id   ID de la demande.
+	 * @param string $remise    Remise en % saisie (vide = aucune).
+	 * @param string $livraison Frais de livraison et reprise saisis (vide = non chiffrés).
+	 * @return bool Le tarif a-t-il changé ?
+	 */
+	public static function appliquer_tarif( $post_id, $remise, $livraison ) {
+		$avant     = etr_tarif( $post_id );
+		$remise    = etr_lire_nombre( $remise );
+		$livraison = etr_lire_nombre( $livraison );
+
+		if ( $remise ) {
+			update_post_meta( $post_id, '_etr_remise_pct', min( 100.0, $remise ) );
+		} else {
+			delete_post_meta( $post_id, '_etr_remise_pct' );
+		}
+		if ( null === $livraison ) {
+			delete_post_meta( $post_id, '_etr_frais_livraison' );
+		} else {
+			update_post_meta( $post_id, '_etr_frais_livraison', $livraison );
+		}
+
+		$apres = etr_tarif( $post_id );
+		if ( $avant == $apres ) { // phpcs:ignore Universal.Operators.StrictComparisons -- comparaison de valeurs (float).
+			return false;
+		}
+		$texte = array();
+		/* translators: %s : pourcentage. */
+		$texte[] = $apres['remise_pct'] ? sprintf( __( 'remise %s %%', 'espace-traiteur' ), number_format_i18n( $apres['remise_pct'], fmod( $apres['remise_pct'], 1 ) ? 2 : 0 ) ) : __( 'sans remise', 'espace-traiteur' );
+		if ( null === $apres['livraison'] ) {
+			$texte[] = __( 'livraison non chiffrée', 'espace-traiteur' );
+		} else {
+			/* translators: %s : montant. */
+			$texte[] = $apres['livraison'] ? sprintf( __( 'livraison %s', 'espace-traiteur' ), html_entity_decode( wp_strip_all_tags( etr_format_prix( $apres['livraison'] ) ) ) ) : __( 'livraison offerte', 'espace-traiteur' );
+		}
+		/* translators: %s : détail du tarif. */
+		ETR_Historique::ajouter( $post_id, 'tarif', sprintf( __( 'Tarif : %s', 'espace-traiteur' ), implode( ', ', $texte ) ) );
+		do_action( 'etr_tarif_change', $post_id, $apres );
+		return true;
 	}
 
 	/**

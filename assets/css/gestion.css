@@ -391,3 +391,12 @@ td.etr-table__nombre .etr-manque { margin: 0; font-size: inherit; font-weight: 5
 .etr-table--catalogue tr[hidden],
 .etr-table-cadre[hidden],
 .etr-vide[hidden] { display: none; }
+
+/* Tarification (remise, livraison) */
+.etr-tarif { display: flex; flex-direction: column; gap: 14px; }
+.etr-app .etr-tarif .etr-panneau__titre { margin: 0; }
+.etr-tarif__champs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.etr-saisie-unite { position: relative; display: block; }
+.etr-app .etr-saisie-unite input { width: 100%; padding-right: 32px; text-align: right; font-variant-numeric: tabular-nums; }
+.etr-saisie-unite > span { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); color: var(--etr-gris); pointer-events: none; }
+.etr-tarif .etr-btn { align-self: flex-start; }

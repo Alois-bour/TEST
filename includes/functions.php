@@ -177,16 +177,51 @@ function etr_format_prix( $montant ) {
 }
 
 /**
- * Chiffrage indicatif d'une demande, ligne par ligne.
+ * Remise et frais de livraison saisis par l'équipe sur une demande.
  *
  * @param int $demande_id ID de la demande.
- * @return array{lignes:array<int,array{unitaire:float|null,total:float|null}>,total:float,sans_prix:int}
+ * @return array{remise_pct:float,livraison:float|null}
+ */
+function etr_tarif( $demande_id ) {
+	$remise    = get_post_meta( $demande_id, '_etr_remise_pct', true );
+	$livraison = get_post_meta( $demande_id, '_etr_frais_livraison', true );
+	return array(
+		'remise_pct' => '' === $remise ? 0.0 : min( 100.0, max( 0.0, (float) $remise ) ),
+		'livraison'  => '' === $livraison ? null : max( 0.0, (float) $livraison ),
+	);
+}
+
+/**
+ * Lit un montant ou un pourcentage saisi (« 10,5 », « 80 € »…).
+ *
+ * @param string $saisie Valeur saisie.
+ * @return float|null Null si vide ou illisible.
+ */
+function etr_lire_nombre( $saisie ) {
+	$saisie = str_replace( array( ',', ' ', "\xc2\xa0", '€', '%' ), array( '.', '', '', '', '' ), trim( (string) $saisie ) );
+	if ( '' === $saisie || ! is_numeric( $saisie ) ) {
+		return null;
+	}
+	return max( 0.0, round( (float) $saisie, 2 ) );
+}
+
+/**
+ * Chiffrage indicatif d'une demande, ligne par ligne, avec remise et livraison.
+ *
+ * « total » est le prix final : sous-total − remise + livraison.
+ *
+ * @param int $demande_id ID de la demande.
+ * @return array{lignes:array<int,array{unitaire:float|null,total:float|null}>,sous_total:float,remise_pct:float,remise:float,livraison:float|null,total:float,sans_prix:int}
  */
 function etr_chiffrage( $demande_id ) {
 	$chiffrage = array(
-		'lignes'    => array(),
-		'total'     => 0.0,
-		'sans_prix' => 0,
+		'lignes'     => array(),
+		'sous_total' => 0.0,
+		'remise_pct' => 0.0,
+		'remise'     => 0.0,
+		'livraison'  => null,
+		'total'      => 0.0,
+		'sans_prix'  => 0,
 	);
 	foreach ( etr_get_lignes( $demande_id ) as $index => $ligne ) {
 		$unitaire = etr_prix_unitaire( $ligne['article_id'] );
@@ -198,10 +233,53 @@ function etr_chiffrage( $demande_id ) {
 		if ( null === $total ) {
 			++$chiffrage['sans_prix'];
 		} else {
-			$chiffrage['total'] += $total;
+			$chiffrage['sous_total'] += $total;
 		}
 	}
+	$tarif                   = etr_tarif( $demande_id );
+	$chiffrage['remise_pct'] = $tarif['remise_pct'];
+	$chiffrage['remise']     = round( $chiffrage['sous_total'] * $tarif['remise_pct'] / 100, 2 );
+	$chiffrage['livraison']  = $tarif['livraison'];
+	$chiffrage['total']      = $chiffrage['sous_total'] - $chiffrage['remise'] + (float) $tarif['livraison'];
 	return $chiffrage;
+}
+
+/**
+ * Lignes de détail du prix final (sous-total, remise, livraison), vides sans remise ni livraison.
+ *
+ * @param array $chiffrage Résultat de etr_chiffrage().
+ * @return array<int,array{0:string,1:string}> Libellé, montant HTML.
+ */
+function etr_detail_chiffrage( $chiffrage ) {
+	if ( ! $chiffrage['remise_pct'] && null === $chiffrage['livraison'] ) {
+		return array();
+	}
+	$detail = array( array( __( 'Sous-total du matériel', 'espace-traiteur' ), etr_format_prix( $chiffrage['sous_total'] ) ) );
+	if ( $chiffrage['remise_pct'] ) {
+		/* translators: %s : pourcentage. */
+		$detail[] = array( sprintf( __( 'Remise (%s %%)', 'espace-traiteur' ), number_format_i18n( $chiffrage['remise_pct'], fmod( $chiffrage['remise_pct'], 1 ) ? 2 : 0 ) ), '−&nbsp;' . etr_format_prix( $chiffrage['remise'] ) );
+	}
+	if ( null !== $chiffrage['livraison'] ) {
+		$detail[] = array( __( 'Livraison et reprise', 'espace-traiteur' ), $chiffrage['livraison'] ? '+&nbsp;' . etr_format_prix( $chiffrage['livraison'] ) : esc_html__( 'Offertes', 'espace-traiteur' ) );
+	}
+	return $detail;
+}
+
+/**
+ * Note sous le prix final.
+ *
+ * @param array $chiffrage Résultat de etr_chiffrage().
+ * @return string Texte brut.
+ */
+function etr_note_chiffrage( $chiffrage ) {
+	$note = null === $chiffrage['livraison']
+		? __( 'Selon les tarifs actuels du site, hors livraison et reprise.', 'espace-traiteur' )
+		: __( 'Selon les tarifs actuels du site.', 'espace-traiteur' );
+	if ( $chiffrage['sans_prix'] ) {
+		/* translators: %s : nombre d'articles. */
+		$note .= ' ' . sprintf( _n( '%s article sans prix n’est pas compté.', '%s articles sans prix ne sont pas comptés.', $chiffrage['sans_prix'], 'espace-traiteur' ), number_format_i18n( $chiffrage['sans_prix'] ) );
+	}
+	return $note;
 }
 
 /**
@@ -225,14 +303,17 @@ function etr_prix_ligne_html( $prix, $quantite ) {
  * @return string HTML.
  */
 function etr_total_indicatif_html( $chiffrage ) {
-	$html  = '<div class="etr-chiffrage"><span class="etr-chiffrage__libelle">' . esc_html__( 'Prix final indicatif', 'espace-traiteur' ) . '</span>';
-	$html .= '<span class="etr-chiffrage__total">' . etr_format_prix( $chiffrage['total'] ) . '</span>';
-	$note  = __( 'Selon les tarifs actuels du site, hors livraison et reprise.', 'espace-traiteur' );
-	if ( $chiffrage['sans_prix'] ) {
-		/* translators: %s : nombre d'articles. */
-		$note .= ' ' . sprintf( _n( '%s article sans prix n’est pas compté.', '%s articles sans prix ne sont pas comptés.', $chiffrage['sans_prix'], 'espace-traiteur' ), number_format_i18n( $chiffrage['sans_prix'] ) );
+	$html = '<div class="etr-chiffrage">';
+	$detail = etr_detail_chiffrage( $chiffrage );
+	foreach ( $detail as $ligne ) {
+		$html .= '<span class="etr-chiffrage__detail">' . esc_html( $ligne[0] ) . '</span><span class="etr-chiffrage__montant">' . $ligne[1] . '</span>';
 	}
-	$html .= '<span class="etr-chiffrage__note">' . esc_html( $note ) . '</span></div>';
+	if ( $detail ) {
+		$html .= '<span class="etr-chiffrage__sep" aria-hidden="true"></span>';
+	}
+	$html .= '<span class="etr-chiffrage__libelle">' . esc_html__( 'Prix final indicatif', 'espace-traiteur' ) . '</span>';
+	$html .= '<span class="etr-chiffrage__total">' . etr_format_prix( $chiffrage['total'] ) . '</span>';
+	$html .= '<span class="etr-chiffrage__note">' . esc_html( etr_note_chiffrage( $chiffrage ) ) . '</span></div>';
 	return $html;
 }
 
@@ -423,14 +504,14 @@ function etr_lignes_html( $demande_id, $avec_dispo = false ) {
 		$html .= '<td class="etr-num">' . ( null === $prix['total'] ? '—' : etr_format_prix( $prix['total'] ) ) . '</td>';
 		$html .= '</tr>';
 	}
-	$html .= '</tbody><tfoot><tr><th colspan="' . ( $avec_dispo ? 5 : 4 ) . '">' . esc_html__( 'Prix final indicatif', 'espace-traiteur' ) . '</th>';
-	$html .= '<th class="etr-num"><strong>' . etr_format_prix( $chiffrage['total'] ) . '</strong></th></tr></tfoot></table>';
-	$note  = __( 'Selon les tarifs actuels du site, hors livraison et reprise.', 'espace-traiteur' );
-	if ( $chiffrage['sans_prix'] ) {
-		/* translators: %s : nombre d'articles. */
-		$note .= ' ' . sprintf( _n( '%s article sans prix n’est pas compté.', '%s articles sans prix ne sont pas comptés.', $chiffrage['sans_prix'], 'espace-traiteur' ), number_format_i18n( $chiffrage['sans_prix'] ) );
+	$colonnes = $avec_dispo ? 5 : 4;
+	$html    .= '</tbody><tfoot>';
+	foreach ( etr_detail_chiffrage( $chiffrage ) as $detail ) {
+		$html .= '<tr><td colspan="' . $colonnes . '">' . esc_html( $detail[0] ) . '</td><td class="etr-num">' . $detail[1] . '</td></tr>';
 	}
-	$html .= '<p class="etr-muted">' . esc_html( $note ) . '</p>';
+	$html .= '<tr><th colspan="' . $colonnes . '">' . esc_html__( 'Prix final indicatif', 'espace-traiteur' ) . '</th>';
+	$html .= '<th class="etr-num"><strong>' . etr_format_prix( $chiffrage['total'] ) . '</strong></th></tr></tfoot></table>';
+	$html .= '<p class="etr-muted">' . esc_html( etr_note_chiffrage( $chiffrage ) ) . '</p>';
 	return $html;
 }
 

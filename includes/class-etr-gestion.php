@@ -127,6 +127,8 @@ class ETR_Gestion {
 		$action = isset( $_REQUEST['etr_gestion_action'] ) ? sanitize_key( wp_unslash( $_REQUEST['etr_gestion_action'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification -- vérifié par action.
 		if ( 'decision' === $action ) {
 			self::action_decision();
+		} elseif ( 'tarif' === $action ) {
+			self::action_tarif();
 		} elseif ( 'creer_traiteur' === $action ) {
 			self::action_creer_traiteur();
 		} elseif ( 'inviter' === $action || 'basculer' === $action ) {
@@ -153,6 +155,31 @@ class ETR_Gestion {
 					'vue'     => 'demande',
 					'id'      => $id,
 					'etr_msg' => $change ? 'statut' : 'enregistre',
+				)
+			)
+		);
+		exit;
+	}
+
+	/**
+	 * Enregistre la remise et les frais de livraison d'une demande.
+	 */
+	private static function action_tarif() {
+		$id = isset( $_POST['demande_id'] ) ? absint( $_POST['demande_id'] ) : 0;
+		check_admin_referer( 'etr_gestion_tarif_' . $id, 'etr_nonce' );
+		if ( ! $id || 'etr_demande' !== get_post_type( $id ) || ! current_user_can( 'edit_post', $id ) ) {
+			wp_die( esc_html__( 'Demande introuvable.', 'espace-traiteur' ), '', array( 'response' => 403 ) );
+		}
+		$remise    = isset( $_POST['etr_remise_pct'] ) ? sanitize_text_field( wp_unslash( $_POST['etr_remise_pct'] ) ) : '';
+		$livraison = isset( $_POST['etr_frais_livraison'] ) ? sanitize_text_field( wp_unslash( $_POST['etr_frais_livraison'] ) ) : '';
+		ETR_Admin::appliquer_tarif( $id, $remise, $livraison );
+
+		wp_safe_redirect(
+			self::url(
+				array(
+					'vue'     => 'demande',
+					'id'      => $id,
+					'etr_msg' => 'tarif',
 				)
 			)
 		);
@@ -602,6 +629,7 @@ class ETR_Gestion {
 		$succes = array(
 			'statut'     => __( 'Statut enregistré. Le traiteur a été prévenu par e-mail.', 'espace-traiteur' ),
 			'enregistre' => __( 'Message enregistré. Le statut n’a pas changé : aucun e-mail n’a été envoyé.', 'espace-traiteur' ),
+			'tarif'      => __( 'Remise et frais de livraison enregistrés.', 'espace-traiteur' ),
 			'cree'       => __( 'Traiteur ajouté. Il a reçu un e-mail pour choisir son mot de passe.', 'espace-traiteur' ),
 			'invite'     => __( 'Invitation renvoyée.', 'espace-traiteur' ),
 			'desactive'  => __( 'Accès désactivé : le traiteur est déconnecté et ne peut plus se connecter.', 'espace-traiteur' ),
@@ -965,6 +993,7 @@ class ETR_Gestion {
 
 		echo '<aside class="etr-dossier__cote">';
 		self::panneau_decision( $id, $statut );
+		self::panneau_tarif( $id );
 		self::panneau_traiteur( $auteur );
 		if ( current_user_can( 'edit_post', $id ) ) {
 			echo '<p class="etr-dossier__wp"><a class="etr-lien" href="' . esc_url( get_edit_post_link( $id, 'url' ) ) . '">' . esc_html__( 'Ouvrir dans l’administration WordPress', 'espace-traiteur' ) . '</a></p>';
@@ -1092,6 +1121,26 @@ class ETR_Gestion {
 		echo '<textarea id="etr-reponse" name="etr_reponse" rows="4" placeholder="' . esc_attr__( 'Précisions sur la livraison, article remplacé…', 'espace-traiteur' ) . '">' . esc_textarea( (string) get_post_meta( $id, '_etr_reponse', true ) ) . '</textarea></div>';
 		echo '<p class="etr-muted">' . esc_html__( 'Le traiteur voit ce message dans son espace. S’il change de statut, il reçoit aussi un e-mail.', 'espace-traiteur' ) . '</p>';
 		echo '<button type="submit" class="etr-btn etr-btn--plein">' . esc_html__( 'Enregistrer', 'espace-traiteur' ) . '</button>';
+		echo '</form>';
+	}
+
+	/**
+	 * Remise et frais de livraison.
+	 *
+	 * @param int $id Demande.
+	 */
+	private static function panneau_tarif( $id ) {
+		$tarif = etr_tarif( $id );
+		echo '<form class="etr-panneau etr-tarif" method="post" action="' . esc_url( self::url_demande( $id ) ) . '">';
+		wp_nonce_field( 'etr_gestion_tarif_' . $id, 'etr_nonce' );
+		echo '<input type="hidden" name="etr_gestion_action" value="tarif"><input type="hidden" name="demande_id" value="' . (int) $id . '">';
+		echo '<h2 class="etr-panneau__titre">' . esc_html__( 'Tarification', 'espace-traiteur' ) . '</h2>';
+		echo '<div class="etr-tarif__champs">';
+		echo '<p class="etr-champ"><label for="etr-remise">' . esc_html__( 'Remise', 'espace-traiteur' ) . '</label><span class="etr-saisie-unite"><input type="text" inputmode="decimal" id="etr-remise" name="etr_remise_pct" value="' . esc_attr( $tarif['remise_pct'] ? str_replace( '.', ',', (string) $tarif['remise_pct'] ) : '' ) . '" placeholder="0"><span aria-hidden="true">%</span></span></p>';
+		echo '<p class="etr-champ"><label for="etr-livraison">' . esc_html__( 'Livraison et reprise', 'espace-traiteur' ) . '</label><span class="etr-saisie-unite"><input type="text" inputmode="decimal" id="etr-livraison" name="etr_frais_livraison" value="' . esc_attr( null === $tarif['livraison'] ? '' : str_replace( '.', ',', (string) $tarif['livraison'] ) ) . '" placeholder="—"><span aria-hidden="true">€</span></span></p>';
+		echo '</div>';
+		echo '<p class="etr-muted">' . esc_html__( 'Pris en compte dans le prix final indicatif, visible aussi par le traiteur si les prix sont affichés. Livraison vide = non chiffrée, 0 = offerte.', 'espace-traiteur' ) . '</p>';
+		echo '<button type="submit" class="etr-btn">' . esc_html__( 'Mettre à jour le prix', 'espace-traiteur' ) . '</button>';
 		echo '</form>';
 	}
 
