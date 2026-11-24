@@ -9,11 +9,17 @@
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
 remove_role( 'traiteur' );
+foreach ( array( 'etr_bureau', 'etr_preparateur', 'etr_livreur' ) as $etr_role ) {
+	remove_role( $etr_role );
+}
 
 $etr_admin = get_role( 'administrator' );
 if ( $etr_admin ) {
 	$etr_admin->remove_cap( 'acceder_espace_traiteur' );
 	$etr_admin->remove_cap( 'gerer_espace_traiteur' );
+	foreach ( array( 'acceder_gestion', 'preparer_commandes', 'livrer_commandes' ) as $etr_cap ) {
+		$etr_admin->remove_cap( $etr_cap );
+	}
 }
 
 delete_option( 'etr_version' );

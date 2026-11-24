@@ -58,6 +58,7 @@ class ETR_Installer {
 			ETR_Migrations::executer( 'activation' );
 		}
 		ETR_Gestion::regle_reecriture();
+		ETR_PWA::regle_reecriture();
 		flush_rewrite_rules();
 	}
 
@@ -88,6 +89,8 @@ class ETR_Installer {
 			$admin->add_cap( 'acceder_espace_traiteur' );
 			$admin->add_cap( 'gerer_espace_traiteur' );
 		}
+
+		ETR_Equipe::installer_roles();
 	}
 
 }
