@@ -132,9 +132,11 @@
 
 /* Tableaux */
 .etr-table-cadre { overflow-x: auto; border: 1px solid var(--etr-trait); border-radius: 12px; background: #fff; }
-.etr-app .etr-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+/* Les règles du thème (bordures de cellules, lignes alternées) sont neutralisées. */
+.etr-app .etr-table { width: 100%; margin: 0; border: 0; border-collapse: collapse; border-spacing: 0; background: none; font-size: 14px; line-height: 1.45; }
+.etr-app .etr-table tr { border: 0; background: none; }
 .etr-app .etr-table th,
-.etr-app .etr-table td { padding: 14px 16px; border-bottom: 1px solid var(--etr-trait-doux); text-align: left; vertical-align: middle; }
+.etr-app .etr-table td { padding: 14px 16px; border: 0; border-bottom: 1px solid var(--etr-trait-doux); background: none; text-align: left; vertical-align: middle; }
 .etr-app .etr-table thead th { padding-top: 12px; padding-bottom: 12px; background: var(--etr-voile); font-size: 13px; font-weight: 500; color: var(--etr-gris); white-space: nowrap; }
 .etr-app .etr-table tbody tr:last-child > * { border-bottom: 0; }
 .etr-app .etr-table tbody tr:hover > td { background: #fcfbf9; }
