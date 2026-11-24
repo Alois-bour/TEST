@@ -98,10 +98,17 @@ L'espace de gestion (`/gestion-traiteur/`) s'installe comme une application sur 
 - Les droits sont vérifiés côté serveur : une demande en attente est introuvable pour le terrain (fiche, bons), toute action de gestion est refusée hors bureau.
 - Les administrateurs WordPress ont tous les droits.
 
+### Notifications (iPhone)
+
+- Sur iPhone (iOS 16.4 ou plus), elles fonctionnent dans l'application **installée sur l'écran d'accueil**. Chacun les active depuis la cloche (page *Notifications*) : l'iPhone demande l'autorisation, puis une notification de test arrive. Une invitation à les activer s'affiche dans l'app tant que la personne n'a pas répondu. Elles marchent aussi sur ordinateur (Chrome, Edge, Firefox, Safari).
+- Envoi standard Web Push : messages chiffrés pour chaque appareil (RFC 8291), signés par le site (VAPID, RFC 8292). Rien à configurer, aucun service tiers ni dépendance : il suffit de l'extension PHP OpenSSL. Les clés du site sont créées au premier usage.
+- La personne qui fait l'action n'est jamais notifiée. Toucher une alerte ouvre la demande. Un appareil désactivé ou désinstallé est retiré automatiquement. L'envoi se fait après l'affichage de la page, sans la ralentir.
+- Sécurité : envoi uniquement vers les services de notification connus (Apple, Google, Mozilla, Microsoft) ; enregistrement par l'API `etr/v1/notifications/` réservé à l'équipe connectée, avec jeton.
+
 ### Feuille de route
 
 1. ✅ Rôles et application installable (1.8.0).
-2. Notifications sur l'iPhone : nouvelle demande, modification, rappels de la veille.
+2. ✅ Notifications sur l'iPhone (1.9.0) : nouvelle demande et demande annulée pour le bureau ; commande validée, puis annulée ou refusée, pour les préparateurs et les livreurs.
 3. Préparation : bon à cocher sur le téléphone, étiquettes QR, scan à la sortie et au retour.
 4. Tournées : livraisons et reprises du jour, itinéraire, signature, photos, comptage des retours.
 

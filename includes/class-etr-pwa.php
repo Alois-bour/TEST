@@ -187,6 +187,9 @@ class ETR_PWA {
 			'assets'    => ETR_URL . 'assets/',
 			'perimetre' => self::perimetre(),
 			'permalien' => (bool) get_option( 'permalink_structure' ),
+			'nom'       => self::nom(),
+			'icone'     => self::icone( 192 ),
+			'accueil'   => ETR_Gestion::url(),
 		);
 		echo '/* Espace Traiteur : service worker de l’application de l’équipe. */' . "\n";
 		echo 'const ETR = ' . wp_json_encode( $config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . ";\n";
