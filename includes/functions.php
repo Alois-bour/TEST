@@ -622,3 +622,40 @@ function etr_nom_site() {
 	$court = trim( (string) preg_split( '/\s+[|–—-]\s+/u', $nom, 2 )[0] );
 	return (string) apply_filters( 'etr_nom_site', '' !== $court ? $court : $nom, $nom );
 }
+
+/**
+ * Recharge un compte depuis la base de données (identifiant ou e-mail).
+ *
+ * Un cache d'objets persistant (LiteSpeed Cache, Redis, Memcached…) peut garder une
+ * ancienne copie du compte : la clé d'un lien « choisir mon mot de passe » tout juste
+ * envoyé, ou un mot de passe tout juste choisi, serait alors refusé.
+ *
+ * @param string $login Identifiant ou adresse e-mail.
+ * @return int ID du compte (0 s'il n'existe pas).
+ */
+function etr_rafraichir_compte( $login ) {
+	global $wpdb;
+	$login = (string) $login;
+	if ( '' === $login ) {
+		return 0;
+	}
+	$colonne = is_email( $login ) ? 'user_email' : 'user_login';
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- lecture volontairement hors cache.
+	$id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM {$wpdb->users} WHERE {$colonne} = %s LIMIT 1", $login ) );
+	if ( $id ) {
+		clean_user_cache( $id );
+	}
+	return $id;
+}
+
+/**
+ * Vérifie la clé d'un lien « choisir mon mot de passe » à partir de la base de données.
+ *
+ * @param string $cle   Clé reçue dans le lien.
+ * @param string $login Identifiant.
+ * @return WP_User|WP_Error
+ */
+function etr_verifier_cle( $cle, $login ) {
+	etr_rafraichir_compte( $login );
+	return check_password_reset_key( $cle, $login );
+}

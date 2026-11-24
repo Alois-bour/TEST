@@ -300,6 +300,7 @@ class ETR_Comptes {
 			return;
 		}
 
+		etr_rafraichir_compte( $login ); // Mot de passe tout juste choisi : jamais une copie en cache.
 		self::$via_espace = true;
 		$user             = wp_signon(
 			array(
@@ -367,7 +368,7 @@ class ETR_Comptes {
 		$mdp2  = isset( $_POST['pass2'] ) ? (string) wp_unslash( $_POST['pass2'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 		// phpcs:enable
 
-		$user = check_password_reset_key( $cle, $login );
+		$user = etr_verifier_cle( $cle, $login );
 		if ( is_wp_error( $user ) || ! ETR_Access::traiteur_seulement( $user->ID ) ) {
 			self::$erreurs[] = __( 'Ce lien n’est plus valable. Demandez un nouveau lien ci-dessous.', 'espace-traiteur' );
 			return;
@@ -755,7 +756,7 @@ class ETR_Comptes {
 		$cle   = isset( $_REQUEST['key'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['key'] ) ) : '';
 		// phpcs:enable
 
-		$user = check_password_reset_key( $cle, $login );
+		$user = etr_verifier_cle( $cle, $login );
 		if ( is_wp_error( $user ) || ! ETR_Access::traiteur_seulement( $user->ID ) ) {
 			self::entete( __( 'Lien expiré', 'espace-traiteur' ), __( 'Ce lien n’est plus valable : il expire après 24 heures ou une fois utilisé. Demandez-en un nouveau, il arrive en quelques instants.', 'espace-traiteur' ) );
 			self::messages();

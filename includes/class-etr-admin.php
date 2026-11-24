@@ -19,6 +19,7 @@ class ETR_Admin {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_init', array( __CLASS__, 'enregistrer_reglages' ) );
 		add_action( 'admin_post_etr_test_mail', array( __CLASS__, 'envoyer_mail_test' ) );
+		add_action( 'admin_post_etr_test_lien', array( __CLASS__, 'lancer_test_lien' ) );
 
 		// Champs « Espace traiteur » sur les produits WooCommerce.
 		add_action( 'woocommerce_product_options_inventory_product_data', array( __CLASS__, 'champs_produit' ) );
@@ -194,6 +195,7 @@ class ETR_Admin {
 		submit_button();
 		echo '</form>';
 		self::test_mail();
+		self::test_lien();
 		self::mises_a_jour();
 		echo '</div>';
 	}
@@ -235,6 +237,158 @@ class ETR_Admin {
 		echo '</tbody></table>';
 		submit_button( __( 'Envoyer un e-mail de test', 'espace-traiteur' ), 'secondary' );
 		echo '</form>';
+	}
+
+	/**
+	 * Test des liens « choisir mon mot de passe » (invitations, mot de passe oublié) :
+	 * une clé est créée pour le compte connecté, puis vérifiée à la page suivante,
+	 * comme lorsqu'on ouvre le lien d'un e-mail.
+	 */
+	private static function test_lien() {
+		echo '<h3 id="etr-liens">' . esc_html__( 'Liens « choisir mon mot de passe »', 'espace-traiteur' ) . '</h3>';
+		echo '<p>' . esc_html__( 'Vérifie que les liens des invitations sont acceptés par le site. Votre propre mot de passe ne change pas.', 'espace-traiteur' ) . '</p>';
+
+		$resultat = self::resultat_test_lien();
+		if ( $resultat ) {
+			$classe = 'ok' === $resultat['code'] ? 'notice-success' : 'notice-error';
+			echo '<div class="notice ' . esc_attr( $classe ) . ' inline"><p><strong>' . esc_html( $resultat['titre'] ) . '</strong><br>' . esc_html( $resultat['texte'] ) . '</p>';
+			if ( $resultat['extensions'] ) {
+				/* translators: %s : liste de fonctions. */
+				echo '<p>' . esc_html( sprintf( __( 'Code d’autres extensions qui intervient à la création des liens : %s', 'espace-traiteur' ), implode( ', ', $resultat['extensions'] ) ) ) . '</p>';
+			}
+			echo '</div>';
+		}
+
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+		wp_nonce_field( 'etr_test_lien' );
+		echo '<input type="hidden" name="action" value="etr_test_lien">';
+		submit_button( __( 'Tester les liens de mot de passe', 'espace-traiteur' ), 'secondary', 'submit', false );
+		echo '</form>';
+	}
+
+	/**
+	 * Crée une clé pour le compte connecté, vérifie qu'elle est acceptée tout de suite,
+	 * puis revient sur les réglages pour la vérifier à nouveau (nouvelle requête).
+	 */
+	public static function lancer_test_lien() {
+		check_admin_referer( 'etr_test_lien' );
+		if ( ! current_user_can( 'gerer_espace_traiteur' ) ) {
+			wp_die( esc_html__( 'Action non autorisée.', 'espace-traiteur' ), '', array( 'response' => 403 ) );
+		}
+		$user = wp_get_current_user();
+		$cle  = get_password_reset_key( $user );
+		if ( ! is_wp_error( $cle ) ) {
+			set_transient(
+				'etr_test_lien_' . $user->ID,
+				array(
+					'cle'       => $cle,
+					'immediat'  => ! is_wp_error( check_password_reset_key( $cle, $user->user_login ) ),
+					'cache_ext' => wp_using_ext_object_cache(),
+				),
+				10 * MINUTE_IN_SECONDS
+			);
+		}
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'post_type'     => 'etr_demande',
+					'page'          => 'etr-reglages',
+					'etr_test_lien' => is_wp_error( $cle ) ? 'erreur' : 'fait',
+				),
+				admin_url( 'edit.php' )
+			) . '#etr-liens'
+		);
+		exit;
+	}
+
+	/**
+	 * Résultat du test (lu une fois) ; la clé de test est ensuite effacée.
+	 *
+	 * @return array|null { code, titre, texte, extensions }
+	 */
+	private static function resultat_test_lien() {
+		// phpcs:ignore WordPress.Security.NonceVerification -- simple message après redirection.
+		$etat = isset( $_GET['etr_test_lien'] ) ? sanitize_key( wp_unslash( $_GET['etr_test_lien'] ) ) : '';
+		if ( '' === $etat ) {
+			return null;
+		}
+		$user = wp_get_current_user();
+		$test = get_transient( 'etr_test_lien_' . $user->ID );
+		delete_transient( 'etr_test_lien_' . $user->ID );
+		if ( 'fait' !== $etat || ! is_array( $test ) ) {
+			return array(
+				'code'       => 'erreur',
+				'titre'      => __( 'Le test n’a pas pu se faire.', 'espace-traiteur' ),
+				'texte'      => __( 'WordPress n’a pas pu créer de lien. Relancez le test.', 'espace-traiteur' ),
+				'extensions' => array(),
+			);
+		}
+
+		// Vérification comme WordPress la fait (cache compris), puis depuis la base de données.
+		$par_cache = ! is_wp_error( check_password_reset_key( $test['cle'], $user->user_login ) );
+		$en_base   = ! is_wp_error( etr_verifier_cle( $test['cle'], $user->user_login ) );
+
+		// Le compte n'a plus de clé en attente.
+		global $wpdb;
+		$wpdb->update( $wpdb->users, array( 'user_activation_key' => '' ), array( 'ID' => $user->ID ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		clean_user_cache( $user->ID );
+
+		$extensions = self::extensions_sur_liens();
+		$cache      = $test['cache_ext'] ? __( 'Un cache d’objets persistant est actif sur ce site.', 'espace-traiteur' ) : __( 'Aucun cache d’objets persistant n’est actif.', 'espace-traiteur' );
+
+		if ( $test['immediat'] && $par_cache && $en_base ) {
+			return array(
+				'code'       => 'ok',
+				'titre'      => __( 'Les liens fonctionnent.', 'espace-traiteur' ),
+				'texte'      => __( 'Un lien tout juste créé est bien accepté. Si une personne voit encore un lien refusé, c’est qu’un lien plus récent lui a été envoyé : elle doit ouvrir le dernier e-mail.', 'espace-traiteur' ) . ' ' . $cache,
+				'extensions' => array(),
+			);
+		}
+		if ( $en_base ) {
+			return array(
+				'code'       => 'cache',
+				'titre'      => __( 'Le site garde en cache d’anciennes copies des comptes.', 'espace-traiteur' ),
+				'texte'      => __( 'Lu directement dans la base de données, le lien est accepté : l’espace traiteur contourne désormais ce cache pour ses liens et ses connexions. Pour le reste du site, videz le cache d’objets (LiteSpeed Cache › Boîte à outils › Purger tout) et vérifiez sa configuration (LiteSpeed Cache › Cache › Objet).', 'espace-traiteur' ),
+				'extensions' => array(),
+			);
+		}
+		return array(
+			'code'       => 'efface',
+			'titre'      => __( 'La clé du lien est effacée ou modifiée juste après sa création.', 'espace-traiteur' ),
+			'texte'      => __( 'Une autre extension, ou un extrait de code (Code Snippets), intervient sur les comptes à ce moment-là. Désactivez-les une par une et relancez le test pour trouver laquelle.', 'espace-traiteur' ) . ' ' . $cache,
+			'extensions' => $extensions,
+		);
+	}
+
+	/**
+	 * Fonctions d'autres extensions accrochées à la création des clés et à la mise à jour des comptes.
+	 *
+	 * @return string[]
+	 */
+	private static function extensions_sur_liens() {
+		global $wp_filter;
+		$noms = array();
+		foreach ( array( 'retrieve_password_key', 'wp_pre_insert_user_data', 'profile_update', 'password_reset', 'after_password_reset' ) as $hook ) {
+			if ( empty( $wp_filter[ $hook ] ) ) {
+				continue;
+			}
+			foreach ( $wp_filter[ $hook ]->callbacks as $rappels ) {
+				foreach ( $rappels as $rappel ) {
+					$fn = $rappel['function'];
+					if ( is_string( $fn ) ) {
+						$nom = $fn;
+					} elseif ( is_array( $fn ) ) {
+						$nom = ( is_object( $fn[0] ) ? get_class( $fn[0] ) : (string) $fn[0] ) . '::' . $fn[1];
+					} else {
+						$nom = 'fonction anonyme';
+					}
+					if ( 0 !== strpos( $nom, 'ETR_' ) && 0 !== strpos( $nom, 'wp_' ) ) {
+						$noms[] = $hook . ' → ' . $nom;
+					}
+				}
+			}
+		}
+		return array_values( array_unique( $noms ) );
 	}
 
 	/**
