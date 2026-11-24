@@ -20,6 +20,7 @@ class ETR_Admin {
 		add_action( 'admin_init', array( __CLASS__, 'enregistrer_reglages' ) );
 		add_action( 'admin_post_etr_test_mail', array( __CLASS__, 'envoyer_mail_test' ) );
 		add_action( 'admin_post_etr_test_lien', array( __CLASS__, 'lancer_test_lien' ) );
+		add_action( 'admin_post_etr_vider_journal', array( __CLASS__, 'vider_journal' ) );
 
 		// Champs « Espace traiteur » sur les produits WooCommerce.
 		add_action( 'woocommerce_product_options_inventory_product_data', array( __CLASS__, 'champs_produit' ) );
@@ -196,6 +197,7 @@ class ETR_Admin {
 		echo '</form>';
 		self::test_mail();
 		self::test_lien();
+		self::journal_liens();
 		self::mises_a_jour();
 		echo '</div>';
 	}
@@ -389,6 +391,79 @@ class ETR_Admin {
 			}
 		}
 		return array_values( array_unique( $noms ) );
+	}
+
+	/**
+	 * Journal des liens « choisir mon mot de passe » (derniers événements).
+	 */
+	private static function journal_liens() {
+		$lignes = ETR_Journal_Liens::lignes();
+		echo '<h3 id="etr-journal">' . esc_html__( 'Journal des liens', 'espace-traiteur' ) . '</h3>';
+		echo '<p>' . esc_html__( 'Chaque nouvelle clé annule les liens envoyés avant pour ce compte. Si un lien tout juste reçu est refusé, ce journal montre ce qui a créé ou modifié la clé entre-temps. Les clés n’y figurent pas : seulement une empreinte pour les reconnaître.', 'espace-traiteur' ) . '</p>';
+		if ( ! $lignes ) {
+			echo '<p><em>' . esc_html__( 'Aucun événement pour l’instant.', 'espace-traiteur' ) . '</em></p>';
+			return;
+		}
+
+		// Clés créées, pour dire de quelle clé parle un lien refusé.
+		$creations = array();
+		foreach ( $lignes as $ligne ) {
+			if ( 'cle_creee' === $ligne['e'] ) {
+				$creations[ $ligne['l'] . '|' . $ligne['d'] ] = $ligne['t'];
+			}
+		}
+		$libelles = array(
+			'cle_creee'     => __( 'Nouvelle clé (les liens précédents ne marchent plus)', 'espace-traiteur' ),
+			'cle_effacee'   => __( 'Clé effacée', 'espace-traiteur' ),
+			'cle_remplacee' => __( 'Clé remplacée directement', 'espace-traiteur' ),
+			'connexion'     => __( 'Connexion : WordPress efface la clé en attente', 'espace-traiteur' ),
+			'mot_de_passe'  => __( 'Mot de passe choisi', 'espace-traiteur' ),
+			'lien_accepte'  => __( 'Lien ouvert : accepté', 'espace-traiteur' ),
+			'lien_refuse'   => __( 'Lien ouvert : refusé', 'espace-traiteur' ),
+		);
+
+		echo '<table class="widefat striped"><thead><tr>';
+		foreach ( array( __( 'Heure', 'espace-traiteur' ), __( 'Identifiant', 'espace-traiteur' ), __( 'Événement', 'espace-traiteur' ), __( 'Empreinte de la clé', 'espace-traiteur' ), __( 'Origine', 'espace-traiteur' ) ) as $titre ) {
+			echo '<th>' . esc_html( $titre ) . '</th>';
+		}
+		echo '</tr></thead><tbody>';
+		foreach ( $lignes as $ligne ) {
+			$detail = $ligne['d'];
+			if ( 'lien_refuse' === $ligne['e'] ) {
+				$empreinte = strtok( $detail, ' ' );
+				$cle       = $ligne['l'] . '|' . $empreinte;
+				$detail   .= isset( $creations[ $cle ] )
+					/* translators: %s : heure. */
+					? ' — ' . sprintf( __( 'clé créée à %s, remplacée depuis', 'espace-traiteur' ), wp_date( 'H:i:s', $creations[ $cle ] ) )
+					: ' — ' . __( 'clé inconnue du journal', 'espace-traiteur' );
+			}
+			echo '<tr>';
+			echo '<td>' . esc_html( wp_date( 'j M H:i:s', $ligne['t'] ) ) . '</td>';
+			echo '<td>' . esc_html( $ligne['l'] ) . '</td>';
+			echo '<td>' . esc_html( isset( $libelles[ $ligne['e'] ] ) ? $libelles[ $ligne['e'] ] : $ligne['e'] ) . '</td>';
+			echo '<td>' . ( '' !== $detail ? '<code>' . esc_html( $detail ) . '</code>' : '' ) . '</td>';
+			echo '<td><small>' . esc_html( trim( $ligne['s'] . ( $ligne['s'] && $ligne['r'] ? ' · ' : '' ) . $ligne['r'] ) ) . '</small></td>';
+			echo '</tr>';
+		}
+		echo '</tbody></table>';
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="margin-top:8px">';
+		wp_nonce_field( 'etr_vider_journal' );
+		echo '<input type="hidden" name="action" value="etr_vider_journal">';
+		submit_button( __( 'Vider le journal', 'espace-traiteur' ), 'secondary small', 'submit', false );
+		echo '</form>';
+	}
+
+	/**
+	 * Vide le journal des liens.
+	 */
+	public static function vider_journal() {
+		check_admin_referer( 'etr_vider_journal' );
+		if ( ! current_user_can( 'gerer_espace_traiteur' ) ) {
+			wp_die( esc_html__( 'Action non autorisée.', 'espace-traiteur' ), '', array( 'response' => 403 ) );
+		}
+		ETR_Journal_Liens::vider();
+		wp_safe_redirect( add_query_arg( array( 'post_type' => 'etr_demande', 'page' => 'etr-reglages' ), admin_url( 'edit.php' ) ) . '#etr-journal' );
+		exit;
 	}
 
 	/**

@@ -25,6 +25,7 @@ if ( $etr_admin ) {
 delete_option( 'etr_version' );
 delete_option( 'etr_page_id' );
 delete_option( 'etr_categories' );
+delete_option( 'etr_journal_liens' );
 delete_option( 'etr_afficher_prix' );
 delete_option( 'etr_email_equipe' );
 delete_option( 'etr_logo' );
