@@ -559,6 +559,55 @@
 	}
 
 	/* ------------------------------------------------------------------ */
+	/* Tournée (bureau) : livreur de chaque étape, ordre de passage        */
+	/* ------------------------------------------------------------------ */
+
+	function toastOuMessage( texte, type ) {
+		if ( window.etrToast ) {
+			window.etrToast( texte, type );
+		}
+	}
+
+	document.addEventListener( 'change', function ( e ) {
+		var choix = e.target.closest( '[data-affecter]' );
+		if ( ! choix ) {
+			return;
+		}
+		choix.disabled = true;
+		api( choix.getAttribute( 'data-id' ) + '/affectation', { etape: choix.getAttribute( 'data-etape' ), livreur: entier( choix.value ) } ).then( function () {
+			toastOuMessage( entier( choix.value ) ? 'Étape confiée à ' + choix.options[ choix.selectedIndex ].text + ' (prévenu).' : 'Étape à répartir.' );
+		} ).catch( function ( erreur ) {
+			toastOuMessage( erreur.message, 'erreur' );
+		} ).then( function () {
+			choix.disabled = false;
+		} );
+	} );
+
+	document.addEventListener( 'click', function ( e ) {
+		var bouton = e.target.closest( '[data-deplacer]' );
+		if ( ! bouton ) {
+			return;
+		}
+		var arret = bouton.closest( '.etr-arret' );
+		var liste = arret.parentNode;
+		if ( entier( bouton.getAttribute( 'data-deplacer' ) ) < 0 && arret.previousElementSibling ) {
+			liste.insertBefore( arret, arret.previousElementSibling );
+		} else if ( entier( bouton.getAttribute( 'data-deplacer' ) ) > 0 && arret.nextElementSibling ) {
+			liste.insertBefore( arret.nextElementSibling, arret );
+		} else {
+			return;
+		}
+		var ids = Array.prototype.map.call( liste.querySelectorAll( '.etr-arret' ), function ( a ) {
+			return entier( a.getAttribute( 'data-demande' ) );
+		} );
+		api( 'ordre', { etape: liste.getAttribute( 'data-ordre' ), ids: ids } ).then( function () {
+			toastOuMessage( 'Ordre de passage enregistré.' );
+		} ).catch( function ( erreur ) {
+			toastOuMessage( erreur.message, 'erreur' );
+		} );
+	} );
+
+	/* ------------------------------------------------------------------ */
 	/* Notes de l'équipe, incidents résolus                               */
 	/* ------------------------------------------------------------------ */
 

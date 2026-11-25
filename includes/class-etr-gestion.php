@@ -165,6 +165,13 @@ class ETR_Gestion {
 		if ( 'fichier' === $vue_demandee ) {
 			ETR_Fichiers::servir( isset( $_GET['f'] ) ? sanitize_file_name( wp_unslash( $_GET['f'] ) ) : '' );
 		}
+		if ( 'bon-livraison' === $vue_demandee ) {
+			$id = isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0;
+			if ( ! self::demande_visible( $id ) || ! ETR_Operations::livraison( $id ) ) {
+				wp_die( esc_html__( 'Bon de livraison introuvable.', 'espace-traiteur' ), '', array( 'response' => 404 ) );
+			}
+			ETR_Bon_Livraison::servir( $id );
+		}
 		if ( 'etiquettes' === $vue_demandee ) {
 			ETR_Terrain::etiquettes( isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0 );
 		}
@@ -1159,7 +1166,7 @@ class ETR_Gestion {
 			$pastilles['demandes'] = count( self::filtrer_statut( 'en_attente' ) );
 		}
 		if ( ETR_Equipe::livreur() && ! ETR_Equipe::bureau() ) {
-			$tournee               = ETR_Operations::tournee( current_datetime()->format( 'Y-m-d' ) );
+			$tournee               = ETR_Operations::tournee_de( current_datetime()->format( 'Y-m-d' ), get_current_user_id() );
 			$pastilles['tournee'] = count( $tournee['livraisons'] ) + count( $tournee['reprises'] );
 		}
 		return array_filter( $pastilles );

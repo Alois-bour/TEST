@@ -252,7 +252,147 @@ class ETR_Operations {
 				$tournee['reprises'][] = $id;
 			}
 		}
+		// Ordre de passage fixé par le bureau (les étapes sans ordre à la fin).
+		foreach ( array( 'livraisons' => 'livraison', 'reprises' => 'reprise' ) as $cle => $etape ) {
+			usort(
+				$tournee[ $cle ],
+				function ( $a, $b ) use ( $etape ) {
+					$oa = (int) get_post_meta( $a, '_etr_ordre_' . $etape, true );
+					$ob = (int) get_post_meta( $b, '_etr_ordre_' . $etape, true );
+					return ( $oa ? $oa : PHP_INT_MAX ) <=> ( $ob ? $ob : PHP_INT_MAX ) ?: $a <=> $b;
+				}
+			);
+		}
 		return $tournee;
+	}
+
+	/**
+	 * Tournée d'un livreur : ses étapes et celles qui ne sont confiées à personne.
+	 *
+	 * @param string $jour    AAAA-MM-JJ.
+	 * @param int    $user_id Livreur.
+	 * @return array { livraisons: int[], reprises: int[] }
+	 */
+	public static function tournee_de( $jour, $user_id ) {
+		$tournee = self::tournee( $jour );
+		foreach ( array( 'livraisons' => 'livraison', 'reprises' => 'reprise' ) as $cle => $etape ) {
+			$tournee[ $cle ] = array_values(
+				array_filter(
+					$tournee[ $cle ],
+					function ( $id ) use ( $etape, $user_id ) {
+						$livreur = self::livreur_de( $id, $etape );
+						return ! $livreur || $livreur === (int) $user_id;
+					}
+				)
+			);
+		}
+		return $tournee;
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Affectation des étapes                                             */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Livreurs (accès actif).
+	 *
+	 * @return string[] user_id => nom.
+	 */
+	public static function livreurs() {
+		$livreurs = array();
+		foreach ( get_users( array( 'role__in' => array( 'etr_livreur' ), 'orderby' => 'display_name' ) ) as $user ) {
+			if ( ! ETR_Equipe::acces_retire( $user->ID ) ) {
+				$livreurs[ $user->ID ] = etr_nom( $user );
+			}
+		}
+		return $livreurs;
+	}
+
+	/**
+	 * Livreur à qui une étape est confiée (0 : à répartir).
+	 *
+	 * @param int    $id    Demande.
+	 * @param string $etape livraison | reprise.
+	 * @return int
+	 */
+	public static function livreur_de( $id, $etape ) {
+		return (int) get_post_meta( $id, '_etr_livreur_' . ( 'reprise' === $etape ? 'reprise' : 'livraison' ), true );
+	}
+
+	/**
+	 * Confie une étape à un livreur (0 : à répartir) ; il est prévenu.
+	 *
+	 * @param int    $id      Demande.
+	 * @param string $etape   livraison | reprise.
+	 * @param int    $livreur Livreur.
+	 * @return true|WP_Error
+	 */
+	public static function affecter( $id, $etape, $livreur ) {
+		$etape    = 'reprise' === $etape ? 'reprise' : 'livraison';
+		$livreurs = self::livreurs();
+		if ( $livreur && ! isset( $livreurs[ $livreur ] ) ) {
+			return new WP_Error( 'etr_livreur', __( 'Livreur inconnu.', 'espace-traiteur' ), array( 'status' => 400 ) );
+		}
+		if ( self::livreur_de( $id, $etape ) === $livreur ) {
+			return true;
+		}
+		if ( $livreur ) {
+			update_post_meta( $id, '_etr_livreur_' . $etape, $livreur );
+		} else {
+			delete_post_meta( $id, '_etr_livreur_' . $etape );
+		}
+		$libelle = 'livraison' === $etape ? __( 'Livraison', 'espace-traiteur' ) : __( 'Reprise', 'espace-traiteur' );
+		ETR_Historique::ajouter(
+			$id,
+			'tournee',
+			$livreur
+				/* translators: 1 : livraison ou reprise, 2 : livreur. */
+				? sprintf( __( '%1$s confiée à %2$s', 'espace-traiteur' ), $libelle, $livreurs[ $livreur ] )
+				/* translators: %s : livraison ou reprise. */
+				: sprintf( __( '%s à répartir', 'espace-traiteur' ), $libelle )
+		);
+		if ( $livreur ) {
+			list( $jour_livraison, $jour_reprise ) = self::jours( $id );
+			$jour                                  = 'livraison' === $etape ? $jour_livraison : $jour_reprise;
+			ETR_Push::notifier(
+				'livreur',
+				/* translators: 1 : livraison ou reprise, 2 : traiteur. */
+				sprintf( __( '%1$s pour vous : %2$s', 'espace-traiteur' ), $libelle, self::traiteur( $id ) ),
+				get_the_title( $id ) . ( $jour ? ' · ' . etr_format_date( $jour ) : '' ),
+				$id,
+				'',
+				'affectation',
+				array( $livreur )
+			);
+		}
+		return true;
+	}
+
+	/**
+	 * Ordre de passage des étapes d'un jour.
+	 *
+	 * @param string $etape livraison | reprise.
+	 * @param int[]  $ids   Demandes, dans l'ordre.
+	 */
+	public static function ordonner( $etape, $ids ) {
+		$etape = 'reprise' === $etape ? 'reprise' : 'livraison';
+		foreach ( array_values( $ids ) as $rang => $id ) {
+			if ( ETR_Gestion::demande_visible( $id ) ) {
+				update_post_meta( $id, '_etr_ordre_' . $etape, $rang + 1 );
+			}
+		}
+	}
+
+	/**
+	 * Destinataires d'une étape : son livreur, ou tous s'il n'y en a pas (tableau vide).
+	 *
+	 * @param int    $id    Demande.
+	 * @param string $etape livraison | reprise.
+	 * @return int[]
+	 */
+	private static function destinataires_etape( $id, $etape ) {
+		$livreur = self::livreur_de( $id, $etape );
+		return $livreur ? array( $livreur ) : array();
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -329,7 +469,8 @@ class ETR_Operations {
 			sprintf( __( '%1$s · livraison le %2$s · %3$s colis', 'espace-traiteur' ), get_the_title( $id ), $jour ? etr_format_date( $jour ) : '—', number_format_i18n( $prepa['colis'] ) ) . ( $manque ? ' · ' . __( 'incomplète', 'espace-traiteur' ) : '' ),
 			$id,
 			'',
-			'prete'
+			'prete',
+			self::destinataires_etape( $id, 'livraison' )
 		);
 		return $prepa;
 	}
@@ -416,6 +557,7 @@ class ETR_Operations {
 		/* translators: %s : personne qui a signé. */
 		ETR_Historique::ajouter( $id, 'livraison', sprintf( __( 'Livrée, réceptionnée et signée par %s', 'espace-traiteur' ), $signataire ) . ( $note ? ' — ' . $note : '' ) );
 		etr_changer_statut( $id, 'livree' );
+		do_action( 'etr_livree', $id ); // Bon de livraison signé envoyé au traiteur (ETR_Bon_Livraison).
 		ETR_Push::notifier(
 			'bureau',
 			/* translators: %s : traiteur. */
@@ -749,7 +891,9 @@ class ETR_Operations {
 	public static function rappels_veille() {
 		$maintenant = current_datetime();
 		$jour       = $maintenant->format( 'Y-m-d' );
-		if ( (int) $maintenant->format( 'G' ) < self::HEURE_RAPPEL || get_option( 'etr_rappel_veille' ) === $jour ) {
+		/** Heure des rappels de la veille (17 h par défaut). */
+		$heure = (int) apply_filters( 'etr_heure_rappel_veille', self::HEURE_RAPPEL );
+		if ( (int) $maintenant->format( 'G' ) < $heure || get_option( 'etr_rappel_veille' ) === $jour ) {
 			return;
 		}
 		update_option( 'etr_rappel_veille', $jour, false );
@@ -762,9 +906,14 @@ class ETR_Operations {
 			)
 		);
 
-		$nb_l = count( $tournee['livraisons'] );
-		$nb_r = count( $tournee['reprises'] );
-		if ( $nb_l || $nb_r ) {
+		// Chaque livreur reçoit sa tournée (ses étapes et celles à répartir).
+		foreach ( array_keys( self::livreurs() ) as $livreur ) {
+			$sienne = self::tournee_de( $demain, $livreur );
+			$nb_l   = count( $sienne['livraisons'] );
+			$nb_r   = count( $sienne['reprises'] );
+			if ( ! $nb_l && ! $nb_r ) {
+				continue;
+			}
 			$parties = array();
 			if ( $nb_l ) {
 				/* translators: %s : nombre. */
@@ -774,9 +923,9 @@ class ETR_Operations {
 				/* translators: %s : nombre. */
 				$parties[] = sprintf( _n( '%s reprise', '%s reprises', $nb_r, 'espace-traiteur' ), number_format_i18n( $nb_r ) );
 			}
-			$noms = array_map( array( __CLASS__, 'traiteur' ), array_merge( $tournee['livraisons'], $tournee['reprises'] ) );
+			$noms = array_map( array( __CLASS__, 'traiteur' ), array_merge( $sienne['livraisons'], $sienne['reprises'] ) );
 			/* translators: %s : « 2 livraisons, 1 reprise ». */
-			ETR_Push::notifier( 'livreur', sprintf( __( 'Demain : %s', 'espace-traiteur' ), implode( ', ', $parties ) ), implode( ' · ', array_unique( $noms ) ), 0, $url, 'rappel' );
+			ETR_Push::notifier( 'livreur', sprintf( __( 'Demain : %s', 'espace-traiteur' ), implode( ', ', $parties ) ), implode( ' · ', array_unique( $noms ) ), 0, $url, 'rappel', array( $livreur ) );
 		}
 
 		$a_finir = array_values(
@@ -825,6 +974,8 @@ class ETR_Operations {
 			$base . '/preparation/prete' => array( 'api_prete', 'preparateur' ),
 			$base . '/livraison'         => array( 'api_livrer', 'livreur' ),
 			$base . '/reprise'           => array( 'api_reprendre', 'livreur' ),
+			$base . '/affectation'       => array( 'api_affecter', 'bureau' ),
+			'/terrain/ordre'             => array( 'api_ordonner', 'bureau' ),
 			$base . '/note'              => array( 'api_note', 'equipe' ),
 			$base . '/incident'          => array( 'api_incident', 'equipe' ),
 			$base . '/incident/(?P<n>\d+)/resolu' => array( 'api_resoudre', 'bureau' ),
@@ -1064,6 +1215,32 @@ class ETR_Operations {
 				return rest_ensure_response( $resultat );
 			}
 		);
+	}
+
+	/**
+	 * POST affectation : { etape, livreur } (bureau).
+	 *
+	 * @param WP_REST_Request $requete Requête.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function api_affecter( $requete ) {
+		$id = (int) $requete['id'];
+		if ( ! ETR_Gestion::demande_visible( $id ) ) {
+			return new WP_Error( 'etr_demande', __( 'Demande introuvable.', 'espace-traiteur' ), array( 'status' => 404 ) );
+		}
+		$resultat = self::affecter( $id, (string) $requete->get_param( 'etape' ), (int) $requete->get_param( 'livreur' ) );
+		return is_wp_error( $resultat ) ? $resultat : rest_ensure_response( array( 'ok' => true ) );
+	}
+
+	/**
+	 * POST ordre : { etape, ids } (bureau).
+	 *
+	 * @param WP_REST_Request $requete Requête.
+	 * @return WP_REST_Response
+	 */
+	public static function api_ordonner( $requete ) {
+		self::ordonner( (string) $requete->get_param( 'etape' ), array_map( 'intval', (array) $requete->get_param( 'ids' ) ) );
+		return rest_ensure_response( array( 'ok' => true ) );
 	}
 
 	/**

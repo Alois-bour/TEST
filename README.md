@@ -123,6 +123,13 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Tournées réparties, bon de livraison signé (2.4.0)
+
+- **Répartition des tournées** (bureau, écran Tournée) : chaque livraison ou reprise est confiée à un livreur (il est prévenu), et l'**ordre de passage** se règle avec ↑ ↓. Un livreur voit **ses étapes** et celles **à répartir** ; sa pastille et ses rappels de la veille ne comptent que celles-ci. « Commande prête » ne prévient que le livreur de la livraison (tous s'il n'y en a pas encore).
+- **Itinéraire de la tournée** : toutes les étapes dans l'ordre, en un toucher (Google Maps, départ de la position actuelle) ; l'itinéraire de chaque étape reste disponible (Plans).
+- **Bon de livraison signé (PDF)** : matériel livré, colis, date et heure, livreur, personne qui a réceptionné, **signature** et **photos**. Envoyé automatiquement au traiteur par e-mail (pièce jointe) dès la livraison, téléchargeable depuis la fiche (équipe) et depuis l'espace traiteur (le traiteur de la demande uniquement). Généré par le plugin, sans dépendance (extension GD pour la signature et les photos).
+- L'heure des rappels de la veille se règle avec le filtre `etr_heure_rappel_veille` (17 par défaut).
+
 ### Notes, incidents, recherche, préférences (2.3.0)
 
 - **Notes de l'équipe** sur chaque demande (fiche) : visibles seulement par l'équipe, jamais par le traiteur ; ajoutées sans recharger la page, gardées sur le téléphone sans réseau.

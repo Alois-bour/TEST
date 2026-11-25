@@ -115,30 +115,63 @@ class ETR_Terrain {
 
 		// Gardés sur le téléphone pour le hors connexion (hors-ligne.js) : scanner et lecteur de QR.
 		echo '<a hidden data-hors-ligne href="' . esc_url( self::url( array( 'vue' => 'scanner' ) ) ) . '"></a><a hidden data-hors-ligne href="' . esc_url( ETR_URL . 'assets/vendor/jsqr.min.js?ver=' . ETR_VERSION ) . '"></a>';
-		$tournee = ETR_Operations::tournee( $jour );
+		// Le bureau voit et répartit toute la tournée ; un livreur voit ses étapes et celles à répartir.
+		$bureau  = ETR_Equipe::bureau();
+		$tournee = $bureau ? ETR_Operations::tournee( $jour ) : ETR_Operations::tournee_de( $jour, get_current_user_id() );
 		if ( ! $tournee['livraisons'] && ! $tournee['reprises'] ) {
 			echo '<div class="etr-vide"><p>' . esc_html__( 'Aucune livraison ni reprise ce jour-là.', 'espace-traiteur' ) . '</p></div>';
 			return;
 		}
+		$itineraire = self::url_itineraire_tournee( array_merge( $tournee['livraisons'], $tournee['reprises'] ) );
+		if ( $itineraire ) {
+			echo '<p class="etr-tournee__route"><a class="etr-btn" href="' . esc_url( $itineraire ) . '" target="_blank" rel="noopener">' . self::icone( 'lieu' ) . '<span>' . esc_html__( 'Itinéraire de la tournée', 'espace-traiteur' ) . '</span></a><small>' . esc_html__( 'Toutes les étapes, dans l’ordre (Google Maps).', 'espace-traiteur' ) . '</small></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		}
+		$livreurs = $bureau ? ETR_Operations::livreurs() : array();
 		foreach ( array( 'livraisons' => __( 'Livraisons', 'espace-traiteur' ), 'reprises' => __( 'Reprises', 'espace-traiteur' ) ) as $cle => $titre ) {
 			if ( ! $tournee[ $cle ] ) {
 				continue;
 			}
-			echo '<section class="etr-tournee"><h2 class="etr-tournee__titre">' . esc_html( $titre ) . ' <span class="etr-compteur">' . esc_html( number_format_i18n( count( $tournee[ $cle ] ) ) ) . '</span></h2><ul class="etr-tournee__liste">';
+			echo '<section class="etr-tournee"><h2 class="etr-tournee__titre">' . esc_html( $titre ) . ' <span class="etr-compteur">' . esc_html( number_format_i18n( count( $tournee[ $cle ] ) ) ) . '</span></h2><ul class="etr-tournee__liste"' . ( $bureau ? ' data-ordre="' . ( 'livraisons' === $cle ? 'livraison' : 'reprise' ) . '"' : '' ) . '>';
 			foreach ( $tournee[ $cle ] as $id ) {
-				self::carte_tournee( $id, 'livraisons' === $cle );
+				self::carte_tournee( $id, 'livraisons' === $cle, $livreurs );
 			}
 			echo '</ul></section>';
 		}
 	}
 
 	/**
+	 * Itinéraire de toute la tournée (Google Maps : départ de la position actuelle, étapes dans l'ordre).
+	 *
+	 * @param int[] $ids Demandes, dans l'ordre de passage.
+	 * @return string Adresse, ou '' sans lieu connu.
+	 */
+	public static function url_itineraire_tournee( $ids ) {
+		$lieux = array();
+		foreach ( $ids as $id ) {
+			$lieu = trim( preg_replace( '/\s+/', ' ', (string) get_post_meta( $id, '_etr_lieu', true ) ) );
+			if ( '' !== $lieu ) {
+				$lieux[] = $lieu;
+			}
+		}
+		if ( ! $lieux ) {
+			return '';
+		}
+		$destination = array_pop( $lieux );
+		$url         = 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' . rawurlencode( $destination );
+		if ( $lieux ) {
+			$url .= '&waypoints=' . implode( '%7C', array_map( 'rawurlencode', array_slice( $lieux, 0, 9 ) ) );
+		}
+		return $url;
+	}
+
+	/**
 	 * Carte d'une étape de tournée.
 	 *
-	 * @param int  $id        Demande.
-	 * @param bool $livraison Livraison (sinon reprise).
+	 * @param int      $id        Demande.
+	 * @param bool     $livraison Livraison (sinon reprise).
+	 * @param string[] $livreurs  Livreurs (bureau : répartition des étapes), sinon vide.
 	 */
-	private static function carte_tournee( $id, $livraison ) {
+	private static function carte_tournee( $id, $livraison, $livreurs = array() ) {
 		$lieu    = (string) get_post_meta( $id, '_etr_lieu', true );
 		$contact = (string) get_post_meta( $id, '_etr_contact', true );
 		$prepa   = ETR_Operations::preparation( $id );
@@ -148,6 +181,18 @@ class ETR_Terrain {
 		echo '<div class="etr-arret__tete"><a class="etr-arret__nom" data-hors-ligne href="' . esc_url( self::url( array( 'vue' => 'demande', 'id' => $id ) ) ) . '"><strong>' . esc_html( ETR_Operations::traiteur( $id ) ) . '</strong><span>' . esc_html( get_the_title( $id ) ) . '</span></a>';
 		echo self::badge_preparation( $id, $livraison ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé.
 		echo '</div>';
+		$etape   = $livraison ? 'livraison' : 'reprise';
+		$confiee = ETR_Operations::livreur_de( $id, $etape );
+		if ( $livreurs ) {
+			// Bureau : à qui confier l'étape, et ordre de passage.
+			echo '<div class="etr-arret__repartition"><label><span>' . esc_html__( 'Livreur', 'espace-traiteur' ) . '</span><select data-affecter data-id="' . (int) $id . '" data-etape="' . esc_attr( $etape ) . '"><option value="0">' . esc_html__( '— À répartir —', 'espace-traiteur' ) . '</option>';
+			foreach ( $livreurs as $livreur_id => $nom ) {
+				echo '<option value="' . (int) $livreur_id . '"' . selected( $confiee, $livreur_id, false ) . '>' . esc_html( $nom ) . '</option>';
+			}
+			echo '</select></label><span class="etr-arret__ordre"><button type="button" class="etr-btn etr-btn--discret etr-btn--icone" data-deplacer="-1" aria-label="' . esc_attr__( 'Plus tôt dans la tournée', 'espace-traiteur' ) . '">↑</button><button type="button" class="etr-btn etr-btn--discret etr-btn--icone" data-deplacer="1" aria-label="' . esc_attr__( 'Plus tard dans la tournée', 'espace-traiteur' ) . '">↓</button></span></div>';
+		} elseif ( ! $confiee ) {
+			echo '<p class="etr-arret__libre">' . esc_html__( 'À répartir : pas encore confiée à un livreur', 'espace-traiteur' ) . '</p>';
+		}
 		if ( $lieu ) {
 			echo '<p class="etr-arret__ligne">' . self::icone( 'lieu' ) . '<span>' . nl2br( esc_html( $lieu ) ) . '</span></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
@@ -707,6 +752,7 @@ class ETR_Terrain {
 			if ( ! empty( $livraison['note'] ) ) {
 				echo '<p class="etr-cr__note">' . nl2br( esc_html( $livraison['note'] ) ) . '</p>';
 			}
+			echo '<a class="etr-btn etr-btn--discret" href="' . esc_url( ETR_Bon_Livraison::url( $id ) ) . '" target="_blank">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Bon de livraison signé (PDF)', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
 			echo '</section>';
 		}
 		$reprise = ETR_Operations::reprise( $id );

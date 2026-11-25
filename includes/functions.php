@@ -570,9 +570,10 @@ function etr_est_gestionnaire( $user_id = 0 ) {
  * @param string          $objet   Objet.
  * @param string          $corps   Message.
  * @param string[]        $entetes En-têtes.
+ * @param string[]        $pieces  Pièces jointes (chemins de fichiers).
  * @return bool
  */
-function etr_envoyer_mail( $a, $objet, $corps, $entetes = array() ) {
+function etr_envoyer_mail( $a, $objet, $corps, $entetes = array(), $pieces = array() ) {
 	$cle = 'etr_erreur_mail_' . get_current_user_id();
 	delete_transient( $cle );
 	$noter = function ( $erreur ) use ( $cle ) {
@@ -581,7 +582,7 @@ function etr_envoyer_mail( $a, $objet, $corps, $entetes = array() ) {
 		}
 	};
 	add_action( 'wp_mail_failed', $noter );
-	$envoye = wp_mail( $a, $objet, $corps, $entetes );
+	$envoye = wp_mail( $a, $objet, $corps, $entetes, $pieces );
 	remove_action( 'wp_mail_failed', $noter );
 	return $envoye;
 }

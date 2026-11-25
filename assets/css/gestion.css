@@ -828,8 +828,9 @@ td.etr-table__nombre .etr-manque { margin: 0; font-size: inherit; font-weight: 5
 /* « hidden » l'emporte toujours (les boutons ont leur propre display). */
 .etr-gestion [hidden] { display: none !important; }
 
-/* Onglet « Plus » : seulement dans l'application installée sur téléphone. */
-.etr-app__onglet-plus { display: none; }
+/* Onglet « Plus » et titre compact : seulement dans l'application installée sur téléphone. */
+.etr-app__onglet-plus,
+.etr-app__titre-compact { display: none; }
 
 /* Transitions entre les écrans (Safari 18.2+, Chrome) : contenu qui glisse, barres fixes. */
 @view-transition { navigation: auto; }
@@ -1107,3 +1108,13 @@ html:active-view-transition-type(onglet)::view-transition-new(etr-contenu) { ani
 	.etr-gestion .etr-incident.est-resolu { border-color: var(--etr-trait); background: var(--etr-fond-carte); }
 	.etr-gestion .etr-choix input:checked + span { color: #161813; }
 }
+
+/* Tournée : itinéraire complet, répartition des étapes (bureau). */
+.etr-tournee__route { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 22px; }
+.etr-tournee__route small { color: var(--etr-gris); font-size: 13px; }
+.etr-arret__repartition { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px; margin: 4px 0 8px; padding: 10px 12px; border-radius: 12px; background: var(--etr-voile); }
+.etr-arret__repartition label { display: flex; flex: 1 1 180px; flex-direction: column; gap: 4px; font-size: 12px; color: var(--etr-gris); }
+.etr-arret__repartition select { min-height: 44px; }
+.etr-arret__ordre { display: flex; gap: 6px; }
+.etr-app .etr-arret__ordre .etr-btn { width: 44px; min-height: 44px; padding: 0; font-size: 18px; }
+.etr-arret__libre { margin: 0 0 6px; padding: 6px 10px; border-radius: 10px; background: var(--etr-lin); color: var(--etr-gris); font-size: 13px; font-weight: 600; }

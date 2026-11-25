@@ -68,6 +68,7 @@ class ETR_Push {
 			'validee'          => array( 'terrain', __( 'Commande validée par le bureau', 'espace-traiteur' ) ),
 			'annulee'          => array( 'terrain', __( 'Commande validée puis annulée', 'espace-traiteur' ) ),
 			'prete'            => array( 'livreur', __( 'Commande prête à livrer', 'espace-traiteur' ) ),
+			'affectation'      => array( 'livreur', __( 'Livraison ou reprise qui vous est confiée', 'espace-traiteur' ) ),
 			'rappel'           => array( 'terrain', __( 'Rappels de la veille (vers 17 h)', 'espace-traiteur' ) ),
 		);
 	}
@@ -471,8 +472,9 @@ class ETR_Push {
 	 * @param int    $demande_id Demande ouverte au toucher.
 	 * @param string $url        Page ouverte au toucher (sinon la demande, ou l'accueil).
 	 * @param string $type       Type (voir types()) : la personne peut l'avoir désactivé.
+	 * @param int[]  $seulement  Seulement ces personnes du groupe (vide : tout le groupe).
 	 */
-	public static function notifier( $groupe, $titre, $texte, $demande_id = 0, $url = '', $type = '' ) {
+	public static function notifier( $groupe, $titre, $texte, $demande_id = 0, $url = '', $type = '', $seulement = array() ) {
 		if ( '' === $url ) {
 			$url = $demande_id ? ETR_Gestion::url( array( 'vue' => 'demande', 'id' => (int) $demande_id ) ) : ETR_Gestion::url();
 		}
@@ -485,6 +487,9 @@ class ETR_Push {
 		$moi = get_current_user_id();
 		foreach ( self::comptes_avec_appareil() as $user_id ) {
 			if ( $user_id === $moi || ! self::concerne( $user_id, $groupe ) ) {
+				continue;
+			}
+			if ( $seulement && ! in_array( $user_id, array_map( 'intval', $seulement ), true ) ) {
 				continue;
 			}
 			if ( $type && in_array( $type, self::types_desactives( $user_id ), true ) ) {
@@ -525,7 +530,7 @@ class ETR_Push {
 		}
 		$user = get_userdata( $user_id );
 		if ( $user && in_array( 'etr_livreur', ETR_Equipe::roles_equipe( $user ), true ) ) {
-			$tournee = ETR_Operations::tournee( current_datetime()->format( 'Y-m-d' ) );
+			$tournee = ETR_Operations::tournee_de( current_datetime()->format( 'Y-m-d' ), $user_id );
 			return count( $tournee['livraisons'] ) + count( $tournee['reprises'] );
 		}
 		return 0;

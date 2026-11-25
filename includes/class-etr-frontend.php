@@ -1089,6 +1089,7 @@ class ETR_Frontend {
 		self::entete_page( get_the_title( $demande ), $sous, '<div class="etr-page-entete__statut">' . etr_statut_badge( $statut ) . '</div>', $retour );
 
 		self::suivi( $statut );
+		do_action( 'etr_traiteur_demande_apres_suivi', $demande_id ); // Bon de livraison signé, suivi détaillé.
 
 		$reponse = get_post_meta( $demande_id, '_etr_reponse', true );
 		if ( $reponse ) {
