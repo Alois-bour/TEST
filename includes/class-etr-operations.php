@@ -625,6 +625,7 @@ class ETR_Operations {
 			)
 		);
 
+		do_action( 'etr_reprise_enregistree', $id, $lignes ); // Matériel en réparation, casse facturée.
 		$ecarts = self::texte_ecarts( $manquants, $casses );
 		ETR_Historique::ajouter( $id, 'reprise', ( $ecarts ? sprintf( /* translators: %s : écarts. */ __( 'Matériel repris : %s', 'espace-traiteur' ), $ecarts ) : __( 'Matériel repris, complet et en bon état', 'espace-traiteur' ) ) . ( $note ? ' — ' . $note : '' ) );
 		$cloturee = ! $ecarts && etr_changer_statut( $id, 'cloturee' );

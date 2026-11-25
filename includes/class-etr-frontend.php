@@ -27,6 +27,13 @@ class ETR_Frontend {
 	private static $demande_modifiee_id = 0;
 
 	/**
+	 * Demande servant de modèle (« Commander à nouveau »), sans ses dates.
+	 *
+	 * @var int
+	 */
+	private static $modele_id = 0;
+
+	/**
 	 * Hooks.
 	 */
 	public static function init() {
@@ -232,6 +239,9 @@ class ETR_Frontend {
 			self::modifier_demande();
 		} elseif ( 'annuler_demande' === $action ) {
 			self::annuler_demande();
+		} else {
+			/** Formulaires ajoutés par les fonctions activables (ETR_Modules). */
+			do_action( 'etr_traiteur_action', $action );
 		}
 	}
 
@@ -504,7 +514,11 @@ class ETR_Frontend {
 	 */
 	private static function ancienne_valeur( $cle ) {
 		if ( ! self::$erreurs || ! isset( $_POST['etr'][ $cle ] ) || ! is_string( $_POST['etr'][ $cle ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
-			return self::$demande_modifiee_id ? (string) get_post_meta( self::$demande_modifiee_id, '_etr_' . $cle, true ) : '';
+			if ( self::$demande_modifiee_id ) {
+				return (string) get_post_meta( self::$demande_modifiee_id, '_etr_' . $cle, true );
+			}
+			// Commander à nouveau : tout sauf les dates.
+			return self::$modele_id && 0 !== strpos( $cle, 'date_' ) ? (string) get_post_meta( self::$modele_id, '_etr_' . $cle, true ) : '';
 		}
 		return sanitize_textarea_field( wp_unslash( $_POST['etr'][ $cle ] ) ); // phpcs:ignore WordPress.Security.NonceVerification
 	}
@@ -517,8 +531,8 @@ class ETR_Frontend {
 	 */
 	private static function ancienne_quantite( $article_id ) {
 		if ( ! self::$erreurs || ! isset( $_POST['quantites'][ $article_id ] ) || ! is_scalar( $_POST['quantites'][ $article_id ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
-			if ( self::$demande_modifiee_id ) {
-				foreach ( etr_get_lignes( self::$demande_modifiee_id ) as $ligne ) {
+			if ( self::$demande_modifiee_id || self::$modele_id ) {
+				foreach ( etr_get_lignes( self::$demande_modifiee_id ? self::$demande_modifiee_id : self::$modele_id ) as $ligne ) {
 					if ( (int) $ligne['article_id'] === (int) $article_id ) {
 						return (string) (int) $ligne['quantite'];
 					}
@@ -615,6 +629,7 @@ class ETR_Frontend {
 		// Installer l'espace sur l'iPhone (affiché par traiteur-app.js dans Safari, si pas encore installé).
 		echo '<aside class="etr-installer" id="etr-installer-traiteur" hidden><span class="etr-installer__icone" aria-hidden="true"><img src="' . esc_url( ETR_PWA::icone( 180 ) ) . '" alt="" width="44" height="44"></span><p><strong>' . esc_html__( 'Votre espace sur l’iPhone', 'espace-traiteur' ) . '</strong><span>' . esc_html__( 'Dans Safari, touchez « Partager » puis « Sur l’écran d’accueil » : vos demandes et leur suivi en un toucher.', 'espace-traiteur' ) . '</span></p><button type="button" class="etr-installer__fermer" aria-label="' . esc_attr__( 'Fermer', 'espace-traiteur' ) . '">×</button></aside>';
 		self::messages();
+		do_action( 'etr_traiteur_haut' ); // Fonctions activables : notifications sur l'iPhone.
 
 		if ( 'nouvelle' === $vue ) {
 			self::vue_formulaire();
@@ -1163,6 +1178,8 @@ class ETR_Frontend {
 		echo '</section>';
 		echo '</div>';
 
+		do_action( 'etr_traiteur_demande_fin', $demande_id ); // Fonctions activables : devis, messages, commander à nouveau…
+
 		if ( 'en_attente' === $statut && (int) $demande->post_author === get_current_user_id() ) {
 			echo '<p><a class="etr-btn etr-btn--secondaire" href="' . esc_url( etr_url( array( 'etr_vue' => 'modifier', 'id' => $demande_id ) ) ) . '">' . esc_html__( 'Modifier la demande', 'espace-traiteur' ) . '</a></p>';
 			echo '<form method="post" class="etr-annuler" onsubmit="return confirm(\'' . esc_js( __( 'Annuler cette demande ? Le matériel sera libéré.', 'espace-traiteur' ) ) . '\');">';
@@ -1184,6 +1201,7 @@ class ETR_Frontend {
 			$demande = null;
 		}
 		self::$demande_modifiee_id = $demande ? (int) $demande_id : 0;
+		self::$modele_id           = $demande ? 0 : (int) apply_filters( 'etr_modele_demande', 0 );
 		self::entete_page(
 			$demande ? __( 'Modifier la demande', 'espace-traiteur' ) : __( 'Nouvelle demande', 'espace-traiteur' ),
 			__( 'Décrivez votre réception, puis choisissez le matériel. Notre équipe vous répond par e-mail.', 'espace-traiteur' ),

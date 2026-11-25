@@ -23,6 +23,9 @@ class ETR_Bon_Livraison {
 	 * Hooks.
 	 */
 	public static function init() {
+		if ( ! ETR_Modules::actif( 'bon_livraison' ) ) {
+			return;
+		}
 		add_action( 'etr_livree', array( __CLASS__, 'envoyer' ) );
 		add_action( 'template_redirect', array( __CLASS__, 'telechargement_traiteur' ), 5 );
 		add_action( 'etr_traiteur_demande_apres_suivi', array( __CLASS__, 'lien_traiteur' ) );
@@ -153,7 +156,7 @@ class ETR_Bon_Livraison {
 	 * @param bool   $contenu $source est le contenu.
 	 * @return string JPEG, ou '' si impossible (GD absent, image illisible).
 	 */
-	private static function jpeg( $source, $max, $contenu = false ) {
+	public static function jpeg( $source, $max, $contenu = false ) {
 		if ( ! function_exists( 'imagecreatefromstring' ) ) {
 			return '';
 		}

@@ -26,6 +26,9 @@ delete_option( 'etr_version' );
 delete_option( 'etr_page_id' );
 delete_option( 'etr_categories' );
 delete_option( 'etr_journal_liens' );
+foreach ( array( 'etr_modules', 'etr_hors_service', 'etr_relances_jour', 'etr_cgv_url', 'etr_devis_validite' ) as $etr_option ) {
+	delete_option( $etr_option ); // Fonctions activables (2.7.0).
+}
 delete_option( 'etr_push_vapid' );
 delete_option( 'etr_rappel_veille' );
 delete_metadata( 'user', 0, 'etr_push_appareils', '', true );

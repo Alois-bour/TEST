@@ -43,7 +43,7 @@ class ETR_Cles_Acces {
 	 * @return bool
 	 */
 	public static function disponible() {
-		return function_exists( 'openssl_verify' ) && function_exists( 'random_bytes' );
+		return function_exists( 'openssl_verify' ) && function_exists( 'random_bytes' ) && ETR_Modules::actif( 'face_id' );
 	}
 
 	/**
@@ -99,6 +99,9 @@ class ETR_Cles_Acces {
 	 * Routes.
 	 */
 	public static function routes() {
+		if ( ! self::disponible() ) {
+			return; // Fonction désactivée (Espace traiteur › Fonctions) : clés refusées.
+		}
 		$connecte = function () {
 			return is_user_logged_in() && ETR_Equipe::acces();
 		};

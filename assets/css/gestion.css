@@ -1128,3 +1128,18 @@ html:active-view-transition-type(onglet)::view-transition-new(etr-contenu) { ani
 .etr-auth__ou { display: flex; align-items: center; gap: 12px; margin: 18px 0 6px; color: var(--etr-gris, #6b655f); font-size: 13px; }
 .etr-auth__ou::before,
 .etr-auth__ou::after { content: ""; flex: 1; height: 1px; background: var(--etr-trait, #e3ddd3); }
+
+/* Fonctions activables (2.7.0) */
+.etr-en-route__choix { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; padding: 4px 0 8px; }
+.etr-en-route__choix .etr-btn { justify-content: center; min-height: 48px; }
+.etr-glisse .etr-calendrier__jour { transition: background .15s; }
+.etr-calendrier__jour.est-cible { background: var(--etr-olive-clair, #e8ecdc); outline: 2px dashed var(--etr-olive); outline-offset: -2px; }
+.etr-mvt[draggable="true"] { cursor: grab; }
+.etr-reparation__liste { list-style: none; margin: 0; padding: 0; }
+.etr-reparation__liste li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--etr-trait-doux, #eee); }
+.etr-reparation__liste form { display: flex; gap: 8px; align-items: center; }
+.etr-reparation__liste input[type="number"] { width: 70px; }
+.etr-dates-form .etr-champ, .etr-acompte .etr-champ { margin: 0 0 10px; }
+.etr-devis p, .etr-casse p { margin: 0 0 10px; }
+.etr-stats--terrain { margin-top: 24px; }
+.etr-stats__incidents { margin-top: 14px; }

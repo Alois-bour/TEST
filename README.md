@@ -123,6 +123,28 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Fonctions activables (2.7.0)
+
+Chaque fonction ci-dessous s'active ou se désactive dans **Espace traiteur › Fonctions**. Désactivée, elle disparaît de l'application de l'équipe et de l'espace des traiteurs, et ses routes sont refusées. Ses données sont gardées. Les fonctions qui touchent à l'argent ou envoient des e-mails nouveaux sont désactivées par défaut.
+
+| Fonction | Par défaut | Ce qu'elle fait |
+|---|---|---|
+| Déplacer une livraison ou une reprise | activée | Planning : glisser l'étape sur un autre jour (ordinateur) ; fiche : panneau « Changer les dates » (téléphone). Stock vérifié sur la nouvelle période, dates cohérentes avec l'événement, traiteur prévenu. |
+| Matériel en réparation | désactivée | La casse constatée à la reprise sort du stock disponible (une reprise refaite ne compte que la différence). Écran Catalogue : « Remis en stock ». |
+| Notifications sur l'iPhone du traiteur | activée | Espace traiteur installé : carte « Être prévenu sur cet iPhone ». Demande validée ou refusée, devis prêt, livreur en route, livré, clôturé, message, date déplacée. Service worker dédié (`/gestion-traiteur/sw-traiteur.js`, sans cache), abonnement par admin-ajax avec jeton. |
+| « En route » | activée | Tournée : le livreur touche « En route » et choisit le temps de trajet ; le traiteur reçoit l'heure d'arrivée (e-mail et notification) et la voit dans son suivi. |
+| Messages par demande | activée | Fil de discussion bureau ↔ traiteur sur la fiche ; chaque message prévient l'autre partie (e-mail, notification ; type « Message d'un traiteur » réglable par le bureau). |
+| Commander à nouveau | activée | Le traiteur reprend une ancienne demande : événement, lieu, compléments et matériel préremplis, dates à choisir. |
+| Devis PDF et acceptation en ligne | désactivée | Le bureau envoie le devis (PDF joint : matériel, remise, livraison, total, acompte) ; le traiteur l'accepte dans son espace en cochant les conditions générales (adresse et validité dans Fonctions). Nom, date, heure et adresse IP gardés ; bureau prévenu. Un devis renvoyé doit être accepté à nouveau. |
+| Acompte et caution | désactivée | Montants demandés, dates de réception (et de restitution de la caution), visibles par le traiteur et sur le devis. Pas de paiement en ligne : les traiteurs n'ont pas accès au panier. |
+| Casse et manquants facturés | désactivée | Après une reprise avec écarts : montant au « Prix de remplacement (casse) » du produit (WooCommerce › Inventaire), relevé PDF envoyé par le bureau, téléchargeable par le traiteur. |
+| Relances automatiques | désactivée | Chaque jour à partir de 9 h : devis sans réponse après 3 jours (e-mail au traiteur, une fois), reprise en retard et acompte non reçu à 7 jours de la livraison (notification au bureau). |
+| Statistiques du terrain | activée | Onglet Statistiques : livraisons et reprises par livreur, taux de casse et de manquants, incidents par type, sur 12 mois. |
+| Connexion par Face ID | activée | Désactivée : bouton masqué, clés refusées (gardées). |
+| Bon de livraison PDF | activée | Désactivé : plus d'e-mail ni de téléchargement du bon signé. |
+
+Les devis, relevés et bons ne sont servis qu'au traiteur de la demande et au bureau (`?etr_document=devis|releve&id=…`).
+
 ### Espace traiteur installable, suivi détaillé (2.6.0)
 
 - L'**espace traiteur s'installe sur l'iPhone** du traiteur (Safari › Partager › « Sur l'écran d'accueil ») : manifeste dédié (nom, icône, plein écran), aide à l'installation affichée dans Safari tant que ce n'est pas fait.

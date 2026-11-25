@@ -353,6 +353,18 @@ function etr_catalogue() {
  * @return int|null
  */
 function etr_stock_total( $article_id ) {
+	$stock = etr_stock_brut( $article_id );
+	/** Stock retiré temporairement (matériel en réparation, ETR_Stock_Reparation). */
+	return null === $stock ? null : max( 0, (int) apply_filters( 'etr_stock_total', $stock, $article_id ) );
+}
+
+/**
+ * Quantité possédée, avant le matériel en réparation.
+ *
+ * @param int $article_id ID.
+ * @return int|null
+ */
+function etr_stock_brut( $article_id ) {
 	$propre = get_post_meta( $article_id, '_etr_stock', true );
 	if ( '' !== $propre && null !== $propre ) {
 		return max( 0, (int) $propre );

@@ -157,6 +157,9 @@ class ETR_Gestion {
 			self::action_creer_membre();
 		} elseif ( 'membre' === $action ) {
 			self::action_membre();
+		} elseif ( $action ) {
+			/** Actions du bureau ajoutées par les fonctions activables (ETR_Modules). */
+			do_action( 'etr_gestion_action', $action );
 		}
 
 		// Photos et signatures (fichiers privés), étiquettes QR (page autonome).
@@ -165,7 +168,7 @@ class ETR_Gestion {
 		if ( 'fichier' === $vue_demandee ) {
 			ETR_Fichiers::servir( isset( $_GET['f'] ) ? sanitize_file_name( wp_unslash( $_GET['f'] ) ) : '' );
 		}
-		if ( 'bon-livraison' === $vue_demandee ) {
+		if ( 'bon-livraison' === $vue_demandee && ETR_Modules::actif( 'bon_livraison' ) ) {
 			$id = isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0;
 			if ( ! self::demande_visible( $id ) || ! ETR_Operations::livraison( $id ) ) {
 				wp_die( esc_html__( 'Bon de livraison introuvable.', 'espace-traiteur' ), '', array( 'response' => 404 ) );
@@ -608,6 +611,9 @@ class ETR_Gestion {
 			// Boîte d'envoi hors connexion d'abord : elle reçoit la configuration, terrain.js s'en sert.
 			wp_enqueue_script( 'espace-traiteur-hors-ligne', ETR_URL . 'assets/js/hors-ligne.js', array(), ETR_VERSION, true );
 			wp_enqueue_script( 'espace-traiteur-terrain', ETR_URL . 'assets/js/terrain.js', array( 'espace-traiteur-hors-ligne' ), ETR_VERSION, true );
+			if ( ETR_Modules::actif( 'en_route' ) || ETR_Modules::actif( 'deplacer_dates' ) ) {
+				wp_enqueue_script( 'espace-traiteur-modules', ETR_URL . 'assets/js/modules.js', array( 'espace-traiteur-hors-ligne', 'espace-traiteur-app' ), ETR_VERSION, true );
+			}
 			wp_localize_script(
 				'espace-traiteur-hors-ligne',
 				'etrTerrain',
@@ -1369,17 +1375,27 @@ class ETR_Gestion {
 			'rendu'      => __( 'Accès rendu.', 'espace-traiteur' ),
 			'desactive'  => __( 'Accès désactivé : le traiteur est déconnecté et ne peut plus se connecter.', 'espace-traiteur' ),
 			'reactive'   => __( 'Accès réactivé.', 'espace-traiteur' ),
+			'fait'       => __( 'Enregistré.', 'espace-traiteur' ),
+			'message_envoye' => __( 'Message envoyé : le traiteur est prévenu.', 'espace-traiteur' ),
+			'dates'      => __( 'Dates enregistrées : le traiteur est prévenu.', 'espace-traiteur' ),
+			'devis_envoye' => __( 'Devis envoyé au traiteur.', 'espace-traiteur' ),
+			'releve_envoye' => __( 'Relevé de casse et de manquants envoyé au traiteur.', 'espace-traiteur' ),
 		);
 		$alertes = array(
 			'cree_sans_mail' => __( 'Traiteur ajouté, mais l’e-mail d’invitation n’est pas parti. Renvoyez l’invitation depuis la liste.', 'espace-traiteur' ),
 			'mail_echec'     => __( 'L’e-mail n’est pas parti. Vérifiez la configuration des e-mails du site.', 'espace-traiteur' ),
 			'membre_cree_sans_mail' => __( 'Personne ajoutée, mais l’e-mail d’invitation n’est pas parti. Vérifiez la configuration des e-mails du site, puis renvoyez l’invitation depuis la liste.', 'espace-traiteur' ),
 			'roles_vides'    => __( 'Une personne doit garder au moins un rôle. Pour lui fermer l’application, utilisez « Retirer l’accès ».', 'espace-traiteur' ),
+			'dates_erreur'   => __( 'Dates non enregistrées.', 'espace-traiteur' ),
 		);
 		if ( isset( $succes[ $msg ] ) ) {
 			echo '<div class="etr-notice etr-notice--succes" role="status">' . self::icone( 'coche' ) . '<p>' . esc_html( $succes[ $msg ] ) . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		} elseif ( isset( $alertes[ $msg ] ) ) {
 			$raison = in_array( $msg, array( 'cree_sans_mail', 'mail_echec', 'membre_cree_sans_mail' ), true ) ? etr_raison_echec_mail() : '';
+			if ( 'dates_erreur' === $msg ) {
+				$raison = (string) get_transient( 'etr_erreur_dates_' . get_current_user_id() );
+				delete_transient( 'etr_erreur_dates_' . get_current_user_id() );
+			}
 			/* translators: %s : message d'erreur technique. */
 			$raison = $raison ? '<br><small>' . esc_html( sprintf( __( 'Raison : %s', 'espace-traiteur' ), $raison ) ) . '</small>' : '';
 			echo '<div class="etr-notice etr-notice--erreur" role="alert">' . self::icone( 'alerte' ) . '<p>' . esc_html( $alertes[ $msg ] ) . $raison . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
@@ -1433,7 +1449,8 @@ class ETR_Gestion {
 	private static function mouvement_html( $mvt ) {
 		$types   = self::types_mouvement();
 		$attente = 'en_attente' === etr_get_statut( $mvt['id'] );
-		$html    = '<a class="etr-mvt etr-mvt--' . esc_attr( $mvt['type'] ) . ( $attente ? ' etr-mvt--attente' : '' ) . '" href="' . esc_url( self::url_demande( $mvt['id'] ) ) . '">';
+		$attrs   = (string) apply_filters( 'etr_planning_mouvement_attributs', '', $mvt );
+		$html    = '<a class="etr-mvt etr-mvt--' . esc_attr( $mvt['type'] ) . ( $attente ? ' etr-mvt--attente' : '' ) . '" href="' . esc_url( self::url_demande( $mvt['id'] ) ) . '"' . $attrs . '>';
 		$html   .= '<span class="etr-mvt__type">' . esc_html( $types[ $mvt['type'] ] ) . ( $attente ? ' <em>' . esc_html__( 'à confirmer', 'espace-traiteur' ) . '</em>' : '' ) . '</span>';
 		$html   .= '<span class="etr-mvt__titre">' . esc_html( self::traiteur( $mvt['id'] ) ) . '</span>';
 		$html   .= '<span class="etr-mvt__sous">' . esc_html( get_the_title( $mvt['id'] ) ) . '</span>';
@@ -1546,6 +1563,7 @@ class ETR_Gestion {
 			echo '</tbody></table></div>';
 		}
 		echo '</section></div></div>';
+		do_action( 'etr_gestion_statistiques' ); // Fonctions activables : pilotage du terrain.
 	}
 
 	/**
@@ -1921,6 +1939,7 @@ class ETR_Gestion {
 		ETR_Terrain::panneaux_comptes_rendus( $id );
 		ETR_Terrain::panneau_incidents( $id );
 		ETR_Terrain::panneau_notes( $id );
+		do_action( 'etr_gestion_fiche', $id ); // Fonctions activables : messages, casse facturée…
 		self::panneaux_infos( $id );
 		echo '<section class="etr-panneau"><h2 class="etr-panneau__titre">' . esc_html__( 'Historique', 'espace-traiteur' ) . '</h2>' . ETR_Historique::html( $id ) . '</section>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans ETR_Historique::html().
 		echo '</div>';
@@ -1929,6 +1948,7 @@ class ETR_Gestion {
 		if ( ETR_Equipe::bureau() ) {
 			self::panneau_decision( $id, $statut );
 			self::panneau_tarif( $id );
+			do_action( 'etr_gestion_fiche_cote', $id ); // Fonctions activables : devis, acompte…
 		}
 		self::panneau_documents( $id );
 		self::panneau_traiteur( $auteur );
@@ -2197,7 +2217,7 @@ class ETR_Gestion {
 				if ( $date === $jour ) {
 					$classes[] = 'etr-calendrier__jour--aujourdhui';
 				}
-				echo '<div class="' . esc_attr( implode( ' ', $classes ) ) . '" role="cell">';
+				echo '<div class="' . esc_attr( implode( ' ', $classes ) ) . '" role="cell" data-jour="' . esc_attr( $date ) . '">';
 				echo '<time datetime="' . esc_attr( $date ) . '">' . esc_html( date_i18n( 'j', strtotime( $date ) ) ) . '</time>';
 				if ( ! empty( $jours[ $date ] ) ) {
 					echo '<ul>';
@@ -2520,6 +2540,7 @@ class ETR_Gestion {
 
 		/* translators: %s : nombre d'articles. */
 		self::entete( __( 'Catalogue', 'espace-traiteur' ), sprintf( _n( '%s article proposé aux traiteurs', '%s articles proposés aux traiteurs', $total, 'espace-traiteur' ), number_format_i18n( $total ) ), $action );
+		do_action( 'etr_gestion_catalogue' ); // Fonctions activables : matériel en réparation.
 
 		echo '<div class="etr-barre-outils"><form class="etr-recherche-gestion" method="get" action="' . esc_url( self::url() ) . '" role="search">';
 		if ( ! get_option( 'permalink_structure' ) ) {

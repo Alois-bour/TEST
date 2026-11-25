@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
  */
 class ETR_PWA {
 
-	const FICHIERS = array( 'manifest.webmanifest', 'manifest-traiteur.webmanifest', 'sw.js', 'hors-ligne' );
+	const FICHIERS = array( 'manifest.webmanifest', 'manifest-traiteur.webmanifest', 'sw.js', 'sw-traiteur.js', 'hors-ligne' );
 
 	/**
 	 * Écrans de démarrage iPhone : largeur et hauteur en points, densité (portrait).
@@ -61,7 +61,7 @@ class ETR_PWA {
 	 * Règle de réécriture des fichiers de l'application.
 	 */
 	public static function regle_reecriture() {
-		add_rewrite_rule( '^' . preg_quote( ETR_Gestion::slug(), '/' ) . '/(manifest\.webmanifest|manifest-traiteur\.webmanifest|sw\.js|hors-ligne|demarrage-\d+x\d+\.png)$', 'index.php?etr_gestion_fichier=$matches[1]', 'top' );
+		add_rewrite_rule( '^' . preg_quote( ETR_Gestion::slug(), '/' ) . '/(manifest\.webmanifest|manifest-traiteur\.webmanifest|sw\.js|sw-traiteur\.js|hors-ligne|demarrage-\d+x\d+\.png)$', 'index.php?etr_gestion_fichier=$matches[1]', 'top' );
 	}
 
 	/**
@@ -99,6 +99,16 @@ class ETR_PWA {
 			return '' === $chemin ? '/' : trailingslashit( $chemin );
 		}
 		return untrailingslashit( (string) wp_parse_url( home_url( ETR_Gestion::slug() ), PHP_URL_PATH ) );
+	}
+
+	/**
+	 * Chemin de l'espace traiteur (portée de son service worker).
+	 *
+	 * @return string
+	 */
+	public static function perimetre_traiteur() {
+		$chemin = (string) wp_parse_url( etr_url(), PHP_URL_PATH );
+		return '' === $chemin ? '/' : trailingslashit( $chemin );
 	}
 
 	/**
@@ -161,6 +171,19 @@ class ETR_PWA {
 			header( 'Cache-Control: no-cache' );
 			header( 'Service-Worker-Allowed: ' . self::perimetre() );
 			self::service_worker();
+		} elseif ( 'sw-traiteur.js' === $fichier ) {
+			// Notifications de l'espace traiteur (fonction « push_traiteur ») : rien n'est mis en cache.
+			header( 'Content-Type: application/javascript; charset=utf-8' );
+			header( 'Cache-Control: no-cache' );
+			header( 'Service-Worker-Allowed: ' . self::perimetre_traiteur() );
+			$config = array(
+				'nom'     => etr_nom_site(),
+				'icone'   => self::icone( 192 ),
+				'accueil' => etr_url(),
+			);
+			echo 'const ETR = ' . wp_json_encode( $config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . ";\n";
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- fichier local du plugin.
+			echo file_get_contents( ETR_DIR . 'assets/js/sw-traiteur.js' ); // phpcs:ignore WordPress.Security.EscapeOutput -- code JavaScript du plugin.
 		} else {
 			header( 'Content-Type: text/html; charset=utf-8' );
 			header( 'Cache-Control: no-cache' );
