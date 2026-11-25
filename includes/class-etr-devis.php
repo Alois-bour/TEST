@@ -224,7 +224,7 @@ class ETR_Devis {
 		ETR_Push::notifier( 'bureau', sprintf( __( 'Devis accepté : %s', 'espace-traiteur' ), etr_nom( wp_get_current_user() ) ), get_the_title( $id ) . ' · ' . self::prix( $devis['total'] ), $id, '', 'devis' );
 		$equipe = apply_filters( 'etr_email_equipe', is_email( get_option( 'etr_email_equipe' ) ) ? get_option( 'etr_email_equipe' ) : get_option( 'admin_email' ) );
 		/* translators: 1 : site, 2 : numéro. */
-		etr_envoyer_mail( $equipe, sprintf( __( '[%1$s] Devis accepté — demande #%2$d', 'espace-traiteur' ), etr_nom_site(), $id ), $texte . ".\n\n" . ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id ) ) . "\n" );
+		etr_envoyer_mail( $equipe, sprintf( __( '[%1$s] Devis accepté — demande #%2$d', 'espace-traiteur' ), etr_nom_site(), $id ), $texte . ".\n\n" . __( 'Voir la demande :', 'espace-traiteur' ) . ' ' . ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id ) ) . "\n" );
 	}
 
 	/* ------------------------------------------------------------------ */

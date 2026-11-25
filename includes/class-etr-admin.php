@@ -239,6 +239,9 @@ class ETR_Admin {
 		echo '</tbody></table>';
 		submit_button( __( 'Envoyer un e-mail de test', 'espace-traiteur' ), 'secondary' );
 		echo '</form>';
+		if ( ETR_Modules::actif( 'mails_html' ) ) {
+			echo '<p><a class="button" target="_blank" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=etr_apercu_mail' ), 'etr_apercu_mail' ) ) . '">' . esc_html__( 'Voir un aperçu des e-mails', 'espace-traiteur' ) . '</a> <span class="description">' . esc_html__( 'Logo : celui des réglages de la page de connexion, sinon le logo du site.', 'espace-traiteur' ) . '</span></p>';
+		}
 	}
 
 	/**

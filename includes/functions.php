@@ -634,7 +634,9 @@ function etr_envoyer_mail( $a, $objet, $corps, $entetes = array(), $pieces = arr
 		}
 	};
 	add_action( 'wp_mail_failed', $noter );
-	$envoye = wp_mail( $a, $objet, $corps, $entetes, $pieces );
+	$entetes   = is_array( $entetes ) ? $entetes : array_filter( explode( "\n", str_replace( "\r\n", "\n", (string) $entetes ) ) );
+	$entetes[] = ETR_Mail::ENTETE; // Mise en page HTML (ETR_Mail).
+	$envoye    = wp_mail( $a, $objet, $corps, $entetes, $pieces );
 	remove_action( 'wp_mail_failed', $noter );
 	return $envoye;
 }

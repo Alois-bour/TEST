@@ -67,6 +67,7 @@ class ETR_Modules {
 				__( 'Fonctions déjà en place', 'espace-traiteur' ),
 				array(
 					'face_id'        => array( __( 'Connexion par Face ID', 'espace-traiteur' ), __( 'Clés d’accès de l’application de l’équipe. Désactivée : le bouton disparaît et les clés enregistrées sont refusées (elles restent gardées).', 'espace-traiteur' ) ),
+					'mails_html'     => array( __( 'E-mails mis en page (HTML)', 'espace-traiteur' ), __( 'Tous les e-mails du plugin aux couleurs du site : logo, titre, informations en tableau, boutons. Une version texte est toujours jointe. Désactivée : e-mails en texte simple.', 'espace-traiteur' ) ),
 					'bon_livraison'  => array( __( 'Bon de livraison PDF envoyé au traiteur', 'espace-traiteur' ), __( 'E-mail au traiteur avec le bon signé en pièce jointe à chaque livraison, et téléchargement du bon.', 'espace-traiteur' ) ),
 				),
 			),
@@ -94,6 +95,7 @@ class ETR_Modules {
 			'pilotage_terrain' => true,
 			'face_id'          => true,
 			'bon_livraison'    => true,
+			'mails_html'       => true,
 		);
 	}
 

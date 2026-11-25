@@ -309,6 +309,8 @@ class ETR_Equipe_Acces {
 		$defaults['message'] .= sprintf( __( 'Votre identifiant : %s', 'espace-traiteur' ), $user_login ) . "\n\n";
 		$defaults['message'] .= __( 'Choisissez votre nouveau mot de passe (lien valable 24 heures) :', 'espace-traiteur' ) . "\n" . self::url_mot_de_passe( $key, $user_login ) . "\n\n";
 		$defaults['message'] .= __( 'Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail : votre mot de passe actuel reste valable.', 'espace-traiteur' ) . "\n";
+		// Mise en page HTML (ETR_Mail).
+		$defaults['headers'] = is_array( $defaults['headers'] ) ? array_merge( $defaults['headers'], array( ETR_Mail::ENTETE ) ) : trim( $defaults['headers'] . "\n" . ETR_Mail::ENTETE );
 		return $defaults;
 	}
 

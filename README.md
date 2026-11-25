@@ -123,6 +123,13 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### E-mails mis en page (2.9.0)
+
+- **Tous les e-mails du plugin** (invitations, mots de passe, nouvelle demande, statut, rappels, messages, devis, bon de livraison, relevé, relances, e-mail de test) partent en **HTML aux couleurs du site** : logo (celui de la page de connexion, sinon du site), titre, salutation, informations de la demande en tableau, liste des articles, message de l'équipe encadré, **boutons** d'action (avec l'adresse en clair dessous), pied de page. Lisible sur iPhone, Gmail et Outlook (mise en page en tableaux, styles en ligne).
+- **Version texte** toujours jointe (messageries sans HTML, filtres anti-indésirables).
+- **Aperçu** : Réglages › E-mails › « Voir un aperçu des e-mails ». Désactivable (Fonctions › « E-mails mis en page ») : retour au texte simple.
+- Personnalisation : filtres `etr_mail_couleurs` et `etr_mail_pied`. Les e-mails des autres extensions ne sont pas touchés.
+
 ### Estimation du prix de la livraison (2.8.0)
 
 Sur chaque demande, **pour le bureau et l'administration seulement** (jamais le traiteur, ni les préparateurs et livreurs) : panneau « Tarification » de la fiche dans l'application, et boîte « Estimation de la livraison » dans l'administration WordPress. Fonction activable (Espace traiteur › Fonctions, activée par défaut).

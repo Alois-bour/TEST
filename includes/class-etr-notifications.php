@@ -124,7 +124,7 @@ class ETR_Notifications {
 			: __( 'Votre événement est passé ; pensez à la reprise du matériel.', 'espace-traiteur' );
 		$corps .= "\n\n" . self::resume( $id );
 		$corps .= "\n" . __( 'Voir la demande :', 'espace-traiteur' ) . ' ' . etr_url( array( 'etr_vue' => 'demande', 'id' => $id ) ) . "\n";
-		if ( wp_mail( $user->user_email, $objet, $corps ) ) {
+		if ( etr_envoyer_mail( $user->user_email, $objet, $corps ) ) {
 			update_post_meta( $id, $cle, $date );
 		} else {
 			error_log( 'Espace Traiteur : échec du rappel ' . $type . ' pour la demande #' . (int) $id );
@@ -200,7 +200,7 @@ class ETR_Notifications {
 			$entetes[] = 'Reply-To: ' . $nom . ' <' . $user->user_email . '>';
 		}
 
-		wp_mail( self::equipe(), $objet, $corps, $entetes );
+		etr_envoyer_mail( self::equipe(), $objet, $corps, $entetes );
 	}
 
 	/**
@@ -213,8 +213,11 @@ class ETR_Notifications {
 		$nom  = etr_nom( $user );
 		/* translators: 1 : site, 2 : numéro, 3 : traiteur. */
 		$objet = sprintf( __( '[%1$s] Demande #%2$d annulée par %3$s', 'espace-traiteur' ), self::site(), $demande_id, $nom );
-		$corps = self::resume( $demande_id ) . "\n" . admin_url( 'post.php?post=' . $demande_id . '&action=edit' ) . "\n";
-		wp_mail( self::equipe(), $objet, $corps );
+		/* translators: 1 : traiteur, 2 : événement. */
+		$corps  = sprintf( __( '%1$s a annulé sa demande « %2$s ». Le matériel réservé est libéré.', 'espace-traiteur' ), $nom, get_the_title( $demande_id ) ) . "\n\n";
+		$corps .= self::resume( $demande_id );
+		$corps .= "\n" . __( 'Voir la demande :', 'espace-traiteur' ) . ' ' . admin_url( 'post.php?post=' . $demande_id . '&action=edit' ) . "\n";
+		etr_envoyer_mail( self::equipe(), $objet, $corps );
 	}
 
 	/**
@@ -251,6 +254,6 @@ class ETR_Notifications {
 			)
 		) . "\n";
 
-		wp_mail( $user->user_email, $objet, $corps );
+		etr_envoyer_mail( $user->user_email, $objet, $corps );
 	}
 }
