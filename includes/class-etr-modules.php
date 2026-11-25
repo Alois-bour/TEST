@@ -48,8 +48,9 @@ class ETR_Modules {
 				),
 			),
 			'argent'   => array(
-				__( 'Devis, acompte et casse', 'espace-traiteur' ),
+				__( 'Livraison, devis, acompte et casse', 'espace-traiteur' ),
 				array(
+					'estimation_livraison' => array( __( 'Estimation du prix de la livraison', 'espace-traiteur' ), __( 'Sur chaque demande, pour le bureau et l’administration seulement (jamais le traiteur) : distance par la route depuis le dépôt, gazole, usage du camion, temps du personnel, et prix conseillé à facturer. Bouton « Utiliser ce prix » dans la tarification.', 'espace-traiteur' ) ),
 					'devis'        => array( __( 'Devis PDF et acceptation en ligne', 'espace-traiteur' ), __( 'Le bureau envoie un devis PDF (matériel, remise, livraison, total) ; le traiteur l’accepte dans son espace en cochant les conditions générales. Nom, date et heure de l’acceptation sont gardés.', 'espace-traiteur' ) ),
 					'acompte'      => array( __( 'Acompte et caution', 'espace-traiteur' ), __( 'Le bureau indique l’acompte et la caution demandés, puis reçus (et la caution rendue). Le traiteur les voit sur sa demande et sur le devis. Pas de paiement en ligne : les traiteurs n’ont pas accès au panier.', 'espace-traiteur' ) ),
 					'casse'        => array( __( 'Casse et manquants facturés', 'espace-traiteur' ), __( 'Après une reprise avec écarts, le montant est calculé avec le « Prix de remplacement » de chaque produit ; le bureau vérifie puis envoie le relevé PDF au traiteur.', 'espace-traiteur' ) ),
@@ -85,6 +86,7 @@ class ETR_Modules {
 			'en_route'         => true,
 			'messages'         => true,
 			'recommander'      => true,
+			'estimation_livraison' => true,
 			'devis'            => false,
 			'acompte'          => false,
 			'casse'            => false,
@@ -212,6 +214,7 @@ class ETR_Modules {
 					echo '<p><label>' . esc_html__( 'Conditions générales (adresse de la page)', 'espace-traiteur' ) . '<br><input type="url" class="regular-text" name="etr_cgv_url" value="' . esc_attr( get_option( 'etr_cgv_url' ) ) . '" placeholder="https://"></label></p>';
 					echo '<p><label>' . esc_html__( 'Validité du devis (jours)', 'espace-traiteur' ) . ' <input type="number" min="1" max="365" class="small-text" name="etr_devis_validite" value="' . esc_attr( (string) get_option( 'etr_devis_validite', 30 ) ) . '"></label></p>';
 				}
+				do_action( 'etr_fonctions_reglages', $cle ); // Réglages propres à une fonction (estimation de la livraison).
 				if ( 'casse' === $cle ) {
 					echo '<p class="description">' . esc_html__( 'Prix de remplacement : fiche produit WooCommerce › Inventaire › « Prix de remplacement (casse) ». Sans prix, la ligne est indiquée « à chiffrer ».', 'espace-traiteur' ) . '</p>';
 				}

@@ -2102,6 +2102,7 @@ class ETR_Gestion {
 		echo '<p class="etr-champ"><label for="etr-remise">' . esc_html__( 'Remise', 'espace-traiteur' ) . '</label><span class="etr-saisie-unite"><input type="text" inputmode="decimal" id="etr-remise" name="etr_remise_pct" value="' . esc_attr( $tarif['remise_pct'] ? str_replace( '.', ',', (string) $tarif['remise_pct'] ) : '' ) . '" placeholder="0"><span aria-hidden="true">%</span></span></p>';
 		echo '<p class="etr-champ"><label for="etr-livraison">' . esc_html__( 'Livraison et reprise', 'espace-traiteur' ) . '</label><span class="etr-saisie-unite"><input type="text" inputmode="decimal" id="etr-livraison" name="etr_frais_livraison" value="' . esc_attr( null === $tarif['livraison'] ? '' : str_replace( '.', ',', (string) $tarif['livraison'] ) ) . '" placeholder="—"><span aria-hidden="true">€</span></span></p>';
 		echo '</div>';
+		do_action( 'etr_gestion_tarif_estimation', $id ); // Estimation du prix de la livraison (bureau seulement).
 		echo '<p class="etr-muted">' . esc_html__( 'Pris en compte dans le prix final indicatif, visible aussi par le traiteur si les prix sont affichés. Livraison vide = non chiffrée, 0 = offerte.', 'espace-traiteur' ) . '</p>';
 		echo '<button type="submit" class="etr-btn">' . esc_html__( 'Mettre à jour le prix', 'espace-traiteur' ) . '</button>';
 		echo '</form>';

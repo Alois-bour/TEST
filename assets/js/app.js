@@ -288,6 +288,18 @@
 	}
 	window.etrToast = toast;
 
+	// Estimation de la livraison : « Utiliser ce prix » remplit les frais de livraison.
+	document.addEventListener( 'click', function ( e ) {
+		var bouton = e.target.closest( '[data-remplir-livraison]' );
+		var champ  = document.getElementById( 'etr-livraison' );
+		if ( ! bouton || ! champ ) {
+			return;
+		}
+		champ.value = bouton.getAttribute( 'data-remplir-livraison' );
+		champ.focus();
+		toast( 'Prix reporté : touchez « Mettre à jour le prix » pour l’enregistrer.' );
+	} );
+
 	// Confirmation après une action (« Statut enregistré… ») : en toast, et l'adresse est nettoyée
 	// pour qu'un rechargement ne la réaffiche pas.
 	( function () {
