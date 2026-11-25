@@ -38,6 +38,22 @@ class ETR_Modules {
 					'reparation'     => array( __( 'Matériel en réparation', 'espace-traiteur' ), __( 'La casse constatée à la reprise sort du stock disponible jusqu’à ce que le bureau la remette en stock (écran Catalogue). Évite de louer du matériel cassé.', 'espace-traiteur' ) ),
 				),
 			),
+			'stock' => array(
+				__( 'Stock', 'espace-traiteur' ),
+				array(
+					'historique_casse' => array( __( 'Historique de casse par article', 'espace-traiteur' ), __( 'Statistiques : casse et manquants de chaque article sur 12 mois, taux de pertes, articles « à racheter ».', 'espace-traiteur' ) ),
+					'inventaire'       => array( __( 'Inventaire', 'espace-traiteur' ), __( 'Onglet « Inventaire » (bureau) : on compte à l’entrepôt depuis le téléphone, l’écart avec le stock attendu (possédé − chez les traiteurs − en réparation) s’affiche, le stock est corrigé en un clic.', 'espace-traiteur' ) ),
+					'alertes_stock'    => array( __( 'Alertes de stock bas', 'espace-traiteur' ), __( 'Articles dont la quantité libre passe sous un seuil dans les semaines à venir : encart dans le Catalogue et notification quotidienne au bureau.', 'espace-traiteur' ) ),
+				),
+			),
+			'logistique' => array(
+				__( 'Logistique', 'espace-traiteur' ),
+				array(
+					'volume'            => array( __( 'Volume du camion', 'espace-traiteur' ), __( 'Volume de chaque produit (fiche produit › Inventaire) ; sur chaque demande, volume total et part du camion, alerte quand il faut plusieurs trajets (compté aussi dans l’estimation de la livraison) ; volume à charger sur la tournée du jour.', 'espace-traiteur' ) ),
+					'creneaux'          => array( __( 'Créneaux de livraison et de reprise', 'espace-traiteur' ), __( 'Le traiteur choisit un créneau (matin, après-midi…) ; nombre d’étapes limité par créneau et par jour si vous le souhaitez ; créneau affiché sur la fiche et la tournée.', 'espace-traiteur' ) ),
+					'tournee_optimisee' => array( __( 'Tournée optimisée', 'espace-traiteur' ), __( 'Bouton « Optimiser l’ordre de passage » sur la tournée (bureau) : étapes rangées par créneau, puis au plus court depuis le dépôt (adresse de départ de l’estimation de la livraison).', 'espace-traiteur' ) ),
+				),
+			),
 			'traiteur' => array(
 				__( 'Le traiteur informé en direct', 'espace-traiteur' ),
 				array(
@@ -45,6 +61,11 @@ class ETR_Modules {
 					'en_route'      => array( __( '« En route » avec heure d’arrivée', 'espace-traiteur' ), __( 'Sur la tournée, le livreur touche « En route » et choisit le temps de trajet : le traiteur reçoit l’heure d’arrivée estimée (e-mail et notification) et la voit dans son suivi.', 'espace-traiteur' ) ),
 					'messages'      => array( __( 'Messages par demande', 'espace-traiteur' ), __( 'Fil de discussion entre le bureau et le traiteur sur chaque demande, à la place des échanges d’e-mails. Chaque message est signalé à l’autre partie.', 'espace-traiteur' ) ),
 					'recommander'   => array( __( 'Commander à nouveau', 'espace-traiteur' ), __( 'Le traiteur reprend une ancienne demande comme modèle : événement, lieu et matériel préremplis, seules les dates sont à choisir.', 'espace-traiteur' ) ),
+					'packs'            => array( __( 'Packs prêts à commander', 'espace-traiteur' ), __( 'Vous composez des packs (« Mariage 100 personnes », « Cocktail »…), en quantités fixes ou par invité ; le traiteur en ajoute un en un clic dans sa demande.', 'espace-traiteur' ) ),
+					'suggestions'      => array( __( 'Quantités suggérées', 'espace-traiteur' ), __( 'Bouton « Suggérer les quantités pour mes invités » : quantité conseillée par invité de chaque produit × nombre d’invités (quantités vides seulement, dans la limite du disponible).', 'espace-traiteur' ) ),
+					'calendrier_dispo' => array( __( 'Calendrier des disponibilités', 'espace-traiteur' ), __( 'Écran « Disponibilités » de l’espace traiteur : pour un article, quantité encore libre jour par jour.', 'espace-traiteur' ) ),
+					'multi_comptes'    => array( __( 'Plusieurs comptes par société', 'espace-traiteur' ), __( 'Les collaborateurs d’un traiteur ont leur propre accès et voient les demandes de toute la société (écran « Mon équipe »).', 'espace-traiteur' ) ),
+					'avis'             => array( __( 'Avis après l’événement', 'espace-traiteur' ), __( 'Après la clôture, le traiteur reçoit une invitation à noter la location (1 à 5) et à laisser un commentaire ; le bureau est prévenu ; note moyenne dans les statistiques.', 'espace-traiteur' ) ),
 				),
 			),
 			'argent'   => array(
@@ -55,6 +76,9 @@ class ETR_Modules {
 					'acompte'      => array( __( 'Acompte et caution', 'espace-traiteur' ), __( 'Le bureau indique l’acompte et la caution demandés, puis reçus (et la caution rendue). Le traiteur les voit sur sa demande et sur le devis. Pas de paiement en ligne : les traiteurs n’ont pas accès au panier.', 'espace-traiteur' ) ),
 					'casse'        => array( __( 'Casse et manquants facturés', 'espace-traiteur' ), __( 'Après une reprise avec écarts, le montant est calculé avec le « Prix de remplacement » de chaque produit ; le bureau vérifie puis envoie le relevé PDF au traiteur.', 'espace-traiteur' ) ),
 					'relances'     => array( __( 'Relances automatiques', 'espace-traiteur' ), __( 'Chaque jour : devis pas encore accepté après 3 jours (e-mail au traiteur, une fois), reprise en retard et acompte non reçu à 7 jours de la livraison (notification au bureau).', 'espace-traiteur' ) ),
+					'facture'       => array( __( 'Facture finale', 'espace-traiteur' ), __( 'Facture numérotée (préfixe-année-numéro, sans trou), établie par le bureau après la livraison ou à la clôture : matériel (devis accepté ou chiffrage), remise, livraison, casse et manquants, TVA, acompte déduit. PDF envoyé au traiteur ; onglet « Factures » ; « payée le ».', 'espace-traiteur' ) ),
+					'export_compta' => array( __( 'Export comptable', 'espace-traiteur' ), __( 'Onglet « Factures » : export CSV du mois (numéro, date, client, HT, TVA, TTC, acompte, reste, paiement), lisible par Excel et les logiciels comptables.', 'espace-traiteur' ) ),
+					'stripe'        => array( __( 'Paiement en ligne (Stripe)', 'espace-traiteur' ), __( 'Acompte et solde de la facture payés en ligne ; caution par empreinte bancaire ou carte enregistrée, libérée ou débitée par le bureau, libérée automatiquement après une reprise complète. Nécessite « Acompte et caution ».', 'espace-traiteur' ) ),
 				),
 			),
 			'pilotage' => array(
@@ -67,6 +91,7 @@ class ETR_Modules {
 				__( 'Fonctions déjà en place', 'espace-traiteur' ),
 				array(
 					'face_id'        => array( __( 'Connexion par Face ID', 'espace-traiteur' ), __( 'Clés d’accès de l’application de l’équipe. Désactivée : le bouton disparaît et les clés enregistrées sont refusées (elles restent gardées).', 'espace-traiteur' ) ),
+					'mails_html'     => array( __( 'E-mails mis en page (HTML)', 'espace-traiteur' ), __( 'Tous les e-mails du plugin aux couleurs du site : logo, titre, informations en tableau, boutons. Une version texte est toujours jointe. Désactivée : e-mails en texte simple.', 'espace-traiteur' ) ),
 					'bon_livraison'  => array( __( 'Bon de livraison PDF envoyé au traiteur', 'espace-traiteur' ), __( 'E-mail au traiteur avec le bon signé en pièce jointe à chaque livraison, et téléchargement du bon.', 'espace-traiteur' ) ),
 				),
 			),
@@ -81,19 +106,34 @@ class ETR_Modules {
 	public static function defauts() {
 		return array(
 			'deplacer_dates'   => true,
+			'volume'           => true,
+			'creneaux'         => false,
+			'tournee_optimisee' => true,
 			'reparation'       => false,
+			'historique_casse' => true,
+			'inventaire'       => true,
+			'alertes_stock'    => false,
 			'push_traiteur'    => true,
 			'en_route'         => true,
 			'messages'         => true,
 			'recommander'      => true,
+			'packs'            => true,
+			'suggestions'      => true,
+			'calendrier_dispo' => true,
+			'multi_comptes'    => false,
+			'avis'             => false,
 			'estimation_livraison' => true,
 			'devis'            => false,
 			'acompte'          => false,
 			'casse'            => false,
 			'relances'         => false,
+			'facture'          => false,
+			'export_compta'    => false,
+			'stripe'           => false,
 			'pilotage_terrain' => true,
 			'face_id'          => true,
 			'bon_livraison'    => true,
+			'mails_html'       => true,
 		);
 	}
 

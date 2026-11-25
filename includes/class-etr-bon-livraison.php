@@ -76,7 +76,7 @@ class ETR_Bon_Livraison {
 		$id      = absint( $_GET['etr_bon_livraison'] ); // phpcs:ignore WordPress.Security.NonceVerification
 		$user_id = get_current_user_id();
 		$permis  = $user_id && 'etr_demande' === get_post_type( $id ) && 'publish' === get_post_status( $id )
-			&& ( (int) get_post_field( 'post_author', $id ) === $user_id || ( ETR_Equipe::acces() && ETR_Gestion::demande_visible( $id ) ) );
+			&& ( etr_peut_voir_demande( $id, $user_id ) || ( ETR_Equipe::acces() && ETR_Gestion::demande_visible( $id ) ) );
 		if ( ! $permis || ! ETR_Operations::livraison( $id ) ) {
 			wp_die( esc_html__( 'Bon de livraison introuvable.', 'espace-traiteur' ), '', array( 'response' => 404 ) );
 		}

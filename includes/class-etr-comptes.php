@@ -203,6 +203,8 @@ class ETR_Comptes {
 		$defaults['message'] .= __( 'Choisissez votre nouveau mot de passe (lien valable 24 heures) :', 'espace-traiteur' ) . "\n";
 		$defaults['message'] .= self::url_mot_de_passe( $key, $user_login ) . "\n\n";
 		$defaults['message'] .= __( 'Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail : votre mot de passe actuel reste valable.', 'espace-traiteur' ) . "\n";
+		// Mise en page HTML (ETR_Mail).
+		$defaults['headers'] = is_array( $defaults['headers'] ) ? array_merge( $defaults['headers'], array( ETR_Mail::ENTETE ) ) : trim( $defaults['headers'] . "\n" . ETR_Mail::ENTETE );
 		return $defaults;
 	}
 

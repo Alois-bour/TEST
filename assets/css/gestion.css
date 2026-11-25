@@ -1159,3 +1159,28 @@ html:active-view-transition-type(onglet)::view-transition-new(etr-contenu) { ani
 .etr-estimation__actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
 #etr_mb_estimation .etr-estimation { border: 0; padding: 0; margin: 0; }
 #etr_mb_estimation .etr-estimation__detail div { display: flex; justify-content: space-between; }
+
+/* Logistique (3.0.0) */
+.etr-volume__jauge { height: 8px; margin: 2px 0 10px; border-radius: 999px; background: var(--etr-trait-doux, #efeae2); overflow: hidden; }
+.etr-volume__jauge span { display: block; height: 100%; border-radius: inherit; background: var(--etr-olive); }
+.etr-volume__jauge span.est-plein { background: var(--etr-rouge, #a3342a); }
+.etr-tournee__volume { margin: 0 0 10px; font-weight: 600; }
+.etr-tournee__volume.est-plein { color: var(--etr-rouge, #a3342a); }
+.etr-tournee__optimiser { margin: 0 0 14px; }
+.etr-arret__creneau { font-weight: 600; }
+
+/* Stock (3.0.0) */
+.etr-inventaire__filtre { width: 100%; max-width: 420px; }
+.etr-inventaire__liste { list-style: none; margin: 0 0 16px; padding: 0; }
+.etr-inventaire__ligne { display: grid; grid-template-columns: minmax(0, 1fr) 90px 54px; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--etr-trait-doux, #efeae2); }
+.etr-inventaire__article small { display: block; color: var(--etr-gris); font-size: 12.5px; }
+.etr-inventaire__ligne input { width: 90px; min-height: 44px; text-align: center; font-size: 17px; }
+.etr-inventaire__ecart { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.etr-inventaire__ecart.est-negatif { color: var(--etr-rouge, #a3342a); }
+.etr-inventaire__ecart.est-positif { color: var(--etr-olive); }
+.etr-pastille-etat--alerte { background: #f6dcd8; color: #8a1f1b; }
+.etr-stock-bas { border-color: #e9b9b2; }
+.etr-facture__payee { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }
+.etr-stripe__debit { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.etr-factures__filtre { margin: 0 0 14px; }
+.etr-factures__total { font-weight: 600; }

@@ -414,10 +414,11 @@ class ETR_Estimation {
 	 * @param array $p      Paramètres (défaut : réglages).
 	 * @return array
 	 */
-	public static function chiffrer( $trajet, $p = null ) {
+	public static function chiffrer( $trajet, $p = null, $camions = 1 ) {
 		$p          = $p ? $p : self::parametres();
-		$km         = 4 * (float) $trajet['km'];                       // Livraison et reprise : deux allers-retours.
-		$heures     = ( 4 * (float) $trajet['minutes'] + 2 * $p['manutention'] ) / 60;
+		$camions    = max( 1, (int) $camions );                        // Camions pleins (volume du matériel).
+		$km         = 4 * (float) $trajet['km'] * $camions;            // Livraison et reprise : deux allers-retours par camion.
+		$heures     = ( 4 * (float) $trajet['minutes'] + 2 * $p['manutention'] ) * $camions / 60;
 		$carburant  = $km * $p['conso'] / 100 * $p['gazole'];
 		$usage      = $km * $p['usage_km'];
 		$personnel  = $heures * $p['personnes'] * $p['taux'];
@@ -434,6 +435,7 @@ class ETR_Estimation {
 			'fixes'     => (float) $p['fixes'],
 			'cout'      => $cout,
 			'prix'      => (float) $prix,
+			'camions'   => $camions,
 		);
 	}
 
@@ -472,12 +474,16 @@ class ETR_Estimation {
 		$p           = self::parametres();
 		$gazole      = self::gazole();
 		$p['gazole'] = $gazole['prix'];
-		$c           = self::chiffrer( $trajet, $p );
+		$c           = self::chiffrer( $trajet, $p, (int) apply_filters( 'etr_estimation_camions', 1, $id ) );
 		$prix   = function ( $m ) {
 			return number_format_i18n( $m, 2 ) . ' €';
 		};
 		/* translators: 1 : distance, 2 : durée, 3 : lieu trouvé. */
 		$html  .= '<p class="etr-estimation__trajet">' . esc_html( sprintf( __( '%1$s km et %2$s par trajet, jusqu’à « %3$s »', 'espace-traiteur' ), number_format_i18n( $trajet['km'], 1 ), self::duree( $trajet['minutes'] / 60 ), $trajet['arrivee'] ) ) . ( 'vol' === $trajet['source'] ? ' <em>' . esc_html__( '(approximation à vol d’oiseau : itinéraire indisponible)', 'espace-traiteur' ) . '</em>' : '' ) . '</p>';
+		if ( $c['camions'] > 1 ) {
+			/* translators: %s : nombre de camions. */
+			$html .= '<p class="etr-estimation__trajet"><strong>' . esc_html( sprintf( __( 'Volume du matériel : %s camions pleins, chaque passage compte autant d’allers-retours.', 'espace-traiteur' ), number_format_i18n( $c['camions'] ) ) ) . '</strong></p>';
+		}
 		$html  .= '<dl class="etr-estimation__detail">';
 		$lignes = array(
 			/* translators: 1 : km, 2 : litres, 3 : prix au litre. */

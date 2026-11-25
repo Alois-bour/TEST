@@ -187,6 +187,7 @@ class ETR_Admin {
 
 		echo '<tr><th scope="row">' . esc_html__( 'Espace des traiteurs', 'espace-traiteur' ) . '</th><td><input type="hidden" name="etr_espace_plein_ecran" value="0"><label><input type="checkbox" name="etr_espace_plein_ecran" value="1"' . checked( get_option( 'etr_espace_plein_ecran', '1' ), '1', false ) . '> ' . esc_html__( 'Application plein écran une fois connecté (sans l’en-tête ni le pied de page du site)', 'espace-traiteur' ) . '</label></td></tr>';
 
+		ETR_Apparence::champs_reglages();
 		echo '<tr><th scope="row" colspan="2"><h2 style="margin:16px 0 0">' . esc_html__( 'Page de connexion', 'espace-traiteur' ) . '</h2></th></tr>';
 		echo '<tr><th scope="row">' . esc_html__( 'Affichage', 'espace-traiteur' ) . '</th><td><input type="hidden" name="etr_connexion_plein_ecran" value="0"><label><input type="checkbox" name="etr_connexion_plein_ecran" value="1"' . checked( get_option( 'etr_connexion_plein_ecran', '1' ), '1', false ) . '> ' . esc_html__( 'Plein écran (sans l’en-tête ni le pied de page du site)', 'espace-traiteur' ) . '</label></td></tr>';
 		self::champ_media( 'etr_logo', __( 'Logo', 'espace-traiteur' ), __( 'Affiché au-dessus du formulaire. Sans choix : le logo du site est utilisé automatiquement.', 'espace-traiteur' ), ETR_Comptes::logo_id( true ) );
@@ -239,6 +240,9 @@ class ETR_Admin {
 		echo '</tbody></table>';
 		submit_button( __( 'Envoyer un e-mail de test', 'espace-traiteur' ), 'secondary' );
 		echo '</form>';
+		if ( ETR_Modules::actif( 'mails_html' ) ) {
+			echo '<p><a class="button" target="_blank" href="' . esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=etr_apercu_mail' ), 'etr_apercu_mail' ) ) . '">' . esc_html__( 'Voir un aperçu des e-mails', 'espace-traiteur' ) . '</a> <span class="description">' . esc_html__( 'Logo : celui des réglages de la page de connexion, sinon le logo du site.', 'espace-traiteur' ) . '</span></p>';
+		}
 	}
 
 	/**

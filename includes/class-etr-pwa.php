@@ -218,7 +218,7 @@ class ETR_PWA {
 			'scope'            => get_option( 'permalink_structure' ) ? self::perimetre() : '/',
 			'display'          => 'standalone',
 			'background_color' => '#f8f5f2',
-			'theme_color'      => self::COULEUR,
+			'theme_color'      => ETR_Apparence::barre( 'equipe' ),
 			'icons'            => $icones,
 		);
 	}
@@ -249,8 +249,8 @@ class ETR_PWA {
 			'start_url'        => etr_url(),
 			'scope'            => $chemin ? $chemin : '/',
 			'display'          => 'standalone',
-			'background_color' => '#f8f5f2',
-			'theme_color'      => '#f8f5f2',
+			'background_color' => ETR_Apparence::barre( 'traiteur' ),
+			'theme_color'      => ETR_Apparence::barre( 'traiteur' ),
 			'icons'            => $icones,
 		);
 	}
@@ -272,7 +272,7 @@ class ETR_PWA {
 			return;
 		}
 		echo '<link rel="manifest" href="' . esc_url( self::url( 'manifest-traiteur.webmanifest' ) ) . '">' . "\n";
-		echo '<meta name="theme-color" content="#f8f5f2">' . "\n";
+		echo '<meta name="theme-color" content="' . esc_attr( ETR_Apparence::barre( 'traiteur' ) ) . '">' . "\n";
 		echo '<meta name="apple-mobile-web-app-capable" content="yes">' . "\n";
 		echo '<meta name="mobile-web-app-capable" content="yes">' . "\n";
 		echo '<meta name="apple-mobile-web-app-status-bar-style" content="default">' . "\n";
@@ -318,7 +318,7 @@ class ETR_PWA {
 			return;
 		}
 		$image = imagecreatetruecolor( $largeur, $hauteur );
-		list( $r, $v, $b ) = sscanf( self::COULEUR, '#%02x%02x%02x' );
+		list( $r, $v, $b ) = sscanf( ETR_Apparence::barre( 'equipe' ), '#%02x%02x%02x' );
 		imagefill( $image, 0, 0, imagecolorallocate( $image, $r, $v, $b ) );
 
 		$icone_id = (int) get_option( 'site_icon' );
@@ -348,7 +348,7 @@ class ETR_PWA {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="<?php echo esc_attr( self::COULEUR ); ?>">
+<meta name="theme-color" content="<?php echo esc_attr( ETR_Apparence::barre( 'equipe' ) ); ?>">
 <title><?php echo esc_html( $titre ); ?></title>
 <style>
 	html { color-scheme: light; }
@@ -356,7 +356,7 @@ class ETR_PWA {
 	main { max-width: 340px; }
 	h1 { margin: 0 0 8px; font: italic 400 30px/1.2 Georgia, "Times New Roman", serif; }
 	p { margin: 0 0 24px; color: #6b655f; }
-	button { min-height: 48px; padding: 0 28px; border: 0; border-radius: 10px; background: <?php echo esc_attr( self::COULEUR ); ?>; color: #fff; font: 600 16px/1 inherit; cursor: pointer; }
+	button { min-height: 48px; padding: 0 28px; border: 0; border-radius: 10px; background: <?php echo esc_attr( ETR_Apparence::barre( 'equipe' ) ); ?>; color: #fff; font: 600 16px/1 inherit; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -382,7 +382,7 @@ class ETR_PWA {
 			return;
 		}
 		echo '<link rel="manifest" href="' . esc_url( self::url( 'manifest.webmanifest' ) ) . '">' . "\n";
-		echo '<meta name="theme-color" content="' . esc_attr( self::COULEUR ) . '">' . "\n";
+		echo '<meta name="theme-color" content="' . esc_attr( ETR_Apparence::barre( 'equipe' ) ) . '">' . "\n";
 		echo '<meta name="mobile-web-app-capable" content="yes">' . "\n";
 		echo '<meta name="apple-mobile-web-app-capable" content="yes">' . "\n";
 		echo '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">' . "\n";
