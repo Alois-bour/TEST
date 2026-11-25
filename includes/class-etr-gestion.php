@@ -587,6 +587,7 @@ class ETR_Gestion {
 					'nonce'     => wp_create_nonce( 'wp_rest' ),
 					'jsqr'      => ETR_URL . 'assets/vendor/jsqr.min.js?ver=' . ETR_VERSION,
 					'maxPhotos' => ETR_Operations::MAX_PHOTOS,
+					'hote'      => (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ),
 				)
 			);
 		}

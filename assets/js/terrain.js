@@ -16,8 +16,11 @@
 	/* Outils                                                             */
 	/* ------------------------------------------------------------------ */
 
-	function api( chemin, donnees, multipart ) {
+	function api( chemin, donnees, multipart, garder ) {
 		var options = { method: 'POST', credentials: 'same-origin', headers: { 'X-WP-Nonce': C.nonce } };
+		if ( garder ) {
+			options.keepalive = true; // L'envoi survit au changement de page.
+		}
 		if ( multipart ) {
 			options.body = donnees;
 		} else {
@@ -34,7 +37,9 @@
 				return json;
 			} );
 		}, function () {
-			throw new Error( 'Pas de connexion : rien n’a été enregistré. Réessayez quand le réseau revient.' );
+			var erreur = new Error( 'La connexion a été coupée : impossible de savoir si l’enregistrement a abouti. Rechargez la page pour vérifier avant de recommencer.' );
+			erreur.reseau = true;
+			throw erreur;
 		} );
 	}
 
@@ -109,9 +114,9 @@
 		};
 
 		// Les envois partent dans l'ordre ; chaque champ attend que l'on ait fini de toucher (350 ms).
-		var envoyer = function ( chemin, donnees ) {
+		var envoyer = function ( chemin, donnees, garder ) {
 			file = file.catch( function () {} ).then( function () {
-				return api( chemin, donnees );
+				return api( chemin, donnees, false, garder );
 			} );
 			return file;
 		};
@@ -119,22 +124,28 @@
 			if ( enAttente[ cle ] ) {
 				clearTimeout( enAttente[ cle ].minuteur );
 			}
-			var partir = function () {
+			var partir = function ( garder ) {
 				delete enAttente[ cle ];
 				message( msgPrepa, 'Enregistrement…', 'info' );
-				envoyer( idPrepa + '/preparation', donnees ).then( function ( etat ) {
+				envoyer( idPrepa + '/preparation', donnees, garder ).then( function ( etat ) {
 					appliquer( etat );
 					message( msgPrepa, etat.prete ? 'Enregistré. La commande est prête.' : 'Enregistré.', 'ok' );
 				} ).catch( function ( erreur ) {
 					message( msgPrepa, erreur.message, 'erreur' );
 				} );
 			};
-			enAttente[ cle ] = { minuteur: setTimeout( partir, 350 ), partir: partir };
+			enAttente[ cle ] = {
+				minuteur: setTimeout( partir, 350 ),
+				partir: partir,
+				partirSeul: function () {
+					api( idPrepa + '/preparation', donnees, false, true ).catch( function () {} );
+				},
+			};
 		};
-		var toutEnvoyer = function () {
+		var toutEnvoyer = function ( garder ) {
 			Object.keys( enAttente ).forEach( function ( cle ) {
 				clearTimeout( enAttente[ cle ].minuteur );
-				enAttente[ cle ].partir();
+				enAttente[ cle ].partir( garder === true );
 			} );
 			return file.catch( function () {} );
 		};
@@ -206,19 +217,34 @@
 				} );
 			}
 		} );
-		window.addEventListener( 'pagehide', toutEnvoyer );
+		// En quittant la page : les derniers touchers partent tout de suite, en « keepalive »
+		// (une requête ordinaire serait annulée par le changement de page).
+		window.addEventListener( 'pagehide', function () {
+			Object.keys( enAttente ).forEach( function ( cle ) {
+				clearTimeout( enAttente[ cle ].minuteur );
+				var donnees = enAttente[ cle ];
+				delete enAttente[ cle ];
+				donnees.partirSeul();
+			} );
+		} );
 	}
 
 	/* ------------------------------------------------------------------ */
 	/* Scanner                                                            */
 	/* ------------------------------------------------------------------ */
 
+	// Même site, avec ou sans « www. » (l'app peut avoir été installée depuis l'une ou l'autre adresse).
+	function hote( adresse ) {
+		return adresse.replace( /^www\./i, '' ).toLowerCase();
+	}
+
 	function lireEtiquette( texte ) {
 		try {
-			var url = new URL( texte );
-			var d   = entier( url.searchParams.get( 'd' ) );
-			var c   = entier( url.searchParams.get( 'c' ) );
-			if ( url.origin !== window.location.origin || url.searchParams.get( 'vue' ) !== 'colis' || ! d || ! c ) {
+			var url   = new URL( texte );
+			var d     = entier( url.searchParams.get( 'd' ) );
+			var c     = entier( url.searchParams.get( 'c' ) );
+			var hotes = [ hote( window.location.host ), hote( C.hote || '' ) ];
+			if ( hotes.indexOf( hote( url.host ) ) === -1 || url.searchParams.get( 'vue' ) !== 'colis' || ! d || ! c ) {
 				return null;
 			}
 			return { d: d, c: c };
@@ -493,10 +519,28 @@
 				}
 			} );
 		}
+		// Téléphone tourné : la toile prend la nouvelle largeur, la signature déjà tracée est
+		// redessinée à l'échelle (sinon les traits suivants seraient décalés).
+		var largeur = toileSig.getBoundingClientRect().width;
 		window.addEventListener( 'resize', function () {
+			var nouvelle = toileSig.getBoundingClientRect().width;
+			if ( ! nouvelle || nouvelle === largeur ) {
+				return; // Barre d'adresse de Safari qui apparaît ou disparaît : rien à faire.
+			}
+			largeur = nouvelle;
 			if ( vide ) {
 				preparer();
+				return;
 			}
+			var copie    = document.createElement( 'canvas' );
+			copie.width  = toileSig.width;
+			copie.height = toileSig.height;
+			copie.getContext( '2d' ).drawImage( toileSig, 0, 0 );
+			preparer();
+			var cadre = toileSig.getBoundingClientRect();
+			ctx.drawImage( copie, 0, 0, cadre.width, cadre.height );
+			vide = false;
+			zone.classList.add( 'est-signee' );
 		} );
 		preparer();
 
@@ -547,21 +591,24 @@
 	}
 
 	function zonePhotos( zone, msg ) {
-		var photos = [];
-		var liste  = zone.querySelector( '[data-liste]' );
-		var champ  = zone.querySelector( 'input[type="file"]' );
+		var photos  = [];
+		var enCours = 0; // Photos choisies, encore en cours de réduction.
+		var liste   = zone.querySelector( '[data-liste]' );
+		var champ   = zone.querySelector( 'input[type="file"]' );
 
 		champ.addEventListener( 'change', function () {
 			var fichiers = Array.prototype.slice.call( champ.files );
 			champ.value  = '';
-			var place    = C.maxPhotos - photos.length;
+			var place    = C.maxPhotos - photos.length - enCours;
 			if ( fichiers.length > place ) {
 				message( msg, C.maxPhotos + ' photos au plus : les suivantes sont ignorées.', 'erreur' );
 				fichiers = fichiers.slice( 0, Math.max( 0, place ) );
 			}
+			enCours += fichiers.length;
 			fichiers.reduce( function ( suite, fichier ) {
 				return suite.then( function () {
 					return reduire( fichier ).then( function ( blob ) {
+						enCours--;
 						var photo = { blob: blob };
 						photos.push( photo );
 						var li     = document.createElement( 'li' );
@@ -581,12 +628,16 @@
 						li.appendChild( retirer );
 						liste.appendChild( li );
 					} ).catch( function ( erreur ) {
+						enCours--;
 						message( msg, erreur.message, 'erreur' );
 					} );
 				} );
 			}, Promise.resolve() );
 		} );
 
+		photos.enCours = function () {
+			return enCours;
+		};
 		return photos;
 	}
 
@@ -618,6 +669,8 @@
 		var zoneP     = form.querySelector( '[data-photos]' );
 		var photos    = zoneP ? zonePhotos( zoneP, msg ) : [];
 		var bouton    = form.querySelector( 'button[type="submit"]' );
+		// Jeton de ce formulaire : renvoyé après une coupure, il n'est pas enregistré deux fois.
+		var jeton     = Date.now().toString( 36 ) + '-' + Math.random().toString( 36 ).slice( 2, 12 );
 
 		form.addEventListener( 'change', function ( e ) {
 			var ligne = e.target.closest( '.etr-reprise__ligne' );
@@ -644,7 +697,13 @@
 				return;
 			}
 
+			if ( photos.enCours && photos.enCours() ) {
+				message( msg, 'Patientez : les photos sont en cours de préparation.', 'info' );
+				return;
+			}
+
 			var donnees = new FormData();
+			donnees.append( 'jeton', jeton );
 			donnees.append( 'signataire', nom );
 			donnees.append( 'note', form.elements.note ? form.elements.note.value : '' );
 			if ( signature && ! signature.vide() ) {
@@ -662,7 +721,9 @@
 			api( id + '/' + type, donnees, true ).then( function ( r ) {
 				window.location.href = r.url;
 			} ).catch( function ( erreur ) {
-				message( msg, erreur.message, 'erreur' );
+				message( msg, erreur.reseau
+					? 'La connexion a été coupée. Touchez de nouveau le bouton quand le réseau revient : l’envoi ne sera pas enregistré deux fois.'
+					: erreur.message, 'erreur' );
 				bouton.disabled = false;
 			} );
 		} );

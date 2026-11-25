@@ -939,7 +939,12 @@ class ETR_Admin {
 		update_post_meta( $post_id, '_etr_statut', $nouveau );
 
 		if ( $ancien !== $nouveau ) {
-			do_action( 'etr_statut_change', $post_id, $ancien, $nouveau );
+			ETR_Notifications::$decision_bureau = true; // Le message du bureau accompagne l'e-mail.
+			try {
+				do_action( 'etr_statut_change', $post_id, $ancien, $nouveau );
+			} finally {
+				ETR_Notifications::$decision_bureau = false;
+			}
 		}
 		if ( $ancienne_reponse !== (string) $reponse ) {
 			do_action( 'etr_reponse_modifiee', $post_id, (string) $reponse );

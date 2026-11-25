@@ -30,6 +30,7 @@ class ETR_Operations {
 	const MAX_PHOTOS     = 8;
 	const MAX_COLIS      = 200;
 	const HEURE_RAPPEL   = 17;
+	const VERROU_DUREE   = 30;
 
 	/**
 	 * Hooks.
@@ -38,6 +39,59 @@ class ETR_Operations {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
 		add_filter( 'etr_routes_api_equipe', array( __CLASS__, 'routes_autorisees' ) );
 		add_action( 'etr_rappels_horaires', array( __CLASS__, 'rappels_veille' ) );
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Verrou par demande                                                 */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Exécute une opération seule sur une demande : si deux téléphones enregistrent en même temps
+	 * (scans, livraison renvoyée), le second attend que le premier ait fini, puis relit l'état.
+	 *
+	 * @param int      $id        Demande.
+	 * @param callable $operation Opération (retourne une réponse ou un WP_Error).
+	 * @return mixed
+	 */
+	private static function sous_verrou( $id, $operation ) {
+		global $wpdb;
+		$nom  = 'etr_verrou_' . (int) $id;
+		$fin  = microtime( true ) + 8;
+		$pris = self::prendre_verrou( $nom );
+		while ( ! $pris && microtime( true ) < $fin ) {
+			usleep( 150000 );
+			$pris = self::prendre_verrou( $nom );
+		}
+		if ( ! $pris ) {
+			return new WP_Error( 'etr_occupe', __( 'Un autre enregistrement est en cours sur cette commande. Réessayez dans un instant.', 'espace-traiteur' ), array( 'status' => 409 ) );
+		}
+		try {
+			wp_cache_delete( $id, 'post_meta' ); // État relu depuis la base, même avec un cache d'objets.
+			return call_user_func( $operation );
+		} finally {
+			$wpdb->delete( $wpdb->options, array( 'option_name' => $nom, 'option_value' => $pris ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		}
+	}
+
+	/**
+	 * Prend le verrou (insertion atomique d'une ligne d'option) ; un verrou abandonné expire.
+	 *
+	 * @param string $nom Nom du verrou.
+	 * @return string|false Jeton du verrou, ou false s'il est déjà pris.
+	 */
+	private static function prendre_verrou( $nom ) {
+		global $wpdb;
+		$jeton = time() . '-' . wp_generate_password( 10, false );
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery -- verrou : l'API des options n'est pas atomique.
+		if ( 1 === (int) $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", $nom, $jeton ) ) ) {
+			return $jeton;
+		}
+		$actuel = (string) $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $nom ) );
+		if ( '' !== $actuel && (int) $actuel < time() - self::VERROU_DUREE ) {
+			$wpdb->delete( $wpdb->options, array( 'option_name' => $nom, 'option_value' => $actuel ) ); // Requête interrompue : verrou libéré.
+		}
+		// phpcs:enable
+		return false;
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -215,17 +269,21 @@ class ETR_Operations {
 	public static function preparer( $id, $index, $quantite, $colis ) {
 		$prepa  = self::preparation( $id );
 		$lignes = etr_get_lignes( $id );
+		$baisse = false;
 		if ( null !== $index && isset( $lignes[ $index ] ) && null !== $quantite ) {
-			$prepa['lignes'][ $index ] = min( (int) $lignes[ $index ]['quantite'], max( 0, (int) $quantite ) );
+			$nouvelle                  = min( (int) $lignes[ $index ]['quantite'], max( 0, (int) $quantite ) );
+			$baisse                    = $nouvelle < $prepa['lignes'][ $index ];
+			$prepa['lignes'][ $index ] = $nouvelle;
 		}
 		if ( null !== $colis ) {
 			$prepa['colis'] = min( self::MAX_COLIS, max( 0, (int) $colis ) );
 		}
 		$prepa['prepare']  = array_sum( $prepa['lignes'] );
 		$prepa['complete'] = $prepa['prepare'] >= $prepa['total'];
-		if ( $prepa['prete'] && ! $prepa['complete'] ) {
-			$prepa['prete'] = false; // Une quantité retirée : la commande n'est plus prête.
-			ETR_Historique::ajouter( $id, 'preparation', __( 'Préparation rouverte', 'espace-traiteur' ) );
+		// Une commande prête (même incomplète, après confirmation) ne se rouvre que si l'on retire du matériel.
+		if ( $prepa['prete'] && $baisse ) {
+			$prepa['prete'] = false;
+			ETR_Historique::ajouter( $id, 'preparation', __( 'Préparation rouverte : une quantité a été retirée', 'espace-traiteur' ) );
 		}
 		self::enregistrer_preparation( $id, $prepa );
 		return $prepa;
@@ -327,9 +385,10 @@ class ETR_Operations {
 	 * @param string $signature  Signature (data URL PNG).
 	 * @param string $note       Remarque.
 	 * @param array  $photos     Entrées de $_FILES.
+	 * @param string $jeton      Jeton de l'envoi (un renvoi du même formulaire n'enregistre rien de plus).
 	 * @return true|WP_Error
 	 */
-	public static function livrer( $id, $signataire, $signature, $note, $photos ) {
+	public static function livrer( $id, $signataire, $signature, $note, $photos, $jeton = '' ) {
 		if ( '' === $signataire ) {
 			return new WP_Error( 'etr_livraison', __( 'Indiquez le nom de la personne qui réceptionne.', 'espace-traiteur' ), array( 'status' => 400 ) );
 		}
@@ -347,6 +406,7 @@ class ETR_Operations {
 				'signature'  => $fichiers['signature'],
 				'photos'     => $fichiers['photos'],
 				'note'       => $note,
+				'jeton'      => $jeton,
 			)
 		);
 		/* translators: %s : personne qui a signé. */
@@ -372,9 +432,10 @@ class ETR_Operations {
 	 * @param array  $photos     Entrées de $_FILES.
 	 * @param string $signataire Nom (facultatif).
 	 * @param string $signature  Signature (facultative).
-	 * @return array|WP_Error { manquants, casses, cloturee }
+	 * @param string $jeton      Jeton de l'envoi (un renvoi du même formulaire n'enregistre rien de plus).
+	 * @return array|WP_Error { manquants, casses, ecarts, cloturee }
 	 */
-	public static function reprendre( $id, $saisie, $note, $photos, $signataire, $signature ) {
+	public static function reprendre( $id, $saisie, $note, $photos, $signataire, $signature, $jeton = '' ) {
 		$lignes    = array();
 		$manquants = 0;
 		$casses    = 0;
@@ -411,6 +472,7 @@ class ETR_Operations {
 				'signature'  => $fichiers['signature'],
 				'photos'     => $fichiers['photos'],
 				'note'       => $note,
+				'jeton'      => $jeton,
 			)
 		);
 
@@ -424,12 +486,13 @@ class ETR_Operations {
 				? sprintf( __( 'Reprise avec écarts : %s', 'espace-traiteur' ), self::traiteur( $id ) )
 				/* translators: %s : traiteur. */
 				: sprintf( __( 'Matériel repris : %s', 'espace-traiteur' ), self::traiteur( $id ) ),
-			get_the_title( $id ) . ' · ' . ( $ecarts ? $ecarts : __( 'complet, demande clôturée', 'espace-traiteur' ) ),
+			get_the_title( $id ) . ' · ' . ( $ecarts ? $ecarts : ( $cloturee ? __( 'complet, demande clôturée', 'espace-traiteur' ) : __( 'complet', 'espace-traiteur' ) ) ),
 			$id
 		);
 		return array(
 			'manquants' => $manquants,
 			'casses'    => $casses,
+			'ecarts'    => '' !== $ecarts,
 			'cloturee'  => $cloturee,
 		);
 	}
@@ -652,20 +715,26 @@ class ETR_Operations {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public static function api_preparer( $requete ) {
-		$id = (int) $requete['id'];
-		$ok = self::verifier( $id, array( 'validee' ) );
-		if ( is_wp_error( $ok ) ) {
-			return $ok;
-		}
-		$index = $requete->get_param( 'index' );
-		$colis = $requete->get_param( 'colis' );
-		return rest_ensure_response(
-			self::preparer(
-				$id,
-				null === $index ? null : (int) $index,
-				null === $requete->get_param( 'quantite' ) ? null : (int) $requete->get_param( 'quantite' ),
-				null === $colis ? null : (int) $colis
-			)
+		$id       = (int) $requete['id'];
+		$index    = $requete->get_param( 'index' );
+		$quantite = $requete->get_param( 'quantite' );
+		$colis    = $requete->get_param( 'colis' );
+		return self::sous_verrou(
+			$id,
+			function () use ( $id, $index, $quantite, $colis ) {
+				$ok = self::verifier( $id, array( 'validee' ) );
+				if ( is_wp_error( $ok ) ) {
+					return $ok;
+				}
+				return rest_ensure_response(
+					self::preparer(
+						$id,
+						null === $index ? null : (int) $index,
+						null === $quantite ? null : (int) $quantite,
+						null === $colis ? null : (int) $colis
+					)
+				);
+			}
 		);
 	}
 
@@ -676,16 +745,21 @@ class ETR_Operations {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public static function api_prete( $requete ) {
-		$id = (int) $requete['id'];
-		$ok = self::verifier( $id, array( 'validee' ) );
-		if ( is_wp_error( $ok ) ) {
-			return $ok;
-		}
+		$id    = (int) $requete['id'];
 		$prete = rest_sanitize_boolean( $requete->get_param( 'prete' ) );
-		if ( $prete && self::preparation( $id )['colis'] < 1 ) {
-			return new WP_Error( 'etr_colis', __( 'Indiquez le nombre de colis avant de marquer la commande prête.', 'espace-traiteur' ), array( 'status' => 400 ) );
-		}
-		return rest_ensure_response( self::marquer_prete( $id, $prete ) );
+		return self::sous_verrou(
+			$id,
+			function () use ( $id, $prete ) {
+				$ok = self::verifier( $id, array( 'validee' ) );
+				if ( is_wp_error( $ok ) ) {
+					return $ok;
+				}
+				if ( $prete && self::preparation( $id )['colis'] < 1 ) {
+					return new WP_Error( 'etr_colis', __( 'Indiquez le nombre de colis avant de marquer la commande prête.', 'espace-traiteur' ), array( 'status' => 400 ) );
+				}
+				return rest_ensure_response( self::marquer_prete( $id, $prete ) );
+			}
+		);
 	}
 
 	/**
@@ -700,7 +774,13 @@ class ETR_Operations {
 		if ( ! ETR_Gestion::demande_visible( $id ) ) {
 			return new WP_Error( 'etr_demande', __( 'Étiquette inconnue : la demande n’existe pas ou ne vous est pas visible.', 'espace-traiteur' ), array( 'status' => 404 ) );
 		}
-		$resultat = self::scanner( $id, (int) $requete->get_param( 'c' ), $mode );
+		$numero   = (int) $requete->get_param( 'c' );
+		$resultat = self::sous_verrou(
+			$id,
+			function () use ( $id, $numero, $mode ) {
+				return self::scanner( $id, $numero, $mode );
+			}
+		);
 		if ( is_wp_error( $resultat ) ) {
 			return $resultat;
 		}
@@ -733,19 +813,32 @@ class ETR_Operations {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public static function api_livrer( $requete ) {
-		$id = (int) $requete['id'];
-		$ok = self::verifier( $id, array( 'validee' ) );
-		if ( is_wp_error( $ok ) ) {
-			return $ok;
-		}
-		$resultat = self::livrer(
+		$id    = (int) $requete['id'];
+		$jeton = self::jeton( $requete );
+		$url   = ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id, 'etr_msg' => 'livree' ) );
+		return self::sous_verrou(
 			$id,
-			sanitize_text_field( (string) $requete->get_param( 'signataire' ) ),
-			(string) $requete->get_param( 'signature' ),
-			sanitize_textarea_field( (string) $requete->get_param( 'note' ) ),
-			self::photos( $requete )
+			function () use ( $id, $jeton, $url, $requete ) {
+				// Même formulaire renvoyé (réponse perdue en route) : déjà enregistré, rien de plus.
+				$deja = self::livraison( $id );
+				if ( $jeton && isset( $deja['jeton'] ) && $deja['jeton'] === $jeton ) {
+					return rest_ensure_response( array( 'url' => $url ) );
+				}
+				$ok = self::verifier( $id, array( 'validee' ) );
+				if ( is_wp_error( $ok ) ) {
+					return $ok;
+				}
+				$resultat = self::livrer(
+					$id,
+					sanitize_text_field( (string) $requete->get_param( 'signataire' ) ),
+					(string) $requete->get_param( 'signature' ),
+					sanitize_textarea_field( (string) $requete->get_param( 'note' ) ),
+					self::photos( $requete ),
+					$jeton
+				);
+				return is_wp_error( $resultat ) ? $resultat : rest_ensure_response( array( 'url' => $url ) );
+			}
 		);
-		return is_wp_error( $resultat ) ? $resultat : rest_ensure_response( array( 'url' => ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id, 'etr_msg' => 'livree' ) ) ) );
 	}
 
 	/**
@@ -755,24 +848,51 @@ class ETR_Operations {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public static function api_reprendre( $requete ) {
-		$id = (int) $requete['id'];
-		$ok = self::verifier( $id, array( 'livree' ) );
-		if ( is_wp_error( $ok ) ) {
-			return $ok;
-		}
-		$resultat = self::reprendre(
+		$id    = (int) $requete['id'];
+		$jeton = self::jeton( $requete );
+		return self::sous_verrou(
 			$id,
-			(array) $requete->get_param( 'lignes' ),
-			sanitize_textarea_field( (string) $requete->get_param( 'note' ) ),
-			self::photos( $requete ),
-			sanitize_text_field( (string) $requete->get_param( 'signataire' ) ),
-			(string) $requete->get_param( 'signature' )
+			function () use ( $id, $jeton, $requete ) {
+				$deja = self::reprise( $id );
+				if ( $jeton && isset( $deja['jeton'] ) && $deja['jeton'] === $jeton ) {
+					$resultat = array(
+						'manquants' => (int) $deja['manquants'],
+						'casses'    => (int) $deja['casses'],
+						'ecarts'    => (bool) ( $deja['manquants'] || $deja['casses'] ),
+						'cloturee'  => 'cloturee' === etr_get_statut( $id ),
+					);
+				} else {
+					$ok = self::verifier( $id, array( 'livree' ) );
+					if ( is_wp_error( $ok ) ) {
+						return $ok;
+					}
+					$resultat = self::reprendre(
+						$id,
+						(array) $requete->get_param( 'lignes' ),
+						sanitize_textarea_field( (string) $requete->get_param( 'note' ) ),
+						self::photos( $requete ),
+						sanitize_text_field( (string) $requete->get_param( 'signataire' ) ),
+						(string) $requete->get_param( 'signature' ),
+						$jeton
+					);
+					if ( is_wp_error( $resultat ) ) {
+						return $resultat;
+					}
+				}
+				$resultat['url'] = ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id, 'etr_msg' => $resultat['ecarts'] ? 'reprise_ecarts' : 'reprise' ) );
+				return rest_ensure_response( $resultat );
+			}
 		);
-		if ( is_wp_error( $resultat ) ) {
-			return $resultat;
-		}
-		$resultat['url'] = ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id, 'etr_msg' => $resultat['cloturee'] ? 'reprise' : 'reprise_ecarts' ) );
-		return rest_ensure_response( $resultat );
+	}
+
+	/**
+	 * Jeton d'envoi d'un formulaire (créé à l'ouverture de l'écran).
+	 *
+	 * @param WP_REST_Request $requete Requête.
+	 * @return string
+	 */
+	private static function jeton( $requete ) {
+		return substr( preg_replace( '/[^A-Za-z0-9-]/', '', (string) $requete->get_param( 'jeton' ) ), 0, 64 );
 	}
 
 	/**
