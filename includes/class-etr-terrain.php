@@ -669,6 +669,66 @@ class ETR_Terrain {
 	}
 
 	/* ------------------------------------------------------------------ */
+	/* Suivi détaillé pour le traiteur (espace traiteur)                  */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Où en est la commande : préparation, en route, livrée, reprise (dates et heures).
+	 *
+	 * @param int $id Demande.
+	 */
+	public static function suivi_traiteur( $id ) {
+		$statut = etr_get_statut( $id );
+		if ( ! in_array( $statut, array( 'validee', 'livree', 'cloturee' ), true ) ) {
+			return;
+		}
+		$prepa     = ETR_Operations::preparation( $id );
+		$livraison = ETR_Operations::livraison( $id );
+		$reprise   = ETR_Operations::reprise( $id );
+		list( $jour_livraison, $jour_reprise ) = ETR_Operations::jours( $id );
+		$depart    = 0;
+		foreach ( ETR_Operations::scans( $id ) as $scan ) {
+			if ( ! empty( $scan['sortie'] ) && ( ! $depart || $scan['sortie'] < $depart ) ) {
+				$depart = (int) $scan['sortie'];
+			}
+		}
+		$quand = function ( $horodatage ) {
+			return wp_date( 'j F à H:i', $horodatage );
+		};
+		$etapes = array();
+		if ( $prepa['prete'] ) {
+			/* translators: %s : date et heure. */
+			$etapes[] = array( true, __( 'Matériel préparé', 'espace-traiteur' ), sprintf( __( 'Prêt le %s', 'espace-traiteur' ), $quand( $prepa['le'] ) ) );
+		} else {
+			$etapes[] = array( false, __( 'Préparation', 'espace-traiteur' ), $prepa['prepare'] ? __( 'En cours dans notre entrepôt', 'espace-traiteur' ) : __( 'À venir', 'espace-traiteur' ) );
+		}
+		if ( $depart || $livraison ) {
+			/* translators: %s : date et heure. */
+			$etapes[] = array( true, __( 'En route', 'espace-traiteur' ), $depart ? sprintf( __( 'Chargé le %s', 'espace-traiteur' ), $quand( $depart ) ) : __( 'Parti de l’entrepôt', 'espace-traiteur' ) );
+		}
+		if ( $livraison ) {
+			/* translators: 1 : date et heure, 2 : personne qui a signé. */
+			$etapes[] = array( true, __( 'Livré', 'espace-traiteur' ), sprintf( __( 'Le %1$s, réceptionné par %2$s', 'espace-traiteur' ), $quand( $livraison['le'] ), $livraison['signataire'] ) );
+		} else {
+			/* translators: %s : date. */
+			$etapes[] = array( false, __( 'Livraison', 'espace-traiteur' ), $jour_livraison ? sprintf( __( 'Prévue le %s', 'espace-traiteur' ), etr_format_date( $jour_livraison ) ) : __( 'Date à confirmer', 'espace-traiteur' ) );
+		}
+		if ( $reprise ) {
+			$ecarts = ETR_Operations::texte_ecarts( (int) $reprise['manquants'], (int) $reprise['casses'] );
+			/* translators: 1 : date et heure, 2 : écarts ou « complet ». */
+			$etapes[] = array( true, __( 'Repris', 'espace-traiteur' ), sprintf( __( 'Le %1$s · %2$s', 'espace-traiteur' ), $quand( $reprise['le'] ), $ecarts ? $ecarts : __( 'complet', 'espace-traiteur' ) ) );
+		} else {
+			/* translators: %s : date. */
+			$etapes[] = array( false, __( 'Reprise', 'espace-traiteur' ), $jour_reprise ? sprintf( __( 'Prévue le %s', 'espace-traiteur' ), etr_format_date( $jour_reprise ) ) : __( 'Date à confirmer', 'espace-traiteur' ) );
+		}
+		echo '<section class="etr-suivi-detail"><h2 class="etr-suivi-detail__titre">' . esc_html__( 'Suivi de votre commande', 'espace-traiteur' ) . '</h2><ol>';
+		foreach ( $etapes as $etape ) {
+			echo '<li class="' . ( $etape[0] ? 'est-faite' : '' ) . '"><span class="etr-suivi-detail__puce" aria-hidden="true">' . ( $etape[0] ? self::icone( 'coche' ) : '' ) . '</span><span><strong>' . esc_html( $etape[1] ) . '</strong><small>' . esc_html( $etape[2] ) . '</small></span></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		}
+		echo '</ol></section>';
+	}
+
+	/* ------------------------------------------------------------------ */
 	/* Panneaux de la fiche d'une demande                                 */
 	/* ------------------------------------------------------------------ */
 

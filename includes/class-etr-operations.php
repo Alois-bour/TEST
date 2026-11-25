@@ -41,6 +41,7 @@ class ETR_Operations {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
 		add_filter( 'etr_routes_api_equipe', array( __CLASS__, 'routes_autorisees' ) );
 		add_action( 'etr_rappels_horaires', array( __CLASS__, 'rappels_veille' ) );
+		add_action( 'etr_traiteur_demande_apres_suivi', array( 'ETR_Terrain', 'suivi_traiteur' ), 5 );
 	}
 
 	/* ------------------------------------------------------------------ */

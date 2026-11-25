@@ -70,7 +70,7 @@ class ETR_Frontend {
 	 *
 	 * @return bool
 	 */
-	private static function sur_page_espace() {
+	public static function sur_page_espace() {
 		return is_singular() && has_shortcode( (string) get_post_field( 'post_content', get_queried_object_id() ), 'espace_traiteur' );
 	}
 
@@ -612,6 +612,8 @@ class ETR_Frontend {
 		echo '<div class="etr-espace etr-app' . ( self::plein_ecran() ? '' : ' etr-app--integre' ) . '">';
 		self::barre_laterale( 'nouvelle' === $vue ? 'nouvelle' : 'demandes' );
 		echo '<main class="etr-app__principal" id="etr-contenu">';
+		// Installer l'espace sur l'iPhone (affiché par traiteur-app.js dans Safari, si pas encore installé).
+		echo '<aside class="etr-installer" id="etr-installer-traiteur" hidden><span class="etr-installer__icone" aria-hidden="true"><img src="' . esc_url( ETR_PWA::icone( 180 ) ) . '" alt="" width="44" height="44"></span><p><strong>' . esc_html__( 'Votre espace sur l’iPhone', 'espace-traiteur' ) . '</strong><span>' . esc_html__( 'Dans Safari, touchez « Partager » puis « Sur l’écran d’accueil » : vos demandes et leur suivi en un toucher.', 'espace-traiteur' ) . '</span></p><button type="button" class="etr-installer__fermer" aria-label="' . esc_attr__( 'Fermer', 'espace-traiteur' ) . '">×</button></aside>';
 		self::messages();
 
 		if ( 'nouvelle' === $vue ) {

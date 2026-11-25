@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
  */
 class ETR_PWA {
 
-	const FICHIERS = array( 'manifest.webmanifest', 'sw.js', 'hors-ligne' );
+	const FICHIERS = array( 'manifest.webmanifest', 'manifest-traiteur.webmanifest', 'sw.js', 'hors-ligne' );
 
 	/**
 	 * Écrans de démarrage iPhone : largeur et hauteur en points, densité (portrait).
@@ -53,13 +53,15 @@ class ETR_PWA {
 		add_filter( 'query_vars', array( __CLASS__, 'variables' ) );
 		add_action( 'template_redirect', array( __CLASS__, 'servir' ), 0 );
 		add_action( 'wp_head', array( __CLASS__, 'balises' ), 1 );
+		add_action( 'wp_head', array( __CLASS__, 'balises_traiteur' ), 1 );
+		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'script_traiteur' ) );
 	}
 
 	/**
 	 * Règle de réécriture des fichiers de l'application.
 	 */
 	public static function regle_reecriture() {
-		add_rewrite_rule( '^' . preg_quote( ETR_Gestion::slug(), '/' ) . '/(manifest\.webmanifest|sw\.js|hors-ligne|demarrage-\d+x\d+\.png)$', 'index.php?etr_gestion_fichier=$matches[1]', 'top' );
+		add_rewrite_rule( '^' . preg_quote( ETR_Gestion::slug(), '/' ) . '/(manifest\.webmanifest|manifest-traiteur\.webmanifest|sw\.js|hors-ligne|demarrage-\d+x\d+\.png)$', 'index.php?etr_gestion_fichier=$matches[1]', 'top' );
 	}
 
 	/**
@@ -149,10 +151,11 @@ class ETR_PWA {
 		header( 'X-Content-Type-Options: nosniff' );
 		header( 'X-Robots-Tag: noindex' );
 
-		if ( 'manifest.webmanifest' === $fichier ) {
+		if ( 'manifest.webmanifest' === $fichier || 'manifest-traiteur.webmanifest' === $fichier ) {
 			header( 'Content-Type: application/manifest+json; charset=utf-8' );
 			header( 'Cache-Control: public, max-age=3600' );
-			echo wp_json_encode( self::manifeste(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT );
+			$manifeste = 'manifest.webmanifest' === $fichier ? self::manifeste() : self::manifeste_traiteur();
+			echo wp_json_encode( $manifeste, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT );
 		} elseif ( 'sw.js' === $fichier ) {
 			header( 'Content-Type: application/javascript; charset=utf-8' );
 			header( 'Cache-Control: no-cache' );
@@ -195,6 +198,64 @@ class ETR_PWA {
 			'theme_color'      => self::COULEUR,
 			'icons'            => $icones,
 		);
+	}
+
+	/**
+	 * Manifeste de l'espace traiteur (installable sur l'écran d'accueil de l'iPhone du traiteur).
+	 *
+	 * @return array
+	 */
+	public static function manifeste_traiteur() {
+		$icones = array();
+		foreach ( array( 192, 512 ) as $taille ) {
+			$icones[] = array(
+				'src'     => self::icone( $taille ),
+				'sizes'   => $taille . 'x' . $taille,
+				'type'    => 'image/png',
+				'purpose' => 'any',
+			);
+		}
+		$chemin = (string) wp_parse_url( etr_url(), PHP_URL_PATH );
+		return array(
+			'id'               => $chemin,
+			/* translators: %s : nom du site. */
+			'name'             => (string) apply_filters( 'etr_app_traiteur_nom', sprintf( __( '%s – Espace traiteur', 'espace-traiteur' ), etr_nom_site() ) ),
+			'short_name'       => (string) apply_filters( 'etr_app_traiteur_nom_court', etr_nom_site() ),
+			'description'      => __( 'Vos demandes de matériel et leur suivi, de la préparation à la reprise.', 'espace-traiteur' ),
+			'lang'             => 'fr',
+			'start_url'        => etr_url(),
+			'scope'            => $chemin ? $chemin : '/',
+			'display'          => 'standalone',
+			'background_color' => '#f8f5f2',
+			'theme_color'      => '#f8f5f2',
+			'icons'            => $icones,
+		);
+	}
+
+	/**
+	 * Aide à l'installation de l'espace traiteur (iPhone, Safari).
+	 */
+	public static function script_traiteur() {
+		if ( is_user_logged_in() && class_exists( 'ETR_Frontend' ) && ETR_Frontend::sur_page_espace() ) {
+			wp_enqueue_script( 'espace-traiteur-app-traiteur', ETR_URL . 'assets/js/traiteur-app.js', array(), ETR_VERSION, true );
+		}
+	}
+
+	/**
+	 * Balises de l'espace traiteur installable (page de l'espace seulement).
+	 */
+	public static function balises_traiteur() {
+		if ( ! class_exists( 'ETR_Frontend' ) || ! ETR_Frontend::sur_page_espace() ) {
+			return;
+		}
+		echo '<link rel="manifest" href="' . esc_url( self::url( 'manifest-traiteur.webmanifest' ) ) . '">' . "\n";
+		echo '<meta name="theme-color" content="#f8f5f2">' . "\n";
+		echo '<meta name="apple-mobile-web-app-capable" content="yes">' . "\n";
+		echo '<meta name="mobile-web-app-capable" content="yes">' . "\n";
+		echo '<meta name="apple-mobile-web-app-status-bar-style" content="default">' . "\n";
+		echo '<meta name="apple-mobile-web-app-title" content="' . esc_attr( etr_nom_site() ) . '">' . "\n";
+		echo '<link rel="apple-touch-icon" href="' . esc_url( self::icone( 180 ) ) . '">' . "\n";
+		echo "<script>if(navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches){document.documentElement.classList.add('etr-installee');}</script>\n";
 	}
 
 	/**

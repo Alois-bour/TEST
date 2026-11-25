@@ -123,6 +123,11 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Espace traiteur installable, suivi détaillé (2.6.0)
+
+- L'**espace traiteur s'installe sur l'iPhone** du traiteur (Safari › Partager › « Sur l'écran d'accueil ») : manifeste dédié (nom, icône, plein écran), aide à l'installation affichée dans Safari tant que ce n'est pas fait.
+- **Suivi de la commande** sur la fiche de chaque demande : matériel préparé (heure), en route (premier colis chargé), livré (heure, personne qui a réceptionné), repris (complet ou écarts) ; dates prévues de livraison et de reprise tant qu'elles ne sont pas faites. Lien vers le **bon de livraison signé**.
+
 ### Connexion par Face ID (2.5.0)
 
 - **Activer** : dans l'application, menu › « Connexion par Face ID » › « Activer Face ID sur cet appareil » (une invitation le propose aussi). L'iPhone crée une **clé d'accès** pour le site, gardée dans le trousseau et protégée par Face ID ; le site n'en garde que la partie publique. Aucune donnée du visage n'est transmise.
