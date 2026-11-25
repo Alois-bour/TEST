@@ -114,6 +114,14 @@ class ETR_Gestion {
 		}
 		nocache_headers();
 
+		// Jeton frais pour renvoyer les saisies faites sans réseau (la page en cache a un jeton ancien).
+		if ( isset( $_GET['etr_jeton'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification -- lecture seule.
+			if ( ! is_user_logged_in() || ! ETR_Equipe::acces() ) {
+				wp_send_json_error( array( 'message' => __( 'Reconnectez-vous pour envoyer les saisies en attente.', 'espace-traiteur' ) ), 401 );
+			}
+			wp_send_json_success( array( 'nonce' => wp_create_nonce( 'wp_rest' ) ) );
+		}
+
 		// Connexion, mot de passe oublié, choix du mot de passe : dans l'application même
 		// (une app installée sur iPhone a ses propres cookies), voir ETR_Equipe_Acces.
 		if ( ETR_Equipe_Acces::preparer() ) {
@@ -129,6 +137,7 @@ class ETR_Gestion {
 		}
 
 		self::page_trouvee();
+		header( 'X-ETR-Page: app' ); // Page gardable pour le hors connexion (service worker).
 
 		$action = isset( $_REQUEST['etr_gestion_action'] ) ? sanitize_key( wp_unslash( $_REQUEST['etr_gestion_action'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification -- vérifié par action.
 		if ( $action && ! ETR_Equipe::bureau() ) {
@@ -578,9 +587,11 @@ class ETR_Gestion {
 		if ( ETR_Equipe_Acces::ecran() ) {
 			wp_enqueue_script( 'espace-traiteur-connexion', ETR_URL . 'assets/js/connexion.js', array(), ETR_VERSION, true );
 		} elseif ( is_user_logged_in() ) {
-			wp_enqueue_script( 'espace-traiteur-terrain', ETR_URL . 'assets/js/terrain.js', array(), ETR_VERSION, true );
+			// Boîte d'envoi hors connexion d'abord : elle reçoit la configuration, terrain.js s'en sert.
+			wp_enqueue_script( 'espace-traiteur-hors-ligne', ETR_URL . 'assets/js/hors-ligne.js', array(), ETR_VERSION, true );
+			wp_enqueue_script( 'espace-traiteur-terrain', ETR_URL . 'assets/js/terrain.js', array( 'espace-traiteur-hors-ligne' ), ETR_VERSION, true );
 			wp_localize_script(
-				'espace-traiteur-terrain',
+				'espace-traiteur-hors-ligne',
 				'etrTerrain',
 				array(
 					'api'       => esc_url_raw( rest_url( ETR_Push::API . '/terrain/' ) ),
@@ -588,6 +599,7 @@ class ETR_Gestion {
 					'jsqr'      => ETR_URL . 'assets/vendor/jsqr.min.js?ver=' . ETR_VERSION,
 					'maxPhotos' => ETR_Operations::MAX_PHOTOS,
 					'hote'      => (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ),
+					'gestion'   => self::url(),
 				)
 			);
 		}

@@ -825,6 +825,9 @@ td.etr-table__nombre .etr-manque { margin: 0; font-size: inherit; font-weight: 5
 	.etr-gestion textarea { font-size: 16px; } /* En dessous, Safari zoome sur le champ. */
 }
 
+/* « hidden » l'emporte toujours (les boutons ont leur propre display). */
+.etr-gestion [hidden] { display: none !important; }
+
 /* Onglet « Plus » : seulement dans l'application installée sur téléphone. */
 .etr-app__onglet-plus { display: none; }
 
@@ -1016,3 +1019,26 @@ html:active-view-transition-type(onglet)::view-transition-new(etr-contenu) { ani
 	.etr-gestion .etr-alerte,
 	.etr-gestion .etr-manque { color: var(--etr-rouge); }
 }
+
+/* ==================================================================
+   Terrain sans réseau : envois en attente
+   ================================================================== */
+.etr-app .etr-envois { position: fixed; z-index: 25; top: calc(env(safe-area-inset-top) + 58px); right: 12px; display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 6px 12px; border: 0; border-radius: 999px; background: var(--etr-ambre, #9a6a12); color: #fff; font: 600 13px/1.2 var(--etr-sans); box-shadow: 0 4px 14px rgba(0, 0, 0, .18); cursor: pointer; }
+.etr-app .etr-envois[hidden] { display: none; }
+.etr-app .etr-envois::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.etr-app .etr-envois.est-hors-ligne { background: #55514b; }
+.etr-app .etr-envois.est-refus { background: var(--etr-rouge, #a3342a); }
+.etr-app .etr-envois.est-envoi::before { width: 10px; height: 10px; border: 2px solid currentColor; border-right-color: transparent; background: none; animation: etr-tourne .8s linear infinite; }
+@media (min-width: 901px) {
+	.etr-app .etr-envois { top: 16px; }
+}
+.etr-envois__liste { margin: 0 0 16px; padding: 0; list-style: none; border-radius: 14px; background: var(--etr-fond-carte, #fff); overflow: hidden; }
+.etr-envois__liste li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 12px 16px; }
+.etr-envois__liste li + li { border-top: 1px solid var(--etr-trait-doux); }
+.etr-envois__liste strong { font-size: 15px; font-weight: 600; }
+.etr-envois__liste small { grid-column: 1; color: var(--etr-gris); font-size: 13px; }
+.etr-envois__liste .etr-lien { grid-column: 2; grid-row: 1 / span 2; align-self: center; padding: 0; border: 0; background: none; color: var(--etr-rouge); cursor: pointer; }
+.etr-envois__liste li.est-refus small { color: var(--etr-rouge); }
+.etr-arret__attente { margin: 0 0 6px; padding: 8px 10px; border-radius: 10px; background: var(--etr-ambre-clair, #f8eedb); color: var(--etr-ambre, #9a6a12); font-size: 13px; font-weight: 600; }
+.etr-hors-ligne-ok { max-width: 680px; }
+.etr-hors-ligne-ok p { margin: 0 0 16px; line-height: 1.5; }

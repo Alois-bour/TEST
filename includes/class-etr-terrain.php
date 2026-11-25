@@ -113,6 +113,8 @@ class ETR_Terrain {
 
 		ETR_Gestion::entete( __( 'Tournée', 'espace-traiteur' ), ucfirst( wp_date( 'l j F Y', $date->getTimestamp() ) ), $nav );
 
+		// Gardés sur le téléphone pour le hors connexion (hors-ligne.js) : scanner et lecteur de QR.
+		echo '<a hidden data-hors-ligne href="' . esc_url( self::url( array( 'vue' => 'scanner' ) ) ) . '"></a><a hidden data-hors-ligne href="' . esc_url( ETR_URL . 'assets/vendor/jsqr.min.js?ver=' . ETR_VERSION ) . '"></a>';
 		$tournee = ETR_Operations::tournee( $jour );
 		if ( ! $tournee['livraisons'] && ! $tournee['reprises'] ) {
 			echo '<div class="etr-vide"><p>' . esc_html__( 'Aucune livraison ni reprise ce jour-là.', 'espace-traiteur' ) . '</p></div>';
@@ -142,8 +144,8 @@ class ETR_Terrain {
 		$prepa   = ETR_Operations::preparation( $id );
 		$bilan   = ETR_Operations::bilan_colis( $id );
 
-		echo '<li class="etr-arret">';
-		echo '<div class="etr-arret__tete"><a class="etr-arret__nom" href="' . esc_url( self::url( array( 'vue' => 'demande', 'id' => $id ) ) ) . '"><strong>' . esc_html( ETR_Operations::traiteur( $id ) ) . '</strong><span>' . esc_html( get_the_title( $id ) ) . '</span></a>';
+		echo '<li class="etr-arret" data-demande="' . (int) $id . '" data-etape="' . ( $livraison ? 'livraison' : 'reprise' ) . '">';
+		echo '<div class="etr-arret__tete"><a class="etr-arret__nom" data-hors-ligne href="' . esc_url( self::url( array( 'vue' => 'demande', 'id' => $id ) ) ) . '"><strong>' . esc_html( ETR_Operations::traiteur( $id ) ) . '</strong><span>' . esc_html( get_the_title( $id ) ) . '</span></a>';
 		echo self::badge_preparation( $id, $livraison ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé.
 		echo '</div>';
 		if ( $lieu ) {
@@ -166,8 +168,8 @@ class ETR_Terrain {
 		}
 		if ( ETR_Equipe::livreur() ) {
 			echo $livraison // phpcs:ignore WordPress.Security.EscapeOutput
-				? '<a class="etr-btn" href="' . esc_url( self::url( array( 'vue' => 'livrer', 'id' => $id ) ) ) . '">' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Livrer', 'espace-traiteur' ) . '</span></a>'
-				: '<a class="etr-btn" href="' . esc_url( self::url( array( 'vue' => 'reprendre', 'id' => $id ) ) ) . '">' . self::icone( 'reprise' ) . '<span>' . esc_html__( 'Reprendre', 'espace-traiteur' ) . '</span></a>';
+				? '<a class="etr-btn" data-hors-ligne data-action-etape href="' . esc_url( self::url( array( 'vue' => 'livrer', 'id' => $id ) ) ) . '">' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Livrer', 'espace-traiteur' ) . '</span></a>'
+				: '<a class="etr-btn" data-hors-ligne data-action-etape href="' . esc_url( self::url( array( 'vue' => 'reprendre', 'id' => $id ) ) ) . '">' . self::icone( 'reprise' ) . '<span>' . esc_html__( 'Reprendre', 'espace-traiteur' ) . '</span></a>';
 		}
 		echo '</div></li>';
 	}

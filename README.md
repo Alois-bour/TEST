@@ -113,6 +113,16 @@ Dans l'application installée sur iPhone, l'espace de gestion se comporte comme 
 - **Écran de démarrage** aux couleurs de l'application, avec l'icône (images générées par le plugin, extension GD).
 - **Pastilles** : demandes à traiter (bureau) ou étapes de la tournée du jour (livreurs), sur l'onglet et sur l'icône de l'application (iOS 16.4+, notifications autorisées), mise à jour aussi par les notifications.
 
+### Terrain sans réseau (2.2.0)
+
+Dans un château, une cave ou une salle sans 4G, le terrain continue de travailler :
+
+- **Pages gardées sur le téléphone** : chaque écran de l'application ouvert avec du réseau est gardé ; à l'ouverture de la tournée, les fiches, les écrans de livraison et de reprise du jour, le scanner et son lecteur de QR le sont aussi. Sans réseau, la dernière version s'affiche.
+- **Saisies gardées puis envoyées** : scans, préparation, « commande prête », livraisons signées et reprises (photos et signature comprises) sont enregistrés sur le téléphone (IndexedDB) et partent **tout seuls, dans l'ordre**, dès le retour du réseau (au retour de la connexion, à l'ouverture d'un écran, puis toutes les 30 s). Les renvois sont sans risque : un jeton par formulaire empêche tout doublon.
+- **Pastille d'état** : « Hors connexion », « 3 en attente », « 1 refusée » ; la toucher affiche le détail. Un envoi refusé par le serveur (commande livrée entre-temps par un collègue, étiquette périmée) est signalé avec la raison, et peut être retiré.
+- **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
+- **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
+
 ### Notifications (iPhone)
 
 - Sur iPhone (iOS 16.4 ou plus), elles fonctionnent dans l'application **installée sur l'écran d'accueil**. Chacun les active depuis la cloche (page *Notifications*) : l'iPhone demande l'autorisation, puis une notification de test arrive. Une invitation à les activer s'affiche dans l'app tant que la personne n'a pas répondu. Elles marchent aussi sur ordinateur (Chrome, Edge, Firefox, Safari).
