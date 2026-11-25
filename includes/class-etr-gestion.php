@@ -591,6 +591,17 @@ class ETR_Gestion {
 		wp_enqueue_script( 'espace-traiteur-gestion', ETR_URL . 'assets/js/gestion.js', array(), ETR_VERSION, true );
 		wp_enqueue_script( 'espace-traiteur-app', ETR_URL . 'assets/js/app.js', array(), ETR_VERSION, true );
 		wp_localize_script( 'espace-traiteur-app', 'etrApp', ETR_PWA::config_script() );
+		if ( ETR_Cles_Acces::disponible() && ( ETR_Equipe_Acces::ecran() || is_user_logged_in() ) ) {
+			wp_enqueue_script( 'espace-traiteur-cles', ETR_URL . 'assets/js/cles-acces.js', array(), ETR_VERSION, true );
+			wp_localize_script(
+				'espace-traiteur-cles',
+				'etrCles',
+				array(
+					'api'   => esc_url_raw( rest_url( ETR_Push::API . ETR_Cles_Acces::ROUTE ) ),
+					'nonce' => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
+				)
+			);
+		}
 		if ( ETR_Equipe_Acces::ecran() ) {
 			wp_enqueue_script( 'espace-traiteur-connexion', ETR_URL . 'assets/js/connexion.js', array(), ETR_VERSION, true );
 		} elseif ( is_user_logged_in() ) {
@@ -930,6 +941,7 @@ class ETR_Gestion {
 			'colis'     => ETR_Equipe::preparateur() || ETR_Equipe::livreur(),
 			'incident'  => true,
 			'recherche' => true,
+			'face-id'   => ETR_Cles_Acces::disponible(),
 		);
 		if ( ! empty( $terrain[ $vue ] ) ) {
 			return $vue;
@@ -954,6 +966,7 @@ class ETR_Gestion {
 			'colis'     => 'scanner',
 			'incident'  => 'demandes',
 			'recherche' => '',
+			'face-id'   => '',
 		);
 		$actif  = isset( $parent[ $vue ] ) ? $parent[ $vue ] : $vue;
 
@@ -963,6 +976,12 @@ class ETR_Gestion {
 		self::aide_installation();
 		if ( 'notifications' !== $vue ) {
 			self::invitation_notifications();
+		}
+		if ( 'face-id' !== $vue && ETR_Cles_Acces::disponible() && ! ETR_Cles_Acces::cles( get_current_user_id() ) ) {
+			echo '<aside class="etr-installer etr-notifs-invite" id="etr-cle-invite" hidden><span class="etr-notifs-invite__icone" aria-hidden="true">' . self::icone( 'visage' ) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			echo '<p><strong>' . esc_html__( 'Se connecter avec Face ID', 'espace-traiteur' ) . '</strong><span>' . esc_html__( 'Plus besoin de taper le mot de passe sur ce téléphone.', 'espace-traiteur' ) . '</span></p>';
+			echo '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url( array( 'vue' => 'face-id' ) ) ) . '">' . esc_html__( 'Activer', 'espace-traiteur' ) . '</a>';
+			echo '<button type="button" class="etr-installer__fermer" aria-label="' . esc_attr__( 'Plus tard', 'espace-traiteur' ) . '">×</button></aside>';
 		}
 		self::messages();
 
@@ -1014,6 +1033,9 @@ class ETR_Gestion {
 				break;
 			case 'recherche':
 				self::vue_recherche();
+				break;
+			case 'face-id':
+				self::vue_face_id();
 				break;
 			default:
 				self::vue_tableau();
@@ -1071,6 +1093,33 @@ class ETR_Gestion {
 		return $bureau
 			? __( 'Nouvelles demandes des traiteurs, même application fermée.', 'espace-traiteur' )
 			: __( 'Commandes validées à préparer et à livrer, même application fermée.', 'espace-traiteur' );
+	}
+
+	/**
+	 * Page « Face ID » : activer sur cet appareil, voir et retirer ses appareils.
+	 */
+	private static function vue_face_id() {
+		self::entete( __( 'Connexion par Face ID', 'espace-traiteur' ), __( 'Se connecter d’un regard, sans taper le mot de passe.', 'espace-traiteur' ) );
+		$cles = ETR_Cles_Acces::cles( get_current_user_id() );
+		echo '<section class="etr-panneau etr-notifs" data-etr-cles>';
+		echo '<p class="etr-notifs__etat" data-cle-etat role="status">' . esc_html__( 'Vérification de cet appareil…', 'espace-traiteur' ) . '</p>';
+		echo '<div class="etr-notifs__actions"><button type="button" class="etr-btn" data-cle-activer hidden>' . self::icone( 'visage' ) . '<span>' . esc_html__( 'Activer Face ID sur cet appareil', 'espace-traiteur' ) . '</span></button></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '<p class="etr-muted">' . esc_html__( 'Votre iPhone crée une clé d’accès pour ce site, gardée dans votre trousseau et protégée par Face ID. Le site n’en garde que la partie publique : aucune donnée de votre visage n’est transmise. Le mot de passe reste valable.', 'espace-traiteur' ) . '</p>';
+		echo '</section>';
+
+		echo '<section class="etr-panneau etr-notifs"><h2 class="etr-panneau__titre">' . esc_html__( 'Appareils enregistrés', 'espace-traiteur' ) . '</h2>';
+		if ( ! $cles ) {
+			echo '<p class="etr-muted">' . esc_html__( 'Aucun pour l’instant.', 'espace-traiteur' ) . '</p>';
+		} else {
+			echo '<ul class="etr-envois__liste">';
+			foreach ( $cles as $cle ) {
+				/* translators: 1 : date d'ajout, 2 : dernière utilisation. */
+				$quand = sprintf( __( 'Ajouté le %1$s · %2$s', 'espace-traiteur' ), wp_date( 'j M Y', $cle['cree'] ), $cle['utilise'] ? sprintf( /* translators: %s : date. */ __( 'utilisé le %s', 'espace-traiteur' ), wp_date( 'j M Y, H:i', $cle['utilise'] ) ) : __( 'jamais utilisé', 'espace-traiteur' ) );
+				echo '<li><strong>' . esc_html( $cle['nom'] ? $cle['nom'] : __( 'Appareil', 'espace-traiteur' ) ) . '</strong><small>' . esc_html( $quand ) . '</small><button type="button" class="etr-lien" data-cle-retirer="' . esc_attr( $cle['id'] ) . '">' . esc_html__( 'Retirer', 'espace-traiteur' ) . '</button></li>';
+			}
+			echo '</ul>';
+		}
+		echo '</section>';
 	}
 
 	/**
@@ -1191,6 +1240,9 @@ class ETR_Gestion {
 			array( self::url( array( 'vue' => 'recherche' ) ), __( 'Rechercher', 'espace-traiteur' ), 'recherche' ),
 			array( self::url( array( 'vue' => 'notifications' ) ), __( 'Notifications', 'espace-traiteur' ), 'cloche' ),
 		);
+		if ( ETR_Cles_Acces::disponible() ) {
+			$liens[] = array( self::url( array( 'vue' => 'face-id' ) ), __( 'Connexion par Face ID', 'espace-traiteur' ), 'visage' );
+		}
 		if ( ETR_Equipe::bureau() ) {
 			$liens[] = array( etr_url(), __( 'Voir l’espace traiteur', 'espace-traiteur' ), 'site' );
 			$liens[] = array( admin_url( 'edit.php?post_type=etr_demande&page=etr-reglages' ), __( 'Réglages', 'espace-traiteur' ), 'reglages' );

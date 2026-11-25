@@ -1118,3 +1118,13 @@ html:active-view-transition-type(onglet)::view-transition-new(etr-contenu) { ani
 .etr-arret__ordre { display: flex; gap: 6px; }
 .etr-app .etr-arret__ordre .etr-btn { width: 44px; min-height: 44px; padding: 0; font-size: 18px; }
 .etr-arret__libre { margin: 0 0 6px; padding: 6px 10px; border-radius: 10px; background: var(--etr-lin); color: var(--etr-gris); font-size: 13px; font-weight: 600; }
+
+/* Connexion par Face ID (écran de connexion de l'application). */
+.etr-auth__cle { margin: 0 0 6px; }
+.etr-auth__cle[hidden] { display: none; }
+.etr-app .etr-auth__bouton--cle,
+.etr-auth__bouton--cle { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; }
+.etr-auth__bouton--cle .etr-icone { width: 22px; height: 22px; }
+.etr-auth__ou { display: flex; align-items: center; gap: 12px; margin: 18px 0 6px; color: var(--etr-gris, #6b655f); font-size: 13px; }
+.etr-auth__ou::before,
+.etr-auth__ou::after { content: ""; flex: 1; height: 1px; background: var(--etr-trait, #e3ddd3); }
