@@ -63,6 +63,14 @@
 		return n + ' ' + ( n > 1 ? plusieurs : un );
 	}
 
+	// Confirmation dans une feuille de l'application (app.js), sinon celle du navigateur.
+	function confirmer( texte, valider ) {
+		if ( window.etrConfirmer ) {
+			return window.etrConfirmer( texte, { valider: valider } );
+		}
+		return Promise.resolve( window.confirm( texte ) ); // eslint-disable-line no-alert
+	}
+
 	// Boutons − / + des champs de quantité (préparation, colis, reprise).
 	document.addEventListener( 'click', function ( e ) {
 		var bouton = e.target.closest( '.etr-pas [data-action]' );
@@ -89,6 +97,7 @@
 		var msgPrepa   = prepa.querySelector( '[data-prepa-message]' );
 		var enAttente  = {};
 		var file       = Promise.resolve();
+		var enCours    = 0; // Enregistrements partis, sans réponse encore.
 
 		var progres = function () {
 			var fait  = 0;
@@ -115,8 +124,14 @@
 
 		// Les envois partent dans l'ordre ; chaque champ attend que l'on ait fini de toucher (350 ms).
 		var envoyer = function ( chemin, donnees, garder ) {
+			enCours++;
 			file = file.catch( function () {} ).then( function () {
 				return api( chemin, donnees, false, garder );
+			} );
+			file.then( function () {
+				enCours--;
+			}, function () {
+				enCours--;
 			} );
 			return file;
 		};
@@ -165,6 +180,7 @@
 				return;
 			}
 			var prete = action.getAttribute( 'data-action' ) === 'prete';
+			var accord = Promise.resolve( true );
 			if ( prete ) {
 				var etat  = progres();
 				var colis = entier( prepa.querySelector( '[data-colis]' ).value );
@@ -173,21 +189,30 @@
 					prepa.querySelector( '[data-colis]' ).focus();
 					return;
 				}
-				// eslint-disable-next-line no-alert
-				if ( etat.fait < etat.total && ! window.confirm( 'Il manque ' + pluriel( etat.total - etat.fait, 'article', 'articles' ) + '. Marquer la commande prête quand même ?' ) ) {
-					return;
+				if ( etat.fait < etat.total ) {
+					accord = confirmer( 'Il manque ' + pluriel( etat.total - etat.fait, 'article', 'articles' ) + '. Marquer la commande prête quand même ? Les livreurs seront prévenus qu’elle est incomplète.', 'Marquer prête' );
 				}
 			}
-			action.disabled = true;
-			toutEnvoyer().then( function () {
-				return envoyer( idPrepa + '/preparation/prete', { prete: prete } );
-			} ).then( function ( etat ) {
-				appliquer( etat );
-				message( msgPrepa, prete ? 'Commande prête : les livreurs sont prévenus.' : 'Préparation rouverte.', 'ok' );
-			} ).catch( function ( erreur ) {
-				message( msgPrepa, erreur.message, 'erreur' );
-			} ).then( function () {
-				action.disabled = false;
+			accord.then( function ( ok ) {
+				if ( ! ok ) {
+					return;
+				}
+				action.disabled = true;
+				toutEnvoyer().then( function () {
+					return envoyer( idPrepa + '/preparation/prete', { prete: prete } );
+				} ).then( function ( etat ) {
+					appliquer( etat );
+					message( msgPrepa, '', '' );
+					if ( window.etrToast ) {
+						window.etrToast( prete ? 'Commande prête : les livreurs sont prévenus.' : 'Préparation rouverte.' );
+					} else {
+						message( msgPrepa, prete ? 'Commande prête : les livreurs sont prévenus.' : 'Préparation rouverte.', 'ok' );
+					}
+				} ).catch( function ( erreur ) {
+					message( msgPrepa, erreur.message, 'erreur' );
+				} ).then( function () {
+					action.disabled = false;
+				} );
 			} );
 		} );
 
@@ -217,7 +242,22 @@
 				} );
 			}
 		} );
-		// En quittant la page : les derniers touchers partent tout de suite, en « keepalive »
+		// Un lien touché alors qu'un enregistrement est en attente : on envoie d'abord, puis on change
+		// d'écran (une requête lancée au moment de quitter la page peut être perdue).
+		document.addEventListener( 'click', function ( e ) {
+			var lien = e.target.closest( 'a[href]' );
+			if ( ! lien || lien.target || e.defaultPrevented || ( ! Object.keys( enAttente ).length && ! enCours ) ) {
+				return;
+			}
+			e.preventDefault();
+			e.stopPropagation();
+			message( msgPrepa, 'Enregistrement…', 'info' );
+			toutEnvoyer().then( function () {
+				window.location.href = lien.href;
+			} );
+		}, true );
+
+		// En quittant la page autrement (app fermée…) : les derniers touchers partent en « keepalive »
 		// (une requête ordinaire serait annulée par le changement de page).
 		window.addEventListener( 'pagehide', function () {
 			Object.keys( enAttente ).forEach( function ( cle ) {

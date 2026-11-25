@@ -243,11 +243,12 @@ class ETR_Terrain {
 		echo '<div class="etr-panneau etr-prepa__fin">';
 		echo '<label class="etr-prepa__colis"><span><strong>' . esc_html__( 'Nombre de colis', 'espace-traiteur' ) . '</strong><small>' . esc_html__( 'Caisses, chariots, piles de tables… une étiquette par colis.', 'espace-traiteur' ) . '</small></span>';
 		echo '<span class="etr-pas"><button type="button" data-action="colis-moins" aria-label="' . esc_attr__( 'Un colis de moins', 'espace-traiteur' ) . '">−</button><input type="number" inputmode="numeric" min="0" max="' . (int) ETR_Operations::MAX_COLIS . '" value="' . (int) $prepa['colis'] . '" data-colis><button type="button" data-action="colis-plus" aria-label="' . esc_attr__( 'Un colis de plus', 'espace-traiteur' ) . '">+</button></span></label>';
-		echo '<p class="etr-prepa__message" data-prepa-message role="status"></p>';
+		echo '</div>';
+		echo '<div class="etr-barre-action"><p class="etr-prepa__message" data-prepa-message role="status"></p>';
 		echo '<div class="etr-prepa__actions">';
 		echo '<button type="button" class="etr-btn" data-action="prete"' . ( $prepa['prete'] ? ' hidden' : '' ) . '>' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Commande prête', 'espace-traiteur' ) . '</span></button>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<button type="button" class="etr-btn etr-btn--discret" data-action="rouvrir"' . ( $prepa['prete'] ? '' : ' hidden' ) . '>' . esc_html__( 'Rouvrir la préparation', 'espace-traiteur' ) . '</button>';
-		echo '<a class="etr-btn etr-btn--discret" data-etiquettes href="' . esc_url( self::url( array( 'vue' => 'etiquettes', 'id' => $id ) ) ) . '" target="_blank"' . ( $prepa['colis'] ? '' : ' hidden' ) . '>' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Imprimer les étiquettes', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '<a class="etr-btn etr-btn--discret" data-etiquettes href="' . esc_url( self::url( array( 'vue' => 'etiquettes', 'id' => $id ) ) ) . '" target="_blank"' . ( $prepa['colis'] ? '' : ' hidden' ) . '>' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Étiquettes', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '</div></div>';
 		echo '</div>';
 	}
@@ -441,8 +442,8 @@ class ETR_Terrain {
 		echo '</section>';
 		self::zone_photos( __( 'Photos du matériel livré (facultatif)', 'espace-traiteur' ) );
 		self::zone_note();
-		echo '<p class="etr-prepa__message" data-envoi-message role="status"></p>';
-		echo '<button type="submit" class="etr-btn etr-btn--plein">' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Valider la livraison', 'espace-traiteur' ) . '</span></button>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '<div class="etr-barre-action"><p class="etr-prepa__message" data-envoi-message role="status"></p>';
+		echo '<button type="submit" class="etr-btn etr-btn--plein">' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Valider la livraison', 'espace-traiteur' ) . '</span></button></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '</form>';
 	}
 
@@ -483,8 +484,8 @@ class ETR_Terrain {
 		echo '<p class="etr-champ"><label for="etr-signataire">' . esc_html__( 'Nom', 'espace-traiteur' ) . '</label><input type="text" id="etr-signataire" name="signataire" autocomplete="name"></p>';
 		self::zone_signature( __( 'Signature', 'espace-traiteur' ), false );
 		echo '</details>';
-		echo '<p class="etr-prepa__message" data-envoi-message role="status"></p>';
-		echo '<button type="submit" class="etr-btn etr-btn--plein">' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Valider la reprise', 'espace-traiteur' ) . '</span></button>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '<div class="etr-barre-action"><p class="etr-prepa__message" data-envoi-message role="status"></p>';
+		echo '<button type="submit" class="etr-btn etr-btn--plein">' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Valider la reprise', 'espace-traiteur' ) . '</span></button></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '</form>';
 	}
 

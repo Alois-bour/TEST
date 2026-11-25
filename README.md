@@ -98,6 +98,21 @@ L'espace de gestion (`/gestion-traiteur/`) s'installe comme une application sur 
 - Les droits sont vérifiés côté serveur : une demande en attente est introuvable pour le terrain (fiche, bons), toute action de gestion est refusée hors bureau.
 - Les administrateurs WordPress ont tous les droits.
 
+### Expérience d'application (2.1.0)
+
+Dans l'application installée sur iPhone, l'espace de gestion se comporte comme une app native :
+
+- **Barre d'onglets** en bas avec 4 onglets et **Plus** (feuille avec les autres écrans, les notifications, les réglages et la déconnexion). En-tête compact ; le **grand titre** de la page se replie dans l'en-tête quand on fait défiler.
+- **Transitions** entre les écrans (glissement vers l'avant ou vers l'arrière, fondu entre onglets ; Safari 18.2+), **barre de chargement** fine pendant la navigation.
+- **Feuilles qui montent du bas** : changer le statut et la remise d'une demande (barre d'action en bas de la fiche), confirmations (retirer un accès, commande prête incomplète). Fermeture en touchant le fond ou en tirant la feuille vers le bas.
+- **Notifications temporaires** (« Statut enregistré ») à la place des bandeaux ; l'adresse est nettoyée pour qu'un rechargement ne les réaffiche pas.
+- **Tirer pour actualiser** sur les listes et la tournée (pas sur les écrans de saisie).
+- **Liste des demandes en cartes** sur téléphone : toute la carte ouvre la demande ; **glisser vers la gauche** révèle « Appeler » (traiteur) et « Itinéraire ».
+- **Bouton principal fixe en bas**, à portée du pouce (préparation, livraison, reprise).
+- **Mode sombre** automatique (réglage de l'iPhone ou de l'ordinateur).
+- **Écran de démarrage** aux couleurs de l'application, avec l'icône (images générées par le plugin, extension GD).
+- **Pastilles** : demandes à traiter (bureau) ou étapes de la tournée du jour (livreurs), sur l'onglet et sur l'icône de l'application (iOS 16.4+, notifications autorisées), mise à jour aussi par les notifications.
+
 ### Notifications (iPhone)
 
 - Sur iPhone (iOS 16.4 ou plus), elles fonctionnent dans l'application **installée sur l'écran d'accueil**. Chacun les active depuis la cloche (page *Notifications*) : l'iPhone demande l'autorisation, puis une notification de test arrive. Une invitation à les activer s'affiche dans l'app tant que la personne n'a pas répondu. Elles marchent aussi sur ordinateur (Chrome, Edge, Firefox, Safari).

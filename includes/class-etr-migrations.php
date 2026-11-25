@@ -69,8 +69,24 @@ class ETR_Migrations {
 				'description' => __( 'Rôles de l’équipe (Bureau, Préparateur, Livreur) et adresses de l’application installable.', 'espace-traiteur' ),
 				'callback'    => array( __CLASS__, 'migrer_1_8_0' ),
 			),
+			'2.1.0' => array(
+				'description' => __( 'Application : adresses des écrans de démarrage iPhone.', 'espace-traiteur' ),
+				'callback'    => array( __CLASS__, 'migrer_2_1_0' ),
+			),
 		);
 		return (array) apply_filters( 'etr_migrations', $etapes );
+	}
+
+	/**
+	 * Migration 2.1.0 : adresses des écrans de démarrage (règle de réécriture élargie).
+	 *
+	 * @return true
+	 */
+	public static function migrer_2_1_0() {
+		ETR_Gestion::regle_reecriture();
+		ETR_PWA::regle_reecriture();
+		flush_rewrite_rules( false );
+		return true;
 	}
 
 	/**

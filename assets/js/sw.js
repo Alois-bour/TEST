@@ -25,6 +25,9 @@ self.addEventListener( 'activate', ( evenement ) => {
 			.then( ( cles ) => Promise.all(
 				cles.filter( ( cle ) => cle.startsWith( 'etr-gestion-' ) && cle !== CACHE ).map( ( cle ) => caches.delete( cle ) )
 			) )
+			// Pas de préchargement des navigations : il faisait perdre les derniers enregistrements
+			// envoyés en quittant une page (requêtes « keepalive »). Désactivé s'il l'avait été.
+			.then( () => self.registration.navigationPreload ? self.registration.navigationPreload.disable() : null )
 			.then( () => self.clients.claim() )
 	);
 } );
@@ -108,6 +111,10 @@ self.addEventListener( 'push', ( evenement ) => {
 	try {
 		message = evenement.data ? evenement.data.json() : {};
 	} catch ( e ) {}
+	// Pastille sur l'icône de l'application (iOS 16.4+, application installée).
+	if ( typeof message.badge === 'number' && self.navigator && 'setAppBadge' in self.navigator ) {
+		( message.badge > 0 ? self.navigator.setAppBadge( message.badge ) : self.navigator.clearAppBadge() ).catch( () => {} );
+	}
 	evenement.waitUntil(
 		self.registration.showNotification( message.title || ETR.nom, {
 			body: message.body || '',
