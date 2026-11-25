@@ -13,6 +13,15 @@ defined( 'ABSPATH' ) || exit;
 class ETR_Notifications {
 
 	/**
+	 * Vrai pendant une décision du bureau (formulaire « Statut et message ») : seul ce cas joint
+	 * le message au traiteur à l'e-mail. Une livraison ou une reprise enregistrée sur le terrain
+	 * change aussi le statut, sans nouveau message : l'ancien ne doit pas être renvoyé.
+	 *
+	 * @var bool
+	 */
+	public static $decision_bureau = false;
+
+	/**
 	 * Hooks.
 	 */
 	public static function init() {
@@ -231,7 +240,7 @@ class ETR_Notifications {
 		/* translators: 1 : numéro, 2 : événement, 3 : statut. */
 		$corps .= sprintf( __( 'Votre demande #%1$d (%2$s) est désormais : %3$s.', 'espace-traiteur' ), $demande_id, get_the_title( $demande_id ), $label ) . "\n";
 
-		$reponse = get_post_meta( $demande_id, '_etr_reponse', true );
+		$reponse = self::$decision_bureau ? get_post_meta( $demande_id, '_etr_reponse', true ) : '';
 		if ( $reponse ) {
 			$corps .= "\n" . __( 'Message de notre équipe :', 'espace-traiteur' ) . "\n" . $reponse . "\n";
 		}
