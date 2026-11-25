@@ -123,6 +123,33 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Version 3.0.0 : couleurs, logistique, traiteur, stock, facturation, Stripe
+
+Tout s'active et se règle dans **Espace traiteur › Fonctions** (couleurs : **Réglages › Couleurs**). Les fonctions qui changent le parcours du traiteur, envoient des e-mails ou touchent à l'argent sont désactivées par défaut.
+
+**Couleurs** (Réglages) : couleur principale, menu/en-tête et fond de l'application de l'équipe ; couleur principale, menu et texte de l'espace traiteur (aussi utilisées par les e-mails). Nuances calculées, barre d'état de l'iPhone et écrans de démarrage assortis ; mode sombre inchangé ; retour aux couleurs d'origine.
+
+| Groupe | Fonction | Par défaut | En bref |
+|---|---|---|---|
+| Logistique | Volume du camion | activée | Volume par produit (Inventaire), part du camion sur chaque demande, alerte plusieurs trajets (comptés dans l'estimation), volume à charger sur la tournée. Réglages : volume du camion, remplissage utile. |
+| | Créneaux | désactivée | Le traiteur choisit un créneau de livraison et de reprise ; limite par créneau et par jour ; affiché sur la fiche et la tournée. |
+| | Tournée optimisée | activée | « Optimiser l'ordre de passage » : par créneau, puis au plus court depuis le dépôt (plus proche voisin + 2-opt). |
+| Traiteur | Packs | activée | Espace traiteur › Packs : quantités fixes ou par invité, ajoutées en un clic dans la limite du disponible. |
+| | Quantités suggérées | activée | « Quantité conseillée par invité » (produits) × nombre d'invités. |
+| | Calendrier des disponibilités | activée | Écran « Disponibilités » : quantité libre jour par jour d'un article. |
+| | Plusieurs comptes par société | désactivée | « Mon équipe » : collaborateurs invités par le traiteur, demandes partagées, retrait d'accès. |
+| | Avis après l'événement | désactivée | Invitation après la clôture, note sur 5 et commentaire, bureau prévenu, moyenne dans les statistiques. |
+| Stock | Historique de casse | activée | Casse et manquants par article sur 12 mois, « à racheter » au-delà d'un seuil. |
+| | Inventaire | activée | Onglet « Inventaire » : comptage au téléphone, écart avec l'attendu, correction du stock. |
+| | Alertes de stock bas | désactivée | Quantité libre sous un seuil dans les semaines à venir : encart du catalogue et notification quotidienne. |
+| Argent | Facture finale | désactivée | Numéro chronologique sans trou (préfixe-année-numéro), contenu figé, TVA, acompte déduit, PDF au traiteur, « payée le », onglet « Factures ». Réglages : émetteur, SIRET, TVA, prix TTC ou HT, mentions, IBAN. |
+| | Export comptable | désactivée | CSV du mois pour Excel ou le logiciel comptable. |
+| | Paiement en ligne (Stripe) | désactivée | Acompte et solde par Stripe Checkout ; caution par empreinte bancaire (7 jours au plus, proposée 6 jours avant la livraison) ou carte enregistrée ; libérer ou débiter depuis la fiche ; libération automatique après une reprise complète ; webhook signé. Clés : Fonctions › Paiement en ligne (la clé secrète n'est jamais réaffichée). |
+
+**Stripe, mise en place** : clé secrète (Développeurs › Clés API), puis un webhook vers `…/wp-json/etr/v1/stripe/webhook` avec l'événement `checkout.session.completed`, et son secret de signature. Essayez d'abord avec une clé de test (`sk_test_…`).
+
+**Tests automatiques** : `php tests/executer.php` (sans WordPress), lancés avant chaque déploiement.
+
 ### E-mails mis en page (2.9.0)
 
 - **Tous les e-mails du plugin** (invitations, mots de passe, nouvelle demande, statut, rappels, messages, devis, bon de livraison, relevé, relances, e-mail de test) partent en **HTML aux couleurs du site** : logo (celui de la page de connexion, sinon du site), titre, salutation, informations de la demande en tableau, liste des articles, message de l'équipe encadré, **boutons** d'action (avec l'adresse en clair dessous), pied de page. Lisible sur iPhone, Gmail et Outlook (mise en page en tableaux, styles en ligne).

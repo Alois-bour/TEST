@@ -38,6 +38,9 @@ jobs:
           find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l > /dev/null
           echo "Syntaxe PHP correcte."
 
+      - name: Lancer les tests
+        run: php tests/executer.php
+
       - name: Vérifier la configuration
         id: config
         env:
@@ -126,7 +129,7 @@ jobs:
           ssh serveur "mkdir -p $(printf %q "$CIBLE")"
           rsync -rlptz --delete --itemize-changes \
             --exclude '.git' --exclude '.gitignore' --exclude '.github' \
-            --exclude 'README.md' --exclude 'docs' \
+            --exclude 'README.md' --exclude 'docs' --exclude 'tests' \
             ./ "serveur:$CIBLE/"
 
       - name: Mettre à jour la base de données
