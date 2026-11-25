@@ -23,6 +23,8 @@ class ETR_Estimation {
 	const OPTION_DEPART = 'etr_estimation_depart';
 	const META          = '_etr_estimation_trajet';
 	const DELAI         = 8; // Secondes par appel aux services.
+	const RAYON         = 30; // km autour du dépôt pour le prix du gazole.
+	const CARBURANTS    = 'https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records';
 
 	/**
 	 * Hooks.
@@ -53,7 +55,8 @@ class ETR_Estimation {
 		return array(
 			'depart'      => 'Frolois 54140',
 			'conso'       => 14.0,  // L/100 km.
-			'gazole'      => 1.70,  // €/L.
+			'gazole_source' => 'marche', // marche : prix réel des stations autour du dépôt ; manuel : prix saisi.
+			'gazole'      => 2.00,  // €/L : prix saisi, et prix de secours si le prix du marché est indisponible.
 			'usage_km'    => 0.20,  // €/km : entretien, pneus, assurance, amortissement.
 			'taux'        => 30.0,  // €/h : coût chargé d'une personne.
 			'personnes'   => 1,
@@ -100,6 +103,10 @@ class ETR_Estimation {
 		$saisie = is_array( $saisie ) ? $saisie : array();
 		$propre = array();
 		foreach ( self::defauts() as $cle => $defaut ) {
+			if ( 'gazole_source' === $cle ) {
+				$propre[ $cle ] = isset( $saisie[ $cle ] ) && 'manuel' === $saisie[ $cle ] ? 'manuel' : 'marche';
+				continue;
+			}
 			if ( 'depart' === $cle ) {
 				$valeur = isset( $saisie[ $cle ] ) ? trim( sanitize_text_field( $saisie[ $cle ] ) ) : '';
 				$propre[ $cle ] = '' === $valeur ? $defaut : $valeur;
@@ -113,6 +120,7 @@ class ETR_Estimation {
 		$avant               = self::parametres();
 		if ( $avant['depart'] !== $propre['depart'] ) {
 			delete_option( self::OPTION_DEPART ); // Nouvelle adresse : relocalisée au prochain calcul.
+			delete_transient( 'etr_gazole_marche' ); // Et prix du gazole relevé autour du nouveau dépôt.
 		}
 		return $propre;
 	}
@@ -130,7 +138,6 @@ class ETR_Estimation {
 		$champs = array(
 			'depart'      => array( __( 'Adresse de départ (dépôt)', 'espace-traiteur' ), '' ),
 			'conso'       => array( __( 'Consommation du camion', 'espace-traiteur' ), 'L/100 km' ),
-			'gazole'      => array( __( 'Prix du gazole', 'espace-traiteur' ), '€/L' ),
 			'usage_km'    => array( __( 'Usage du camion (entretien, pneus, assurance, amortissement)', 'espace-traiteur' ), '€/km' ),
 			'taux'        => array( __( 'Coût horaire d’une personne (charges comprises)', 'espace-traiteur' ), '€/h' ),
 			'personnes'   => array( __( 'Personnes par livraison', 'espace-traiteur' ), '' ),
@@ -148,6 +155,13 @@ class ETR_Estimation {
 			}
 			echo '<p><label>' . esc_html( $champ[0] ) . '<br><input type="text" class="' . ( 'depart' === $nom ? 'regular-text' : 'small-text' ) . '" name="' . esc_attr( self::OPTION . '[' . $nom . ']' ) . '" value="' . esc_attr( (string) $valeur ) . '"' . ( 'depart' === $nom ? '' : ' inputmode="decimal"' ) . '> ' . esc_html( $champ[1] ) . '</label></p>';
 		}
+		// Prix du gazole : marché (stations autour du dépôt) ou saisi.
+		$marche = self::prix_marche();
+		echo '<p><strong>' . esc_html__( 'Prix du gazole', 'espace-traiteur' ) . '</strong><br>';
+		echo '<label><input type="radio" name="' . esc_attr( self::OPTION . '[gazole_source]' ) . '" value="marche"' . checked( $p['gazole_source'], 'marche', false ) . '> ' . esc_html__( 'Prix réel du marché (moyenne des stations autour du dépôt, mise à jour toutes les 6 heures)', 'espace-traiteur' ) . '</label><br>';
+		echo '<label><input type="radio" name="' . esc_attr( self::OPTION . '[gazole_source]' ) . '" value="manuel"' . checked( $p['gazole_source'], 'manuel', false ) . '> ' . esc_html__( 'Prix saisi :', 'espace-traiteur' ) . '</label> ';
+		echo '<input type="text" class="small-text" inputmode="decimal" name="' . esc_attr( self::OPTION . '[gazole]' ) . '" value="' . esc_attr( str_replace( '.', ',', (string) $p['gazole'] ) ) . '"> €/L</p>';
+		echo '<p class="description">' . esc_html( $marche ? self::texte_marche( $marche ) : __( 'Prix du marché indisponible pour le moment : le prix saisi est utilisé en attendant.', 'espace-traiteur' ) ) . '</p>';
 		$depart = get_option( self::OPTION_DEPART );
 		if ( is_array( $depart ) && ! empty( $depart['label'] ) ) {
 			/* translators: %s : adresse trouvée. */
@@ -155,6 +169,91 @@ class ETR_Estimation {
 		}
 		echo '<p class="description">' . esc_html__( 'Valeurs par défaut : camion 20 m³ avec hayon au gazole. Le calcul compte deux allers-retours (livraison, puis reprise). Les adresses sont envoyées à la Base Adresse Nationale et au calcul d’itinéraire de l’IGN (services publics gratuits).', 'espace-traiteur' ) . '</p>';
 		echo '</fieldset>';
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Prix du gazole                                                     */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Prix moyen du gazole relevé dans les stations : autour du dépôt, sinon dans son département,
+	 * sinon en France (données publiques « Prix des carburants », data.economie.gouv.fr).
+	 * Gardé 6 heures ; après un échec, nouvel essai au bout d'une heure.
+	 *
+	 * @return array|null { prix, stations, maj, zone }
+	 */
+	public static function prix_marche() {
+		$garde = get_transient( 'etr_gazole_marche' );
+		if ( is_array( $garde ) ) {
+			return empty( $garde['prix'] ) ? null : $garde;
+		}
+		$depart = self::depart();
+		$p      = self::parametres();
+		$zones  = array();
+		if ( $depart ) {
+			/* translators: 1 : rayon, 2 : dépôt. */
+			$zones[] = array( sprintf( "within_distance(geom, geom'POINT(%F %F)', %dkm)", $depart['lon'], $depart['lat'], self::RAYON ), sprintf( __( 'à moins de %1$d km de %2$s', 'espace-traiteur' ), self::RAYON, $depart['label'] ) );
+		}
+		if ( preg_match( '/\b(\d{2})\d{3}\b/', $p['depart'], $cp ) ) {
+			/* translators: %s : département. */
+			$zones[] = array( sprintf( 'code_departement="%s"', $cp[1] ), sprintf( __( 'dans le département %s', 'espace-traiteur' ), $cp[1] ) );
+		}
+		$zones[] = array( '', __( 'en France', 'espace-traiteur' ) );
+		foreach ( $zones as $zone ) {
+			$ou   = 'gazole_prix is not null' . ( $zone[0] ? ' and ' . $zone[0] : '' );
+			$json = self::json( self::CARBURANTS . '?select=' . rawurlencode( 'avg(gazole_prix) as prix, count(gazole_prix) as stations, max(gazole_maj) as maj' ) . '&where=' . rawurlencode( $ou ) );
+			$r    = isset( $json['results'][0] ) ? $json['results'][0] : null;
+			if ( $r && isset( $r['prix'] ) && (float) $r['prix'] > 0.5 && (float) $r['prix'] < 5 && (int) $r['stations'] >= 3 ) {
+				$marche = array(
+					'prix'     => round( (float) $r['prix'], 3 ),
+					'stations' => (int) $r['stations'],
+					'maj'      => isset( $r['maj'] ) ? (string) $r['maj'] : '',
+					'zone'     => $zone[1],
+				);
+				set_transient( 'etr_gazole_marche', $marche, 6 * HOUR_IN_SECONDS );
+				return $marche;
+			}
+		}
+		set_transient( 'etr_gazole_marche', array( 'prix' => 0 ), HOUR_IN_SECONDS );
+		return null;
+	}
+
+	/**
+	 * Phrase sur le prix du marché.
+	 *
+	 * @param array $marche Résultat de prix_marche().
+	 * @return string
+	 */
+	private static function texte_marche( $marche ) {
+		$maj = $marche['maj'] ? strtotime( $marche['maj'] ) : 0;
+		return sprintf(
+			/* translators: 1 : prix, 2 : nombre de stations, 3 : zone, 4 : date. */
+			__( 'Prix du marché : %1$s €/L, moyenne de %2$s stations %3$s%4$s.', 'espace-traiteur' ),
+			number_format_i18n( $marche['prix'], 3 ),
+			number_format_i18n( $marche['stations'] ),
+			$marche['zone'],
+			/* translators: %s : date et heure. */
+			$maj ? ' ' . sprintf( __( '(relevé jusqu’au %s)', 'espace-traiteur' ), wp_date( 'j F à H:i', $maj ) ) : ''
+		);
+	}
+
+	/**
+	 * Prix du gazole retenu pour le calcul.
+	 *
+	 * @return array { prix, texte }
+	 */
+	public static function gazole() {
+		$p = self::parametres();
+		if ( 'marche' === $p['gazole_source'] ) {
+			$marche = self::prix_marche();
+			if ( $marche ) {
+				return array( 'prix' => $marche['prix'], 'texte' => self::texte_marche( $marche ) );
+			}
+			/* translators: %s : prix. */
+			return array( 'prix' => (float) $p['gazole'], 'texte' => sprintf( __( 'Prix du marché indisponible : prix saisi utilisé (%s €/L).', 'espace-traiteur' ), number_format_i18n( $p['gazole'], 2 ) ) );
+		}
+		/* translators: %s : prix. */
+		return array( 'prix' => (float) $p['gazole'], 'texte' => sprintf( __( 'Prix du gazole saisi : %s €/L.', 'espace-traiteur' ), number_format_i18n( $p['gazole'], 2 ) ) );
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -370,8 +469,10 @@ class ETR_Estimation {
 			}
 			return $html . '</div>';
 		}
-		$c      = self::chiffrer( $trajet );
-		$p      = self::parametres();
+		$p           = self::parametres();
+		$gazole      = self::gazole();
+		$p['gazole'] = $gazole['prix'];
+		$c           = self::chiffrer( $trajet, $p );
 		$prix   = function ( $m ) {
 			return number_format_i18n( $m, 2 ) . ' €';
 		};
@@ -379,8 +480,8 @@ class ETR_Estimation {
 		$html  .= '<p class="etr-estimation__trajet">' . esc_html( sprintf( __( '%1$s km et %2$s par trajet, jusqu’à « %3$s »', 'espace-traiteur' ), number_format_i18n( $trajet['km'], 1 ), self::duree( $trajet['minutes'] / 60 ), $trajet['arrivee'] ) ) . ( 'vol' === $trajet['source'] ? ' <em>' . esc_html__( '(approximation à vol d’oiseau : itinéraire indisponible)', 'espace-traiteur' ) . '</em>' : '' ) . '</p>';
 		$html  .= '<dl class="etr-estimation__detail">';
 		$lignes = array(
-			/* translators: 1 : km, 2 : litres. */
-			array( sprintf( __( 'Gazole (%1$s km, %2$s L)', 'espace-traiteur' ), number_format_i18n( $c['km'] ), number_format_i18n( $c['litres'], 1 ) ), $prix( $c['carburant'] ) ),
+			/* translators: 1 : km, 2 : litres, 3 : prix au litre. */
+			array( sprintf( __( 'Gazole (%1$s km, %2$s L à %3$s €)', 'espace-traiteur' ), number_format_i18n( $c['km'] ), number_format_i18n( $c['litres'], 1 ), number_format_i18n( $p['gazole'], 2 ) ), $prix( $c['carburant'] ) ),
 			array( __( 'Usage du camion', 'espace-traiteur' ), $prix( $c['usage'] ) ),
 			/* translators: 1 : durée, 2 : personnes. */
 			array( sprintf( _n( 'Personnel (%1$s, %2$s personne)', 'Personnel (%1$s, %2$s personnes)', $p['personnes'], 'espace-traiteur' ), self::duree( $c['heures'] ), number_format_i18n( $p['personnes'] ) ), $prix( $c['personnel'] ) ),
@@ -394,7 +495,7 @@ class ETR_Estimation {
 		}
 		/* translators: %s : marge. */
 		$html .= '<div class="etr-estimation__prix"><dt>' . esc_html( sprintf( __( 'Prix conseillé (marge %s %%)', 'espace-traiteur' ), number_format_i18n( $p['marge'] ) ) ) . '</dt><dd>' . esc_html( $prix( $c['prix'] ) ) . '</dd></div></dl>';
-		$html .= '<p class="etr-muted etr-estimation__note">' . esc_html__( 'Livraison puis reprise : deux allers-retours depuis le dépôt. Indication à ajuster (accès, étages, horaires, péages).', 'espace-traiteur' ) . '</p>';
+		$html .= '<p class="etr-muted etr-estimation__note">' . esc_html( $gazole['texte'] ) . ' ' . esc_html__( 'Livraison puis reprise : deux allers-retours depuis le dépôt. Indication à ajuster (accès, étages, horaires, péages).', 'espace-traiteur' ) . '</p>';
 		if ( $bouton ) {
 			$html .= '<p class="etr-estimation__actions"><button type="button" class="etr-btn etr-btn--discret" data-remplir-livraison="' . esc_attr( str_replace( '.', ',', (string) $c['prix'] ) ) . '">' . esc_html__( 'Utiliser ce prix', 'espace-traiteur' ) . '</button>';
 			$html .= '<button type="submit" class="etr-btn etr-btn--discret" form="etr-estimation-recalculer">' . esc_html__( 'Recalculer', 'espace-traiteur' ) . '</button></p>';
@@ -444,6 +545,7 @@ class ETR_Estimation {
 		}
 		delete_post_meta( $id, self::META );
 		delete_transient( 'etr_estimation_echec_' . $id );
+		delete_transient( 'etr_gazole_marche' );
 		delete_option( self::OPTION_DEPART );
 		self::trajet( $id );
 		wp_safe_redirect( ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id, 'etr_msg' => 'fait' ) ) );
