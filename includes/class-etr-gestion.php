@@ -904,7 +904,8 @@ class ETR_Gestion {
 		);
 		if ( ETR_Equipe::bureau() ) {
 			$ordre = array( 'tableau', 'demandes', 'planning', 'traiteurs', 'tournee', 'scanner', 'catalogue', 'statistiques', 'equipe' );
-			return array_merge( array_flip( $ordre ), $toutes );
+			/** Écrans ajoutés par les fonctions activables (inventaire, factures…), après les autres. */
+			return (array) apply_filters( 'etr_gestion_vues', array_merge( array_flip( $ordre ), $toutes ) );
 		}
 		// Livreur : la tournée d'abord ; préparateur : le planning. Sans prix ni gestion.
 		$cles = ETR_Equipe::livreur() ? array( 'tournee', 'planning', 'demandes', 'scanner' ) : array( 'planning', 'demandes', 'scanner' );
@@ -1044,7 +1045,11 @@ class ETR_Gestion {
 				self::vue_face_id();
 				break;
 			default:
-				self::vue_tableau();
+				if ( has_action( 'etr_gestion_vue_' . $vue ) ) {
+					do_action( 'etr_gestion_vue_' . $vue ); // Écrans des fonctions activables.
+				} else {
+					self::vue_tableau();
+				}
 		}
 
 		echo '</main></div>';

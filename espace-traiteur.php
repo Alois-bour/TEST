@@ -47,6 +47,7 @@ require_once ETR_DIR . 'includes/class-etr-pilotage.php';
 require_once ETR_DIR . 'includes/class-etr-estimation.php';
 require_once ETR_DIR . 'includes/class-etr-logistique.php';
 require_once ETR_DIR . 'includes/class-etr-traiteur-plus.php';
+require_once ETR_DIR . 'includes/class-etr-stock-plus.php';
 require_once ETR_DIR . 'includes/class-etr-admin.php';
 require_once ETR_DIR . 'includes/class-etr-frontend.php';
 require_once ETR_DIR . 'includes/class-etr-statistiques.php';
@@ -85,6 +86,7 @@ add_action(
 		ETR_Estimation::init();
 		ETR_Logistique::init();
 		ETR_Traiteur_Plus::init();
+		ETR_Stock_Plus::init();
 		ETR_Admin::init();
 		ETR_Frontend::init();
 		ETR_Gestion::init();

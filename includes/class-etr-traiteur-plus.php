@@ -374,6 +374,10 @@ class ETR_Traiteur_Plus {
 	 * @return array[]
 	 */
 	private static function reservations() {
+		static $cache = null;
+		if ( null !== $cache ) {
+			return $cache;
+		}
 		$ids = get_posts(
 			array(
 				'post_type'     => 'etr_demande',
@@ -402,6 +406,7 @@ class ETR_Traiteur_Plus {
 			}
 			$r[] = array( 'debut' => $d, 'fin' => $f, 'lignes' => $lignes );
 		}
+		$cache = $r;
 		return $r;
 	}
 

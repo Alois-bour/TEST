@@ -38,6 +38,14 @@ class ETR_Modules {
 					'reparation'     => array( __( 'Matériel en réparation', 'espace-traiteur' ), __( 'La casse constatée à la reprise sort du stock disponible jusqu’à ce que le bureau la remette en stock (écran Catalogue). Évite de louer du matériel cassé.', 'espace-traiteur' ) ),
 				),
 			),
+			'stock' => array(
+				__( 'Stock', 'espace-traiteur' ),
+				array(
+					'historique_casse' => array( __( 'Historique de casse par article', 'espace-traiteur' ), __( 'Statistiques : casse et manquants de chaque article sur 12 mois, taux de pertes, articles « à racheter ».', 'espace-traiteur' ) ),
+					'inventaire'       => array( __( 'Inventaire', 'espace-traiteur' ), __( 'Onglet « Inventaire » (bureau) : on compte à l’entrepôt depuis le téléphone, l’écart avec le stock attendu (possédé − chez les traiteurs − en réparation) s’affiche, le stock est corrigé en un clic.', 'espace-traiteur' ) ),
+					'alertes_stock'    => array( __( 'Alertes de stock bas', 'espace-traiteur' ), __( 'Articles dont la quantité libre passe sous un seuil dans les semaines à venir : encart dans le Catalogue et notification quotidienne au bureau.', 'espace-traiteur' ) ),
+				),
+			),
 			'logistique' => array(
 				__( 'Logistique', 'espace-traiteur' ),
 				array(
@@ -99,6 +107,9 @@ class ETR_Modules {
 			'creneaux'         => false,
 			'tournee_optimisee' => true,
 			'reparation'       => false,
+			'historique_casse' => true,
+			'inventaire'       => true,
+			'alertes_stock'    => false,
 			'push_traiteur'    => true,
 			'en_route'         => true,
 			'messages'         => true,

@@ -78,6 +78,9 @@ class ETR_Push {
 		if ( ETR_Modules::actif( 'devis' ) ) {
 			$types['devis'] = array( 'bureau', __( 'Devis accepté par un traiteur', 'espace-traiteur' ) );
 		}
+		if ( ETR_Modules::actif( 'alertes_stock' ) ) {
+			$types['stock'] = array( 'bureau', __( 'Stock bas à venir', 'espace-traiteur' ) );
+		}
 		if ( ETR_Modules::actif( 'avis' ) ) {
 			$types['avis'] = array( 'bureau', __( 'Avis d’un traiteur', 'espace-traiteur' ) );
 		}
