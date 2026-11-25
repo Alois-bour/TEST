@@ -123,6 +123,15 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Estimation du prix de la livraison (2.8.0)
+
+Sur chaque demande, **pour le bureau et l'administration seulement** (jamais le traiteur, ni les préparateurs et livreurs) : panneau « Tarification » de la fiche dans l'application, et boîte « Estimation de la livraison » dans l'administration WordPress. Fonction activable (Espace traiteur › Fonctions, activée par défaut).
+
+- **Distance par la route** entre l'adresse de départ (par défaut *Frolois 54140*, modifiable dans Fonctions en cas de déménagement) et le lieu de livraison de la demande. Adresses : Base Adresse Nationale (api-adresse.data.gouv.fr) ; itinéraire : Géoplateforme IGN (data.geopf.fr), sinon OSRM, sinon vol d'oiseau × 1,3 (signalé). Services publics gratuits, sans clé.
+- **Calcul** (camion 20 m³ avec hayon, gazole) : deux allers-retours (livraison puis reprise) ; gazole (14 L/100 km × 1,70 €/L par défaut) ; usage du camion (0,20 €/km : entretien, pneus, assurance, amortissement) ; personnel (temps de route + 30 min sur place à chaque passage, 30 €/h, 1 personne) ; autres frais ; **prix conseillé** = coût + marge (20 %), arrondi aux 5 € supérieurs, avec un minimum possible. Tous ces paramètres sont réglables.
+- **« Utiliser ce prix »** reporte le montant dans les frais de livraison (à enregistrer) ; « Recalculer » relance le calcul.
+- **Rapide** : calcul lancé juste après l'envoi de la demande, puis gardé tant que le lieu et le départ ne changent pas ; après un échec des services, nouvel essai au bout de 30 minutes ; une approximation à vol d'oiseau est retentée le lendemain.
+
 ### Dates cohérentes et sélecteur de dates (2.7.1)
 
 - **Règles** (vérifiées dans le formulaire et sur le serveur) : événement à venir ; livraison au plus tard le jour de l'événement, au plus tôt 7 jours avant ; reprise au plus tôt le jour de l'événement, après la livraison, au plus tard 7 jours après. Écarts réglables : filtres `etr_jours_livraison_avant` et `etr_jours_reprise_apres`.

@@ -1143,3 +1143,19 @@ html:active-view-transition-type(onglet)::view-transition-new(etr-contenu) { ani
 .etr-devis p, .etr-casse p { margin: 0 0 10px; }
 .etr-stats--terrain { margin-top: 24px; }
 .etr-stats__incidents { margin-top: 14px; }
+
+/* Estimation de la livraison (2.8.0), bureau seulement */
+.etr-estimation { margin: 4px 0 14px; padding: 12px 14px; border: 1px dashed var(--etr-trait); border-radius: 12px; background: var(--etr-fond-carte, #fff); font-size: 14px; }
+.etr-estimation__titre { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; margin: 0 0 6px; font-weight: 600; }
+.etr-estimation__prive { font-weight: 400; font-size: 12px; color: var(--etr-gris); }
+.etr-estimation__trajet { margin: 0 0 8px; color: var(--etr-gris); }
+.etr-estimation__detail { margin: 0; }
+.etr-estimation__detail div { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+.etr-estimation__detail dt { color: var(--etr-gris); }
+.etr-estimation__detail dd { margin: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.etr-estimation__prix { margin-top: 4px; padding-top: 6px !important; border-top: 1px solid var(--etr-trait-doux, #eee); font-weight: 600; }
+.etr-estimation__prix dt { color: var(--etr-encre); }
+.etr-estimation__note { margin: 8px 0 0; font-size: 12.5px; }
+.etr-estimation__actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+#etr_mb_estimation .etr-estimation { border: 0; padding: 0; margin: 0; }
+#etr_mb_estimation .etr-estimation__detail div { display: flex; justify-content: space-between; }
