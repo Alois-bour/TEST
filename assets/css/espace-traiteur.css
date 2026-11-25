@@ -52,7 +52,7 @@
 ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-left: 2px solid #e3ddd3; }
 .etr-historique__entree { position: relative; display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0 0 14px; }
 .etr-historique__entree:last-child { padding-bottom: 0; }
-.etr-historique__entree::before { content: ""; position: absolute; top: 6px; left: -24px; width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid #b5ad9f; box-sizing: border-box; }
+.etr-historique__entree::before { content: ""; position: absolute; top: 6px; left: -24px; width: 10px; height: 10px; border-radius: 50%; background: var(--etr-fond-carte, #fff); border: 2px solid #b5ad9f; box-sizing: border-box; }
 .etr-historique__entree--creation::before,
 .etr-historique__entree--statut::before { border-color: #4d5b3e; background: #4d5b3e; }
 .etr-historique__entree--annulation::before { border-color: #a3342a; background: #a3342a; }
@@ -142,7 +142,7 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 .etr-app .etr-app__nav a:hover,
 .etr-app .etr-app__liens a:hover { background: rgba(29, 29, 27, .05); color: var(--etr-encre); }
 .etr-app .etr-app__nav a[aria-current="page"] {
-	background: #fff;
+	background: var(--etr-fond-carte, #fff);
 	color: var(--etr-encre);
 	font-weight: 500;
 	box-shadow: 0 1px 0 var(--etr-trait), 0 0 0 1px var(--etr-trait-doux);
@@ -228,7 +228,7 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 .etr-app .etr-btn:focus { background: #3a3833; border-color: #3a3833; color: #fff; }
 .etr-app .etr-btn .etr-icone { width: 18px; height: 18px; }
 .etr-app .etr-btn--plein { width: 100%; }
-.etr-app .etr-btn--danger { background: #fff; border-color: #e3c4bf; color: var(--etr-rouge); padding: 10px 18px; }
+.etr-app .etr-btn--danger { background: var(--etr-fond-carte, #fff); border-color: #e3c4bf; color: var(--etr-rouge); padding: 10px 18px; }
 .etr-app .etr-btn--danger:hover,
 .etr-app .etr-btn--danger:focus { background: #fbefed; border-color: var(--etr-rouge); color: var(--etr-rouge); }
 .etr-app .etr-lien { color: var(--etr-encre); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
@@ -307,7 +307,7 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 	border-radius: 999px;
 	font-size: 14px;
 	color: var(--etr-texte);
-	background: #fff;
+	background: var(--etr-fond-carte, #fff);
 	transition: border-color .15s ease, background-color .15s ease;
 }
 .etr-app .etr-filtres a:hover { border-color: #c9c0b2; }
@@ -404,7 +404,7 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 	height: 26px;
 	border-radius: 50%;
 	border: 2px solid var(--etr-trait);
-	background: #fff;
+	background: var(--etr-fond-carte, #fff);
 	color: #fff;
 }
 .etr-suivi__point .etr-icone { width: 14px; height: 14px; stroke-width: 2.4; }
@@ -441,7 +441,7 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 	padding: 24px;
 	border: 1px solid var(--etr-trait);
 	border-radius: 12px;
-	background: #fff;
+	background: var(--etr-fond-carte, #fff);
 }
 .etr-app .etr-panneau__titre {
 	display: flex;
@@ -577,7 +577,7 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 	padding: 10px 14px;
 	border: 1px solid var(--etr-trait);
 	border-radius: 8px;
-	background: #fff;
+	background: var(--etr-fond-carte, #fff);
 	box-shadow: none;
 	font: 400 15px/1.4 var(--etr-sans);
 	color: var(--etr-encre);
@@ -633,14 +633,14 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 	padding: 6px 14px;
 	border: 1px solid var(--etr-trait);
 	border-radius: 999px;
-	background: #fff;
+	background: var(--etr-fond-carte, #fff);
 	color: var(--etr-texte);
 	font: 400 14px/1.2 var(--etr-sans);
 	letter-spacing: 0;
 	text-transform: none;
 	cursor: pointer;
 }
-.etr-app .etr-familles__btn:hover { border-color: #c9c0b2; background: #fff; color: var(--etr-encre); }
+.etr-app .etr-familles__btn:hover { border-color: #c9c0b2; background: var(--etr-fond-carte, #fff); color: var(--etr-encre); }
 .etr-app .etr-familles__btn[aria-pressed="true"] { background: var(--etr-encre); border-color: var(--etr-encre); color: #fff; }
 .etr-app .etr-catalogue__aucun { padding: 24px 0; color: var(--etr-gris); }
 
@@ -706,7 +706,7 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 	height: 40px;
 	border: 1px solid var(--etr-trait);
 	border-radius: 8px;
-	background: #fff;
+	background: var(--etr-fond-carte, #fff);
 	overflow: hidden;
 }
 .etr-qte:focus-within { border-color: var(--etr-olive); box-shadow: 0 0 0 3px rgba(77, 91, 62, .16); }
@@ -753,7 +753,7 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 	padding: 24px;
 	border: 1px solid var(--etr-trait);
 	border-radius: 14px;
-	background: #fff;
+	background: var(--etr-fond-carte, #fff);
 	box-shadow: 0 24px 48px -32px rgba(29, 29, 27, .28);
 }
 .etr-app .etr-recap-commande__titre { font: italic 400 24px/1.2 var(--etr-serif); margin-bottom: 4px; }
@@ -795,7 +795,7 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 }
 
 @media (max-width: 900px) {
-	.etr-app { grid-template-columns: minmax(0, 1fr); background: #fff; }
+	.etr-app { grid-template-columns: minmax(0, 1fr); background: var(--etr-fond-carte, #fff); }
 	.etr-app--integre { background: none; }
 	.etr-app .etr-form { grid-template-columns: minmax(0, 1fr); }
 	.etr-recap-commande { position: static; }
@@ -889,7 +889,7 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 .etr-page-application .page-header,
 .etr-page-application .entry-header,
 .etr-page-application .wp-block-post-title { display: none; }
-body.etr-plein-ecran.etr-page-application { background: #fff; }
+body.etr-plein-ecran.etr-page-application { background: var(--etr-fond-carte, #fff); }
 
 /* Admin : récapitulatif du catalogue */
 .etr-recap { max-width: 900px; }
@@ -922,7 +922,7 @@ body.etr-plein-ecran.etr-page-application { background: #fff; }
 	min-height: 640px;
 	max-width: 1120px;
 	margin: 24px auto;
-	background: #fff;
+	background: var(--etr-fond-carte, #fff);
 	border: 1px solid var(--auth-trait);
 	border-radius: 4px;
 	overflow: hidden;
@@ -991,7 +991,7 @@ body.etr-plein-ecran.etr-page-application { background: #fff; }
 	align-items: center;
 	justify-content: center;
 	padding: 56px 48px;
-	background: #fff;
+	background: var(--etr-fond-carte, #fff);
 }
 .etr-auth__contenu { width: 100%; max-width: 380px; }
 .etr-auth .etr-auth__logo { display: inline-block; margin: 0 0 44px; text-decoration: none; }
@@ -1045,7 +1045,7 @@ body.etr-plein-ecran.etr-page-application { background: #fff; }
 .etr-auth input[type="password"]:focus {
 	outline: none;
 	border-color: var(--auth-encre);
-	background: #fff;
+	background: var(--etr-fond-carte, #fff);
 	box-shadow: 0 0 0 3px rgba(29, 29, 27, .1);
 }
 .etr-auth .etr-auth__saisie--mdp input { padding-right: 92px; }
@@ -1110,7 +1110,7 @@ body.etr-plein-ecran.etr-page-application { background: #fff; }
 	transition: background-color .2s ease, color .2s ease;
 }
 .etr-auth .etr-auth__bouton:hover,
-.etr-auth .etr-auth__bouton:focus { background: #fff; color: var(--auth-encre); text-decoration: none; }
+.etr-auth .etr-auth__bouton:focus { background: var(--etr-fond-carte, #fff); color: var(--auth-encre); text-decoration: none; }
 .etr-auth .etr-auth__bouton:focus-visible { outline: 2px solid var(--auth-encre); outline-offset: 3px; }
 .etr-auth .etr-auth__bouton[aria-busy="true"] { cursor: progress; background: var(--auth-encre); color: #fff; }
 .etr-auth .etr-auth__bouton[aria-busy="true"]::before {
@@ -1176,7 +1176,7 @@ body.etr-plein-ecran.etr-page-application { background: #fff; }
 }
 
 /* Connexion en plein écran */
-body.etr-plein-ecran { margin: 0; padding: 0; background: #fff; }
+body.etr-plein-ecran { margin: 0; padding: 0; background: var(--etr-fond-carte, #fff); }
 .etr-plein-ecran__main { display: block; margin: 0; padding: 0; }
 .etr-plein-ecran .etr-espace--auth { margin: 0; padding: 0; }
 .etr-plein-ecran .etr-auth {

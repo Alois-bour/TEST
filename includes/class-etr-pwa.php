@@ -24,6 +24,23 @@ class ETR_PWA {
 	const FICHIERS = array( 'manifest.webmanifest', 'sw.js', 'hors-ligne' );
 
 	/**
+	 * Écrans de démarrage iPhone : largeur et hauteur en points, densité (portrait).
+	 */
+	const DEMARRAGES = array(
+		array( 440, 956, 3 ),
+		array( 430, 932, 3 ),
+		array( 428, 926, 3 ),
+		array( 414, 896, 3 ),
+		array( 414, 896, 2 ),
+		array( 414, 736, 3 ),
+		array( 402, 874, 3 ),
+		array( 393, 852, 3 ),
+		array( 390, 844, 3 ),
+		array( 375, 812, 3 ),
+		array( 375, 667, 2 ),
+	);
+
+	/**
 	 * Couleur de la barre d'application (vert nuit de l'espace de gestion).
 	 */
 	const COULEUR = '#2c3424';
@@ -42,7 +59,7 @@ class ETR_PWA {
 	 * Règle de réécriture des fichiers de l'application.
 	 */
 	public static function regle_reecriture() {
-		add_rewrite_rule( '^' . preg_quote( ETR_Gestion::slug(), '/' ) . '/(manifest\.webmanifest|sw\.js|hors-ligne)$', 'index.php?etr_gestion_fichier=$matches[1]', 'top' );
+		add_rewrite_rule( '^' . preg_quote( ETR_Gestion::slug(), '/' ) . '/(manifest\.webmanifest|sw\.js|hors-ligne|demarrage-\d+x\d+\.png)$', 'index.php?etr_gestion_fichier=$matches[1]', 'top' );
 	}
 
 	/**
@@ -119,6 +136,10 @@ class ETR_PWA {
 		$fichier = (string) get_query_var( 'etr_gestion_fichier' );
 		if ( '' === $fichier ) {
 			return;
+		}
+		if ( preg_match( '/^demarrage-(\d+)x(\d+)\.png$/', $fichier, $taille ) ) {
+			self::ecran_demarrage( (int) $taille[1], (int) $taille[2] );
+			exit;
 		}
 		if ( ! in_array( $fichier, self::FICHIERS, true ) ) {
 			status_header( 404 );
@@ -198,6 +219,42 @@ class ETR_PWA {
 	}
 
 	/**
+	 * Image de démarrage (couleur de l'application, icône au centre), pour une taille d'iPhone connue.
+	 *
+	 * @param int $largeur Largeur en pixels.
+	 * @param int $hauteur Hauteur en pixels.
+	 */
+	private static function ecran_demarrage( $largeur, $hauteur ) {
+		$connue = false;
+		foreach ( self::DEMARRAGES as $ecran ) {
+			$connue = $connue || ( $ecran[0] * $ecran[2] === $largeur && $ecran[1] * $ecran[2] === $hauteur );
+		}
+		if ( ! $connue || ! function_exists( 'imagecreatetruecolor' ) ) {
+			status_header( 404 );
+			return;
+		}
+		$image = imagecreatetruecolor( $largeur, $hauteur );
+		list( $r, $v, $b ) = sscanf( self::COULEUR, '#%02x%02x%02x' );
+		imagefill( $image, 0, 0, imagecolorallocate( $image, $r, $v, $b ) );
+
+		$icone_id = (int) get_option( 'site_icon' );
+		$source   = $icone_id ? get_attached_file( $icone_id ) : '';
+		$source   = $source && is_readable( $source ) ? $source : ETR_DIR . 'assets/img/app-icone-512.png';
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- fichier local.
+		$icone = is_readable( $source ) ? @imagecreatefromstring( (string) file_get_contents( $source ) ) : false; // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		if ( $icone ) {
+			$cote = (int) round( $largeur * 0.28 );
+			imagecopyresampled( $image, $icone, (int) ( ( $largeur - $cote ) / 2 ), (int) ( ( $hauteur - $cote ) / 2 ), 0, 0, $cote, $cote, imagesx( $icone ), imagesy( $icone ) );
+			imagedestroy( $icone );
+		}
+		status_header( 200 );
+		header( 'Content-Type: image/png' );
+		header( 'Cache-Control: public, max-age=2592000' );
+		imagepng( $image, null, 6 );
+		imagedestroy( $image );
+	}
+
+	/**
 	 * Page affichée quand le téléphone n'a pas de réseau.
 	 */
 	private static function page_hors_ligne() {
@@ -247,8 +304,17 @@ class ETR_PWA {
 		echo '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">' . "\n";
 		echo '<meta name="apple-mobile-web-app-title" content="' . esc_attr( self::nom( true ) ) . '">' . "\n";
 		echo '<link rel="apple-touch-icon" href="' . esc_url( self::icone( 180 ) ) . '">' . "\n";
+		if ( function_exists( 'imagecreatetruecolor' ) && get_option( 'permalink_structure' ) ) {
+			foreach ( self::DEMARRAGES as $ecran ) {
+				$media = sprintf( '(device-width: %1$dpx) and (device-height: %2$dpx) and (-webkit-device-pixel-ratio: %3$d) and (orientation: portrait)', $ecran[0], $ecran[1], $ecran[2] );
+				echo '<link rel="apple-touch-startup-image" media="' . esc_attr( $media ) . '" href="' . esc_url( self::url( 'demarrage-' . ( $ecran[0] * $ecran[2] ) . 'x' . ( $ecran[1] * $ecran[2] ) . '.png' ) ) . '">' . "\n";
+			}
+		}
+		echo '<meta name="color-scheme" content="light dark">' . "\n";
 		// App lancée depuis l'écran d'accueil : présentation « app » (barre d'onglets), posée avant l'affichage.
 		echo "<script>if(navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches){document.documentElement.classList.add('etr-installee');}</script>\n";
+		// Transition vers cet écran : sens (avance, retour, onglet) choisi au toucher (app.js).
+		echo "<script>addEventListener('pagereveal',function(e){var t=e.viewTransition;if(!t){return;}['ready','finished','updateCallbackDone'].forEach(function(p){if(t[p]){t[p].catch(function(){});}});try{var s=sessionStorage.getItem('etr-sens')||'avance';sessionStorage.removeItem('etr-sens');if(t.types){t.types.add(s);}}catch(x){}});</script>\n";
 	}
 
 	/**
@@ -257,9 +323,12 @@ class ETR_PWA {
 	 * @return array
 	 */
 	public static function config_script() {
+		$connecte = is_user_logged_in() && ETR_Equipe::acces() && ! ETR_Equipe_Acces::ecran();
 		return array(
 			'sw'        => self::url( 'sw.js' ),
 			'perimetre' => get_option( 'permalink_structure' ) ? self::perimetre() : '/',
+			// Pastille sur l'icône de l'application (iPhone, app installée avec notifications autorisées).
+			'badge'     => $connecte ? ETR_Gestion::pastille_app() : null,
 		);
 	}
 }

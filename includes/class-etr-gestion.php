@@ -114,6 +114,14 @@ class ETR_Gestion {
 		}
 		nocache_headers();
 
+		// Jeton frais pour renvoyer les saisies faites sans réseau (la page en cache a un jeton ancien).
+		if ( isset( $_GET['etr_jeton'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification -- lecture seule.
+			if ( ! is_user_logged_in() || ! ETR_Equipe::acces() ) {
+				wp_send_json_error( array( 'message' => __( 'Reconnectez-vous pour envoyer les saisies en attente.', 'espace-traiteur' ) ), 401 );
+			}
+			wp_send_json_success( array( 'nonce' => wp_create_nonce( 'wp_rest' ) ) );
+		}
+
 		// Connexion, mot de passe oublié, choix du mot de passe : dans l'application même
 		// (une app installée sur iPhone a ses propres cookies), voir ETR_Equipe_Acces.
 		if ( ETR_Equipe_Acces::preparer() ) {
@@ -129,6 +137,7 @@ class ETR_Gestion {
 		}
 
 		self::page_trouvee();
+		header( 'X-ETR-Page: app' ); // Page gardable pour le hors connexion (service worker).
 
 		$action = isset( $_REQUEST['etr_gestion_action'] ) ? sanitize_key( wp_unslash( $_REQUEST['etr_gestion_action'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification -- vérifié par action.
 		if ( $action && ! ETR_Equipe::bureau() ) {
@@ -578,9 +587,11 @@ class ETR_Gestion {
 		if ( ETR_Equipe_Acces::ecran() ) {
 			wp_enqueue_script( 'espace-traiteur-connexion', ETR_URL . 'assets/js/connexion.js', array(), ETR_VERSION, true );
 		} elseif ( is_user_logged_in() ) {
-			wp_enqueue_script( 'espace-traiteur-terrain', ETR_URL . 'assets/js/terrain.js', array(), ETR_VERSION, true );
+			// Boîte d'envoi hors connexion d'abord : elle reçoit la configuration, terrain.js s'en sert.
+			wp_enqueue_script( 'espace-traiteur-hors-ligne', ETR_URL . 'assets/js/hors-ligne.js', array(), ETR_VERSION, true );
+			wp_enqueue_script( 'espace-traiteur-terrain', ETR_URL . 'assets/js/terrain.js', array( 'espace-traiteur-hors-ligne' ), ETR_VERSION, true );
 			wp_localize_script(
-				'espace-traiteur-terrain',
+				'espace-traiteur-hors-ligne',
 				'etrTerrain',
 				array(
 					'api'       => esc_url_raw( rest_url( ETR_Push::API . '/terrain/' ) ),
@@ -588,6 +599,7 @@ class ETR_Gestion {
 					'jsqr'      => ETR_URL . 'assets/vendor/jsqr.min.js?ver=' . ETR_VERSION,
 					'maxPhotos' => ETR_Operations::MAX_PHOTOS,
 					'hote'      => (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ),
+					'gestion'   => self::url(),
 				)
 			);
 		}
@@ -867,7 +879,8 @@ class ETR_Gestion {
 			'scanner'      => array( __( 'Scanner', 'espace-traiteur' ), 'scan' ),
 		);
 		if ( ETR_Equipe::bureau() ) {
-			return $toutes;
+			$ordre = array( 'tableau', 'demandes', 'planning', 'traiteurs', 'tournee', 'scanner', 'catalogue', 'statistiques', 'equipe' );
+			return array_merge( array_flip( $ordre ), $toutes );
 		}
 		// Livreur : la tournée d'abord ; préparateur : le planning. Sans prix ni gestion.
 		$cles = ETR_Equipe::livreur() ? array( 'tournee', 'planning', 'demandes', 'scanner' ) : array( 'planning', 'demandes', 'scanner' );
@@ -935,7 +948,7 @@ class ETR_Gestion {
 
 		echo '<div class="etr-app etr-gestion">';
 		self::barre_laterale( $actif );
-		echo '<main class="etr-app__principal" id="etr-contenu">';
+		echo '<main class="etr-app__principal" id="etr-contenu" data-vue="' . esc_attr( $vue ) . '">';
 		self::aide_installation();
 		if ( 'notifications' !== $vue ) {
 			self::invitation_notifications();
@@ -1113,7 +1126,55 @@ class ETR_Gestion {
 	}
 
 	/**
-	 * Barre latérale.
+	 * Nombre d'onglets visibles dans l'application installée sur téléphone (les autres vont dans « Plus »).
+	 */
+	const ONGLETS_TELEPHONE = 4;
+
+	/**
+	 * Pastilles des onglets : demandes à traiter (bureau), étapes de la tournée du jour (livreurs).
+	 *
+	 * @return int[] Vue => nombre.
+	 */
+	private static function pastilles() {
+		$pastilles = array();
+		if ( ETR_Equipe::bureau() ) {
+			$pastilles['demandes'] = count( self::filtrer_statut( 'en_attente' ) );
+		}
+		if ( ETR_Equipe::livreur() && ! ETR_Equipe::bureau() ) {
+			$tournee               = ETR_Operations::tournee( current_datetime()->format( 'Y-m-d' ) );
+			$pastilles['tournee'] = count( $tournee['livraisons'] ) + count( $tournee['reprises'] );
+		}
+		return array_filter( $pastilles );
+	}
+
+	/**
+	 * Nombre affiché sur l'icône de l'application (iPhone) : même règle que les pastilles.
+	 *
+	 * @return int
+	 */
+	public static function pastille_app() {
+		return (int) array_sum( self::pastilles() );
+	}
+
+	/**
+	 * Liens du compte (notifications, réglages, déconnexion…).
+	 *
+	 * @return array[] { url, libellé, icône }
+	 */
+	private static function liens_compte() {
+		$liens = array( array( self::url( array( 'vue' => 'notifications' ) ), __( 'Notifications', 'espace-traiteur' ), 'cloche' ) );
+		if ( ETR_Equipe::bureau() ) {
+			$liens[] = array( etr_url(), __( 'Voir l’espace traiteur', 'espace-traiteur' ), 'site' );
+			$liens[] = array( admin_url( 'edit.php?post_type=etr_demande&page=etr-reglages' ), __( 'Réglages', 'espace-traiteur' ), 'reglages' );
+			$liens[] = array( admin_url(), __( 'Administration WordPress', 'espace-traiteur' ), 'externe' );
+		}
+		$liens[] = array( wp_logout_url( self::url() ), __( 'Se déconnecter', 'espace-traiteur' ), 'sortie' );
+		return $liens;
+	}
+
+	/**
+	 * Barre latérale (ordinateur) ; sur téléphone : en-tête compact et barre d'onglets en bas,
+	 * avec un onglet « Plus » pour le reste (comme les applications iPhone).
 	 *
 	 * @param string $actif Vue active.
 	 */
@@ -1121,7 +1182,10 @@ class ETR_Gestion {
 		$user      = wp_get_current_user();
 		$logo_id   = ETR_Comptes::logo_id();
 		$site      = get_bloginfo( 'name' );
-		$a_traiter = ETR_Equipe::bureau() ? count( self::filtrer_statut( 'en_attente' ) ) : 0;
+		$pastilles = self::pastilles();
+		$vues      = self::vues();
+		$cles      = array_keys( $vues );
+		$dans_plus = ! in_array( $actif, array_slice( $cles, 0, self::ONGLETS_TELEPHONE ), true );
 
 		echo '<header class="etr-app__barre">';
 		echo '<a class="etr-app__logo" href="' . esc_url( self::url() ) . '">';
@@ -1132,6 +1196,8 @@ class ETR_Gestion {
 		}
 		echo '<span class="etr-gestion__marque">' . esc_html__( 'Gestion des traiteurs', 'espace-traiteur' ) . '</span>';
 		echo '</a>';
+		// Titre compact : affiché dans l'en-tête quand le grand titre de la page a défilé (app.js).
+		echo '<p class="etr-app__titre-compact" aria-hidden="true"></p>';
 
 		// Libellés courts de la barre d'onglets (application installée sur téléphone).
 		$courts = array(
@@ -1139,30 +1205,43 @@ class ETR_Gestion {
 			'statistiques' => __( 'Stats', 'espace-traiteur' ),
 		);
 		echo '<nav class="etr-app__nav" aria-label="' . esc_attr__( 'Gestion', 'espace-traiteur' ) . '"><ul>';
-		foreach ( self::vues() as $cle => $vue ) {
-			$badge = ( 'demandes' === $cle && $a_traiter ) ? '<span class="etr-gestion__pastille" title="' . esc_attr__( 'À traiter', 'espace-traiteur' ) . '">' . esc_html( number_format_i18n( $a_traiter ) ) . '</span>' : '';
+		foreach ( $cles as $rang => $cle ) {
+			$vue   = $vues[ $cle ];
+			$badge = isset( $pastilles[ $cle ] ) ? '<span class="etr-gestion__pastille">' . esc_html( number_format_i18n( $pastilles[ $cle ] ) ) . '</span>' : '';
 			$court = isset( $courts[ $cle ] ) ? $courts[ $cle ] : $vue[0];
-			echo '<li><a href="' . esc_url( self::url( 'tableau' === $cle ? array() : array( 'vue' => $cle ) ) ) . '"' . ( $cle === $actif ? ' aria-current="page"' : '' ) . '>' . self::icone( $vue[1] ) . '<span class="etr-app__nav-libelle">' . esc_html( $vue[0] ) . '</span><span class="etr-app__nav-court" aria-hidden="true">' . esc_html( $court ) . '</span>' . $badge . '</a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique, badge échappé.
+			echo '<li' . ( $rang >= self::ONGLETS_TELEPHONE ? ' class="etr-app__onglet-secondaire"' : '' ) . '><a href="' . esc_url( self::url( 'tableau' === $cle ? array() : array( 'vue' => $cle ) ) ) . '"' . ( $cle === $actif ? ' aria-current="page"' : '' ) . '>' . self::icone( $vue[1] ) . '<span class="etr-app__nav-libelle">' . esc_html( $vue[0] ) . '</span><span class="etr-app__nav-court" aria-hidden="true">' . esc_html( $court ) . '</span>' . $badge . '</a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique, badge échappé.
 		}
+		// Onglet « Plus » (application installée sur téléphone seulement).
+		echo '<li class="etr-app__onglet-plus"><button type="button" data-ouvrir-feuille="etr-plus"' . ( $dans_plus ? ' aria-current="page"' : '' ) . '>' . self::icone( 'plus-onglet' ) . '<span class="etr-app__nav-court">' . esc_html__( 'Plus', 'espace-traiteur' ) . '</span></button></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '</ul></nav>';
 
 		echo '<div class="etr-app__compte">';
 		$role = ETR_Equipe::libelle_role( $user );
 		echo '<p class="etr-app__societe">' . esc_html( etr_nom( $user ) ) . '<span>' . esc_html( $role ? $role : $user->user_email ) . '</span></p>';
 		echo '<ul class="etr-app__liens">';
-		$liens = array();
-		if ( ETR_Equipe::bureau() ) {
-			$liens[] = array( etr_url(), __( 'Voir l’espace traiteur', 'espace-traiteur' ), 'site' );
-			$liens[] = array( admin_url( 'edit.php?post_type=etr_demande&page=etr-reglages' ), __( 'Réglages', 'espace-traiteur' ), 'reglages' );
-			$liens[] = array( admin_url(), __( 'Administration WordPress', 'espace-traiteur' ), 'externe' );
-		}
-		array_unshift( $liens, array( self::url( array( 'vue' => 'notifications' ) ), __( 'Notifications', 'espace-traiteur' ), 'cloche' ) );
-		$liens[] = array( wp_logout_url( self::url() ), __( 'Se déconnecter', 'espace-traiteur' ), 'sortie' );
-		foreach ( $liens as $lien ) {
+		foreach ( self::liens_compte() as $lien ) {
 			echo '<li><a href="' . esc_url( $lien[0] ) . '">' . self::icone( $lien[2] ) . '<span>' . esc_html( $lien[1] ) . '</span></a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
 		echo '</ul></div>';
 		echo '</header>';
+
+		// Feuille « Plus » : les autres écrans et le compte.
+		echo '<dialog class="etr-feuille" id="etr-plus" aria-labelledby="etr-plus-titre"><div class="etr-feuille__poignee" aria-hidden="true"></div>';
+		echo '<div class="etr-feuille__tete"><p class="etr-feuille__titre" id="etr-plus-titre">' . esc_html( etr_nom( $user ) ) . '<small>' . esc_html( $role ? $role : $user->user_email ) . '</small></p><button type="button" class="etr-feuille__fermer" data-fermer-feuille aria-label="' . esc_attr__( 'Fermer', 'espace-traiteur' ) . '">×</button></div>';
+		$secondaires = array_slice( $cles, self::ONGLETS_TELEPHONE );
+		if ( $secondaires ) {
+			echo '<ul class="etr-feuille__liste">';
+			foreach ( $secondaires as $cle ) {
+				$badge = isset( $pastilles[ $cle ] ) ? '<span class="etr-gestion__pastille">' . esc_html( number_format_i18n( $pastilles[ $cle ] ) ) . '</span>' : '';
+				echo '<li><a href="' . esc_url( self::url( array( 'vue' => $cle ) ) ) . '"' . ( $cle === $actif ? ' aria-current="page"' : '' ) . '>' . self::icone( $vues[ $cle ][1] ) . '<span>' . esc_html( $vues[ $cle ][0] ) . '</span>' . $badge . self::icone( 'suite' ) . '</a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			}
+			echo '</ul>';
+		}
+		echo '<ul class="etr-feuille__liste">';
+		foreach ( self::liens_compte() as $lien ) {
+			echo '<li><a href="' . esc_url( $lien[0] ) . '"' . ( 'sortie' === $lien[2] ? ' class="est-danger"' : '' ) . '>' . self::icone( $lien[2] ) . '<span>' . esc_html( $lien[1] ) . '</span>' . ( 'sortie' === $lien[2] ? '' : self::icone( 'suite' ) ) . '</a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		}
+		echo '</ul></dialog>';
 	}
 
 	/**
@@ -1474,7 +1553,7 @@ class ETR_Gestion {
 	 * @param bool  $avec_manque Signale le matériel insuffisant.
 	 */
 	private static function table_demandes( $ids, $avec_manque = false ) {
-		echo '<div class="etr-table-cadre"><table class="etr-table">';
+		echo '<div class="etr-table-cadre etr-table-cadre--demandes"><table class="etr-table etr-table--demandes">';
 		echo '<thead><tr>';
 		echo '<th scope="col">' . esc_html__( 'Événement', 'espace-traiteur' ) . '</th>';
 		echo '<th scope="col">' . esc_html__( 'Traiteur', 'espace-traiteur' ) . '</th>';
@@ -1488,6 +1567,7 @@ class ETR_Gestion {
 			$lieu   = ETR_Frontend::lieu_court( $id );
 			$manque = $avec_manque ? self::manques( $id ) : array();
 			echo '<tr' . ( $date && $date < $jour ? ' class="etr-table__passee"' : '' ) . '>';
+			$actions = self::actions_glisser( $id );
 			echo '<td><a class="etr-table__principal" href="' . esc_url( self::url_demande( $id ) ) . '">' . ETR_Frontend::bloc_date( $date ) . '<span><strong>' . esc_html( get_the_title( $id ) ) . '</strong>'; // phpcs:ignore WordPress.Security.EscapeOutput -- bloc échappé.
 			echo '<small>' . esc_html( $lieu ? $lieu : __( 'Lieu non précisé', 'espace-traiteur' ) ) . '</small></span></a></td>';
 			echo '<td>' . esc_html( self::traiteur( $id ) ) . '<small>' . esc_html(
@@ -1503,10 +1583,34 @@ class ETR_Gestion {
 				echo '<small class="etr-manque">' . self::icone( 'alerte' ) . esc_html( sprintf( _n( '%s article insuffisant', '%s articles insuffisants', count( $manque ), 'espace-traiteur' ), number_format_i18n( count( $manque ) ) ) ) . '</small>'; // phpcs:ignore WordPress.Security.EscapeOutput
 			}
 			echo '</td>';
-			echo '<td>' . etr_statut_badge( etr_get_statut( $id ) ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			echo '<td class="etr-table__statut">' . etr_statut_badge( etr_get_statut( $id ) ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			if ( $actions ) {
+				echo '<td class="etr-glisser__actions" aria-hidden="true">' . $actions . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans actions_glisser().
+			}
 			echo '</tr>';
 		}
 		echo '</tbody></table></div>';
+	}
+
+	/**
+	 * Actions révélées en glissant une demande vers la gauche (téléphone) : appeler, itinéraire.
+	 * Ce sont des raccourcis : les mêmes informations sont sur la fiche.
+	 *
+	 * @param int $id Demande.
+	 * @return string HTML (vide si aucune action).
+	 */
+	private static function actions_glisser( $id ) {
+		$html      = '';
+		$telephone = (string) get_user_meta( (int) get_post_field( 'post_author', $id ), 'etr_telephone', true );
+		$numero    = preg_replace( '/[^\d+]/', '', $telephone );
+		$lieu      = trim( (string) get_post_meta( $id, '_etr_lieu', true ) );
+		if ( strlen( $numero ) >= 6 ) {
+			$html .= '<a class="etr-glisser__action etr-glisser__action--appel" href="tel:' . esc_attr( $numero ) . '" tabindex="-1">' . self::icone( 'telephone' ) . '<span>' . esc_html__( 'Appeler', 'espace-traiteur' ) . '</span></a>';
+		}
+		if ( '' !== $lieu ) {
+			$html .= '<a class="etr-glisser__action etr-glisser__action--route" href="' . esc_url( ETR_Terrain::url_itineraire( $lieu ) ) . '" target="_blank" rel="noopener" tabindex="-1">' . self::icone( 'lieu' ) . '<span>' . esc_html__( 'Itinéraire', 'espace-traiteur' ) . '</span></a>';
+		}
+		return $html;
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -1805,7 +1909,8 @@ class ETR_Gestion {
 			'cloturee'   => __( 'Matériel repris, dossier terminé.', 'espace-traiteur' ),
 			'annulee'    => __( 'Annulée, le matériel est libéré.', 'espace-traiteur' ),
 		);
-		echo '<form class="etr-panneau etr-decision" method="post" action="' . esc_url( self::url_demande( $id ) ) . '">';
+		// Sur téléphone, ce panneau s'ouvre en feuille depuis la barre d'action du bas (app.js).
+		echo '<form class="etr-panneau etr-decision" method="post" action="' . esc_url( self::url_demande( $id ) ) . '" data-feuille="' . esc_attr__( 'Changer le statut', 'espace-traiteur' ) . '" data-feuille-principale>';
 		wp_nonce_field( 'etr_gestion_decision_' . $id, 'etr_nonce' );
 		echo '<input type="hidden" name="etr_gestion_action" value="decision"><input type="hidden" name="demande_id" value="' . (int) $id . '">';
 		echo '<fieldset><legend class="etr-panneau__titre">' . esc_html__( 'Statut', 'espace-traiteur' ) . '</legend>';
@@ -1829,7 +1934,7 @@ class ETR_Gestion {
 	 */
 	private static function panneau_tarif( $id ) {
 		$tarif = etr_tarif( $id );
-		echo '<form class="etr-panneau etr-tarif" method="post" action="' . esc_url( self::url_demande( $id ) ) . '">';
+		echo '<form class="etr-panneau etr-tarif" method="post" action="' . esc_url( self::url_demande( $id ) ) . '" data-feuille="' . esc_attr__( 'Remise et livraison', 'espace-traiteur' ) . '">';
 		wp_nonce_field( 'etr_gestion_tarif_' . $id, 'etr_nonce' );
 		echo '<input type="hidden" name="etr_gestion_action" value="tarif"><input type="hidden" name="demande_id" value="' . (int) $id . '">';
 		echo '<h2 class="etr-panneau__titre">' . esc_html__( 'Tarification', 'espace-traiteur' ) . '</h2>';
@@ -2049,7 +2154,7 @@ class ETR_Gestion {
 	 * @param bool   $avant    Mettre l'action en avant (bouton plein).
 	 */
 	private static function bouton_compte( $action, $user_id, $libelle, $confirm = '', $avant = false ) {
-		echo '<form method="post" action="' . esc_url( self::url( array( 'vue' => 'traiteurs' ) ) ) . '"' . ( $confirm ? ' onsubmit="return confirm(\'' . esc_js( $confirm ) . '\');"' : '' ) . '>';
+		echo '<form method="post" action="' . esc_url( self::url( array( 'vue' => 'traiteurs' ) ) ) . '"' . ( $confirm ? ' data-confirmer="' . esc_attr( $confirm ) . '"' : '' ) . '>';
 		wp_nonce_field( 'etr_gestion_' . $action . '_' . $user_id, 'etr_nonce', false );
 		echo '<input type="hidden" name="etr_gestion_action" value="' . esc_attr( $action ) . '"><input type="hidden" name="user" value="' . (int) $user_id . '">';
 		echo '<button type="submit" class="' . ( $avant ? 'etr-btn etr-btn--plein etr-btn--petit' : 'etr-btn-texte' ) . '">' . esc_html( $libelle ) . '</button>';
@@ -2170,7 +2275,7 @@ class ETR_Gestion {
 	 * @param bool   $avant   Bouton mis en avant.
 	 */
 	private static function formulaire_membre( $user_id, $op, $libelle, $confirm = '', $avant = false ) {
-		echo '<form method="post" action="' . esc_url( self::url( array( 'vue' => 'equipe' ) ) ) . '"' . ( $confirm ? ' onsubmit="return confirm(\'' . esc_js( $confirm ) . '\');"' : '' ) . '>';
+		echo '<form method="post" action="' . esc_url( self::url( array( 'vue' => 'equipe' ) ) ) . '"' . ( $confirm ? ' data-confirmer="' . esc_attr( $confirm ) . '"' : '' ) . '>';
 		wp_nonce_field( 'etr_gestion_membre_' . $user_id, 'etr_nonce', false );
 		echo '<input type="hidden" name="etr_gestion_action" value="membre"><input type="hidden" name="user" value="' . (int) $user_id . '"><input type="hidden" name="op" value="' . esc_attr( $op ) . '">';
 		echo '<button type="submit" class="' . ( $avant ? 'etr-btn etr-btn--plein etr-btn--petit' : 'etr-btn-texte' ) . '">' . esc_html( $libelle ) . '</button>';

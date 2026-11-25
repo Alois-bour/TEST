@@ -410,12 +410,45 @@ class ETR_Push {
 			if ( $user_id === $moi || ! self::concerne( $user_id, $groupe ) ) {
 				continue;
 			}
+			// Pastille sur l'icône de l'application, mise à jour même application fermée.
+			$message['badge'] = self::pastille( $user_id );
 			/** Permet d'écarter un destinataire ou d'adapter le message. */
 			$personnel = apply_filters( 'etr_push_message', $message, $user_id, $groupe, $demande_id );
 			if ( $personnel ) {
 				self::$file[] = array( $user_id, $personnel );
 			}
 		}
+	}
+
+	/**
+	 * Nombre sur l'icône de l'application : demandes à traiter (bureau), étapes de la tournée
+	 * du jour (livreurs). Même règle que les pastilles des onglets.
+	 *
+	 * @param int $user_id Compte.
+	 * @return int
+	 */
+	private static function pastille( $user_id ) {
+		if ( ETR_Equipe::bureau( $user_id ) ) {
+			return count(
+				get_posts(
+					array(
+						'post_type'     => 'etr_demande',
+						'post_status'   => 'publish',
+						'numberposts'   => -1,
+						'fields'        => 'ids',
+						'no_found_rows' => true,
+						'meta_key'      => '_etr_statut', // phpcs:ignore WordPress.DB.SlowDBQuery
+						'meta_value'    => 'en_attente', // phpcs:ignore WordPress.DB.SlowDBQuery
+					)
+				)
+			);
+		}
+		$user = get_userdata( $user_id );
+		if ( $user && in_array( 'etr_livreur', ETR_Equipe::roles_equipe( $user ), true ) ) {
+			$tournee = ETR_Operations::tournee( current_datetime()->format( 'Y-m-d' ) );
+			return count( $tournee['livraisons'] ) + count( $tournee['reprises'] );
+		}
+		return 0;
 	}
 
 	/**

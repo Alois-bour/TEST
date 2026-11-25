@@ -16,7 +16,7 @@
 	/* Outils                                                             */
 	/* ------------------------------------------------------------------ */
 
-	function api( chemin, donnees, multipart, garder ) {
+	function api( chemin, donnees, multipart, garder, reessai ) {
 		var options = { method: 'POST', credentials: 'same-origin', headers: { 'X-WP-Nonce': C.nonce } };
 		if ( garder ) {
 			options.keepalive = true; // L'envoi survit au changement de page.
@@ -31,6 +31,12 @@
 			return reponse.json().catch( function () {
 				return {};
 			} ).then( function ( json ) {
+				// Page ouverte depuis longtemps : jeton de sécurité expiré, on en prend un frais.
+				if ( reponse.status === 403 && json.code === 'rest_cookie_invalid_nonce' && ! reessai && window.etrHorsLigne ) {
+					return window.etrHorsLigne.jeton().then( function () {
+						return api( chemin, donnees, multipart, garder, true );
+					} );
+				}
 				if ( ! reponse.ok ) {
 					throw new Error( json.message || ( 'Erreur ' + reponse.status + '. Vérifiez la connexion et réessayez.' ) );
 				}
@@ -39,6 +45,37 @@
 		}, function () {
 			var erreur = new Error( 'La connexion a été coupée : impossible de savoir si l’enregistrement a abouti. Rechargez la page pour vérifier avant de recommencer.' );
 			erreur.reseau = true;
+			throw erreur;
+		} );
+	}
+
+	/**
+	 * Comme api(), mais sans réseau la saisie est gardée sur le téléphone (hors-ligne.js) et
+	 * partira toute seule : la promesse donne alors { horsLigne: true }.
+	 * Les renvois sont sans risque (jeton pour livraisons et reprises, scans et préparation rejouables).
+	 *
+	 * @param {string}  chemin    Route.
+	 * @param {*}       donnees   JSON ou FormData.
+	 * @param {boolean} multipart FormData.
+	 * @param {Object}  infos     { libelle, demande, type } pour la liste des envois en attente.
+	 * @return {Promise}
+	 */
+	function apiOuAttente( chemin, donnees, multipart, infos ) {
+		var attendre = function () {
+			return window.etrHorsLigne.garder( chemin, donnees, infos ).then( function () {
+				return { horsLigne: true };
+			} );
+		};
+		if ( ! window.etrHorsLigne ) {
+			return api( chemin, donnees, multipart );
+		}
+		if ( navigator.onLine === false ) {
+			return attendre();
+		}
+		return api( chemin, donnees, multipart ).catch( function ( erreur ) {
+			if ( erreur.reseau ) {
+				return attendre();
+			}
 			throw erreur;
 		} );
 	}
@@ -61,6 +98,14 @@
 
 	function pluriel( n, un, plusieurs ) {
 		return n + ' ' + ( n > 1 ? plusieurs : un );
+	}
+
+	// Confirmation dans une feuille de l'application (app.js), sinon celle du navigateur.
+	function confirmer( texte, valider ) {
+		if ( window.etrConfirmer ) {
+			return window.etrConfirmer( texte, { valider: valider } );
+		}
+		return Promise.resolve( window.confirm( texte ) ); // eslint-disable-line no-alert
 	}
 
 	// Boutons − / + des champs de quantité (préparation, colis, reprise).
@@ -89,6 +134,7 @@
 		var msgPrepa   = prepa.querySelector( '[data-prepa-message]' );
 		var enAttente  = {};
 		var file       = Promise.resolve();
+		var enCours    = 0; // Enregistrements partis, sans réponse encore.
 
 		var progres = function () {
 			var fait  = 0;
@@ -115,8 +161,14 @@
 
 		// Les envois partent dans l'ordre ; chaque champ attend que l'on ait fini de toucher (350 ms).
 		var envoyer = function ( chemin, donnees, garder ) {
+			enCours++;
 			file = file.catch( function () {} ).then( function () {
-				return api( chemin, donnees, false, garder );
+				return garder ? api( chemin, donnees, false, true ) : apiOuAttente( chemin, donnees, false, { libelle: 'Préparation, demande n° ' + idPrepa, demande: entier( idPrepa ), type: 'preparation' } );
+			} );
+			file.then( function () {
+				enCours--;
+			}, function () {
+				enCours--;
 			} );
 			return file;
 		};
@@ -128,6 +180,10 @@
 				delete enAttente[ cle ];
 				message( msgPrepa, 'Enregistrement…', 'info' );
 				envoyer( idPrepa + '/preparation', donnees, garder ).then( function ( etat ) {
+					if ( etat.horsLigne ) {
+						message( msgPrepa, 'Hors connexion : enregistré sur le téléphone, envoyé dès le retour du réseau.', 'info' );
+						return;
+					}
 					appliquer( etat );
 					message( msgPrepa, etat.prete ? 'Enregistré. La commande est prête.' : 'Enregistré.', 'ok' );
 				} ).catch( function ( erreur ) {
@@ -138,6 +194,10 @@
 				minuteur: setTimeout( partir, 350 ),
 				partir: partir,
 				partirSeul: function () {
+					if ( navigator.onLine === false && window.etrHorsLigne ) {
+						window.etrHorsLigne.garder( idPrepa + '/preparation', donnees, { libelle: 'Préparation, demande n° ' + idPrepa, demande: entier( idPrepa ), type: 'preparation' } );
+						return;
+					}
 					api( idPrepa + '/preparation', donnees, false, true ).catch( function () {} );
 				},
 			};
@@ -165,6 +225,7 @@
 				return;
 			}
 			var prete = action.getAttribute( 'data-action' ) === 'prete';
+			var accord = Promise.resolve( true );
 			if ( prete ) {
 				var etat  = progres();
 				var colis = entier( prepa.querySelector( '[data-colis]' ).value );
@@ -173,21 +234,38 @@
 					prepa.querySelector( '[data-colis]' ).focus();
 					return;
 				}
-				// eslint-disable-next-line no-alert
-				if ( etat.fait < etat.total && ! window.confirm( 'Il manque ' + pluriel( etat.total - etat.fait, 'article', 'articles' ) + '. Marquer la commande prête quand même ?' ) ) {
-					return;
+				if ( etat.fait < etat.total ) {
+					accord = confirmer( 'Il manque ' + pluriel( etat.total - etat.fait, 'article', 'articles' ) + '. Marquer la commande prête quand même ? Les livreurs seront prévenus qu’elle est incomplète.', 'Marquer prête' );
 				}
 			}
-			action.disabled = true;
-			toutEnvoyer().then( function () {
-				return envoyer( idPrepa + '/preparation/prete', { prete: prete } );
-			} ).then( function ( etat ) {
-				appliquer( etat );
-				message( msgPrepa, prete ? 'Commande prête : les livreurs sont prévenus.' : 'Préparation rouverte.', 'ok' );
-			} ).catch( function ( erreur ) {
-				message( msgPrepa, erreur.message, 'erreur' );
-			} ).then( function () {
-				action.disabled = false;
+			accord.then( function ( ok ) {
+				if ( ! ok ) {
+					return;
+				}
+				action.disabled = true;
+				toutEnvoyer().then( function () {
+					return envoyer( idPrepa + '/preparation/prete', { prete: prete } );
+				} ).then( function ( etat ) {
+					if ( etat.horsLigne ) {
+						appliquer( { prete: prete, colis: entier( prepa.querySelector( '[data-colis]' ).value ) } );
+						message( msgPrepa, '', '' );
+						if ( window.etrToast ) {
+							window.etrToast( prete ? 'Hors connexion : « prête » sera envoyée dès le retour du réseau.' : 'Hors connexion : la réouverture sera envoyée dès le retour du réseau.' );
+						}
+						return;
+					}
+					appliquer( etat );
+					message( msgPrepa, '', '' );
+					if ( window.etrToast ) {
+						window.etrToast( prete ? 'Commande prête : les livreurs sont prévenus.' : 'Préparation rouverte.' );
+					} else {
+						message( msgPrepa, prete ? 'Commande prête : les livreurs sont prévenus.' : 'Préparation rouverte.', 'ok' );
+					}
+				} ).catch( function ( erreur ) {
+					message( msgPrepa, erreur.message, 'erreur' );
+				} ).then( function () {
+					action.disabled = false;
+				} );
 			} );
 		} );
 
@@ -217,7 +295,22 @@
 				} );
 			}
 		} );
-		// En quittant la page : les derniers touchers partent tout de suite, en « keepalive »
+		// Un lien touché alors qu'un enregistrement est en attente : on envoie d'abord, puis on change
+		// d'écran (une requête lancée au moment de quitter la page peut être perdue).
+		document.addEventListener( 'click', function ( e ) {
+			var lien = e.target.closest( 'a[href]' );
+			if ( ! lien || lien.target || e.defaultPrevented || ( ! Object.keys( enAttente ).length && ! enCours ) ) {
+				return;
+			}
+			e.preventDefault();
+			e.stopPropagation();
+			message( msgPrepa, 'Enregistrement…', 'info' );
+			toutEnvoyer().then( function () {
+				window.location.href = lien.href;
+			} );
+		}, true );
+
+		// En quittant la page autrement (app fermée…) : les derniers touchers partent en « keepalive »
 		// (une requête ordinaire serait annulée par le changement de page).
 		window.addEventListener( 'pagehide', function () {
 			Object.keys( enAttente ).forEach( function ( cle ) {
@@ -317,7 +410,15 @@
 
 		var compter = function ( code ) {
 			occupe = true;
-			return api( 'scan', { d: code.d, c: code.c, mode: mode() } ).then( function ( r ) {
+			var modeScan = mode();
+			return apiOuAttente( 'scan', { d: code.d, c: code.c, mode: modeScan }, false, { libelle: 'Scan ' + ( modeScan === 'sortie' ? 'chargement' : 'retour' ) + ' : colis ' + code.c + ', demande n° ' + code.d, demande: code.d, type: 'scan' } ).then( function ( r ) {
+				if ( r.horsLigne ) {
+					var texte = 'Colis ' + code.c + ' compté sur le téléphone';
+					afficher( true, texte, 'Demande n° ' + code.d + ' · hors connexion, envoyé dès le retour du réseau' );
+					noter( texte + ' (demande n° ' + code.d + ', hors connexion)', true );
+					signal( true );
+					return;
+				}
 				var faits = r.mode === 'sortie' ? r.bilan.sortis : r.bilan.revenus;
 				var verbe = r.mode === 'sortie' ? 'chargés' : 'revenus';
 				var titre = ( r.deja ? 'Déjà compté : ' : '' ) + 'colis ' + r.numero + ' / ' + r.bilan.colis + ' — ' + r.traiteur;
@@ -437,7 +538,14 @@
 			}
 			var zone = colis.querySelector( '[data-colis-message]' );
 			bouton.disabled = true;
-			api( 'scan', { d: entier( colis.getAttribute( 'data-d' ) ), c: entier( colis.getAttribute( 'data-c' ) ), mode: bouton.getAttribute( 'data-mode' ) } ).then( function ( r ) {
+			var d = entier( colis.getAttribute( 'data-d' ) );
+			var c = entier( colis.getAttribute( 'data-c' ) );
+			apiOuAttente( 'scan', { d: d, c: c, mode: bouton.getAttribute( 'data-mode' ) }, false, { libelle: 'Colis ' + c + ', demande n° ' + d, demande: d, type: 'scan' } ).then( function ( r ) {
+				if ( r.horsLigne ) {
+					message( zone, 'Hors connexion : compté sur le téléphone, envoyé dès le retour du réseau.', 'info' );
+					bouton.disabled = false;
+					return;
+				}
 				var faits = r.mode === 'sortie' ? r.bilan.sortis : r.bilan.revenus;
 				message( zone, ( r.deja ? 'Déjà compté. ' : 'Compté. ' ) + faits + ' / ' + r.bilan.colis + ( r.mode === 'sortie' ? ' colis chargés.' : ' colis revenus.' ), 'ok' );
 				setTimeout( function () {
@@ -660,6 +768,61 @@
 		ligne.classList.toggle( 'a-ecart', parties.length > 0 );
 	}
 
+	// Livraison ou reprise faite sans réseau : confirmation sur place, puis retour à la tournée.
+	function confirmationHorsLigne( form, type ) {
+		var bloc = document.createElement( 'section' );
+		bloc.className = 'etr-panneau etr-hors-ligne-ok';
+		bloc.setAttribute( 'role', 'status' );
+		bloc.innerHTML = '<h2 class="etr-panneau__titre"></h2><p></p><a class="etr-btn etr-btn--plein"></a>';
+		bloc.querySelector( 'h2' ).textContent = type === 'livraison' ? 'Livraison enregistrée sur le téléphone' : 'Reprise enregistrée sur le téléphone';
+		bloc.querySelector( 'p' ).textContent = 'Pas de réseau ici : elle sera envoyée automatiquement dès le retour de la connexion (signature et photos comprises). Vous pouvez continuer la tournée.';
+		var lien = bloc.querySelector( 'a' );
+		lien.textContent = 'Retour à la tournée';
+		lien.href = ( C.gestion || '/' ) + ( ( C.gestion || '' ).indexOf( '?' ) === -1 ? '?' : '&' ) + 'vue=tournee';
+		form.replaceWith( bloc );
+		window.scrollTo( 0, 0 );
+	}
+
+	// Tournée : étapes faites hors connexion, pas encore envoyées.
+	( function () {
+		var arrets = document.querySelectorAll( '.etr-arret[data-demande]' );
+		if ( ! arrets.length || ! window.etrHorsLigne ) {
+			return;
+		}
+		var marquer = function () {
+			arrets.forEach( function ( arret ) {
+				var etape = arret.getAttribute( 'data-etape' );
+				window.etrHorsLigne.pourDemande( entier( arret.getAttribute( 'data-demande' ) ) ).then( function ( envois ) {
+					var fait = envois.some( function ( e ) {
+						return e.type === etape;
+					} );
+					var badge = arret.querySelector( '.etr-arret__attente' );
+					if ( fait && ! badge ) {
+						badge = document.createElement( 'p' );
+						badge.className = 'etr-arret__attente';
+						badge.textContent = ( etape === 'livraison' ? 'Livrée' : 'Reprise faite' ) + ' sur le téléphone · envoi en attente du réseau';
+						arret.querySelector( '.etr-arret__tete' ).after( badge );
+					} else if ( ! fait && badge ) {
+						badge.remove();
+					}
+					var bouton = arret.querySelector( '[data-action-etape]' );
+					if ( bouton ) {
+						bouton.hidden = fait;
+					}
+				} );
+			} );
+		};
+		marquer();
+		document.addEventListener( 'etr-envois', function ( e ) {
+			// Envoyées : la tournée est rechargée pour refléter le nouvel état.
+			if ( e.detail && e.detail.envoyes && navigator.onLine !== false ) {
+				window.location.reload();
+			} else {
+				marquer();
+			}
+		} );
+	}() );
+
 	document.querySelectorAll( '[data-etr-envoi]' ).forEach( function ( form ) {
 		var type      = form.getAttribute( 'data-etr-envoi' );
 		var id        = form.getAttribute( 'data-id' );
@@ -718,7 +881,12 @@
 
 			bouton.disabled = true;
 			message( msg, photos.length ? 'Envoi des photos…' : 'Enregistrement…', 'info' );
-			api( id + '/' + type, donnees, true ).then( function ( r ) {
+			var libelle = type === 'livraison' ? 'Livraison n° ' + id + ( nom ? ', signée par ' + nom : '' ) : 'Reprise n° ' + id;
+			apiOuAttente( id + '/' + type, donnees, true, { libelle: libelle, demande: entier( id ), type: type } ).then( function ( r ) {
+				if ( r.horsLigne ) {
+					confirmationHorsLigne( form, type );
+					return;
+				}
 				window.location.href = r.url;
 			} ).catch( function ( erreur ) {
 				message( msg, erreur.reseau

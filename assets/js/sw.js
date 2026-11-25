@@ -10,6 +10,10 @@
 'use strict';
 
 const CACHE = 'etr-gestion-' + ETR.version;
+// Pages de l'application gardées pour le hors connexion (tournée, demandes, préparation…).
+// Effacées à la déconnexion ; les plus anciennes partent au-delà de PAGES_MAX.
+const PAGES     = 'etr-pages';
+const PAGES_MAX = 60;
 
 self.addEventListener( 'install', ( evenement ) => {
 	evenement.waitUntil(
@@ -25,6 +29,9 @@ self.addEventListener( 'activate', ( evenement ) => {
 			.then( ( cles ) => Promise.all(
 				cles.filter( ( cle ) => cle.startsWith( 'etr-gestion-' ) && cle !== CACHE ).map( ( cle ) => caches.delete( cle ) )
 			) )
+			// Pas de préchargement des navigations : il faisait perdre les derniers enregistrements
+			// envoyés en quittant une page (requêtes « keepalive »). Désactivé s'il l'avait été.
+			.then( () => self.registration.navigationPreload ? self.registration.navigationPreload.disable() : null )
 			.then( () => self.clients.claim() )
 	);
 } );
@@ -52,11 +59,19 @@ self.addEventListener( 'fetch', ( evenement ) => {
 		return;
 	}
 
-	// Pages de l'application : réseau, sinon page hors ligne.
+	// Pages de l'application : réseau d'abord (toujours à jour) ; sans réseau, la dernière
+	// version gardée sur le téléphone, sinon la page « Pas de connexion ».
 	if ( requete.mode === 'navigate' ) {
 		if ( dansApplication( url ) ) {
 			evenement.respondWith(
-				fetch( requete ).catch( () => caches.match( ETR.horsLigne ) )
+				fetch( requete )
+					.then( ( reponse ) => {
+						garderPage( requete, reponse );
+						return reponse;
+					} )
+					.catch( () => caches.open( PAGES )
+						.then( ( cache ) => cache.match( requete ) )
+						.then( ( gardee ) => gardee || caches.match( ETR.horsLigne ) ) )
 			);
 		}
 		return;
@@ -79,6 +94,50 @@ self.addEventListener( 'fetch', ( evenement ) => {
 				} )
 			)
 		);
+	}
+} );
+
+/**
+ * Garde une page de l'application (seulement une vraie page de l'app, jamais l'écran de connexion).
+ *
+ * @param {Request}  requete Requête.
+ * @param {Response} reponse Réponse du réseau.
+ * @return {Promise}
+ */
+function garderPage( requete, reponse ) {
+	if ( ! reponse.ok ) {
+		return Promise.resolve();
+	}
+	if ( reponse.headers.get( 'X-ETR-Page' ) !== 'app' ) {
+		// Écran de connexion (session finie, autre personne) : les pages gardées sont effacées.
+		return caches.delete( PAGES ).catch( () => {} );
+	}
+	const copie = reponse.clone();
+	return caches.open( PAGES ).then( ( cache ) => cache.put( requete.url, copie ).then( () => cache.keys() ).then( ( cles ) => {
+		// Les plus anciennes d'abord (ordre d'insertion).
+		return Promise.all( cles.slice( 0, Math.max( 0, cles.length - PAGES_MAX ) ).map( ( cle ) => cache.delete( cle ) ) );
+	} ) ).catch( () => {} );
+}
+
+// Messages de l'application : garder des pages pour le hors connexion, ou tout effacer (déconnexion).
+self.addEventListener( 'message', ( evenement ) => {
+	const message = evenement.data || {};
+	if ( message.type === 'etr-vider' ) {
+		evenement.waitUntil( caches.delete( PAGES ) );
+	} else if ( message.type === 'etr-precharger' && Array.isArray( message.adresses ) ) {
+		evenement.waitUntil( Promise.all( message.adresses.slice( 0, 30 ).map( ( adresse ) => {
+			const url = new URL( adresse, self.location.origin );
+			if ( url.origin !== self.location.origin ) {
+				return null;
+			}
+			if ( url.href.startsWith( ETR.assets ) ) {
+				return caches.open( CACHE ).then( ( cache ) => cache.add( url.href ) ).catch( () => {} );
+			}
+			if ( ! dansApplication( url ) ) {
+				return null;
+			}
+			return fetch( url.href, { credentials: 'same-origin' } ).then( ( reponse ) => garderPage( new Request( url.href ), reponse ) ).catch( () => {} );
+		} ) ) );
 	}
 } );
 
@@ -108,6 +167,10 @@ self.addEventListener( 'push', ( evenement ) => {
 	try {
 		message = evenement.data ? evenement.data.json() : {};
 	} catch ( e ) {}
+	// Pastille sur l'icône de l'application (iOS 16.4+, application installée).
+	if ( typeof message.badge === 'number' && self.navigator && 'setAppBadge' in self.navigator ) {
+		( message.badge > 0 ? self.navigator.setAppBadge( message.badge ) : self.navigator.clearAppBadge() ).catch( () => {} );
+	}
 	evenement.waitUntil(
 		self.registration.showNotification( message.title || ETR.nom, {
 			body: message.body || '',
