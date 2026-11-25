@@ -212,6 +212,7 @@ class ETR_Terrain {
 		if ( $lieu ) {
 			echo '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_itineraire( $lieu ) ) . '" target="_blank" rel="noopener">' . self::icone( 'lieu' ) . '<span>' . esc_html__( 'Itinéraire', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
+		do_action( 'etr_tournee_actions', $id, $etape ); // Fonctions activables : « En route ».
 		if ( ETR_Equipe::livreur() ) {
 			echo $livraison // phpcs:ignore WordPress.Security.EscapeOutput
 				? '<a class="etr-btn" data-hors-ligne data-action-etape href="' . esc_url( self::url( array( 'vue' => 'livrer', 'id' => $id ) ) ) . '">' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Livrer', 'espace-traiteur' ) . '</span></a>'
@@ -812,7 +813,9 @@ class ETR_Terrain {
 			if ( ! empty( $livraison['note'] ) ) {
 				echo '<p class="etr-cr__note">' . nl2br( esc_html( $livraison['note'] ) ) . '</p>';
 			}
-			echo '<a class="etr-btn etr-btn--discret" href="' . esc_url( ETR_Bon_Livraison::url( $id ) ) . '" target="_blank">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Bon de livraison signé (PDF)', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			if ( ETR_Modules::actif( 'bon_livraison' ) ) {
+				echo '<a class="etr-btn etr-btn--discret" href="' . esc_url( ETR_Bon_Livraison::url( $id ) ) . '" target="_blank">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Bon de livraison signé (PDF)', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			}
 			echo '</section>';
 		}
 		$reprise = ETR_Operations::reprise( $id );

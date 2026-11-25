@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Espace Traiteur
  * Description:       Espace privé pour les traiteurs : chaque traiteur se connecte à son espace et fait ses demandes de mobilier, vaisselle, linge et matériel, à partir des produits WooCommerce du site.
- * Version:           2.6.0
+ * Version:           2.7.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * License:           GPL-2.0-or-later
@@ -13,13 +13,14 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'ETR_VERSION', '2.6.0' );
+define( 'ETR_VERSION', '2.7.0' );
 define( 'ETR_FILE', __FILE__ );
 define( 'ETR_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ETR_URL', plugin_dir_url( __FILE__ ) );
 
 require_once ETR_DIR . 'includes/functions.php';
 require_once ETR_DIR . 'includes/catalogue.php';
+require_once ETR_DIR . 'includes/class-etr-modules.php';
 require_once ETR_DIR . 'includes/class-etr-installer.php';
 require_once ETR_DIR . 'includes/class-etr-migrations.php';
 require_once ETR_DIR . 'includes/class-etr-post-types.php';
@@ -37,6 +38,10 @@ require_once ETR_DIR . 'includes/class-etr-terrain.php';
 require_once ETR_DIR . 'includes/class-etr-pdf.php';
 require_once ETR_DIR . 'includes/class-etr-bon-livraison.php';
 require_once ETR_DIR . 'includes/class-etr-cles-acces.php';
+require_once ETR_DIR . 'includes/class-etr-traiteur-direct.php';
+require_once ETR_DIR . 'includes/class-etr-materiel.php';
+require_once ETR_DIR . 'includes/class-etr-devis.php';
+require_once ETR_DIR . 'includes/class-etr-pilotage.php';
 require_once ETR_DIR . 'includes/class-etr-admin.php';
 require_once ETR_DIR . 'includes/class-etr-frontend.php';
 require_once ETR_DIR . 'includes/class-etr-statistiques.php';
@@ -65,6 +70,11 @@ add_action(
 		ETR_Operations::init();
 		ETR_Bon_Livraison::init();
 		ETR_Cles_Acces::init();
+		ETR_Modules::init();
+		ETR_Traiteur_Direct::init();
+		ETR_Materiel::init();
+		ETR_Devis::init();
+		ETR_Pilotage::init();
 		ETR_Admin::init();
 		ETR_Frontend::init();
 		ETR_Gestion::init();

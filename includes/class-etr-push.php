@@ -59,7 +59,7 @@ class ETR_Push {
 	 * @return array[]
 	 */
 	public static function types() {
-		return array(
+		$types = array(
 			'nouvelle'         => array( 'bureau', __( 'Nouvelle demande d’un traiteur', 'espace-traiteur' ) ),
 			'annulee_traiteur' => array( 'bureau', __( 'Demande annulée par un traiteur', 'espace-traiteur' ) ),
 			'livree'           => array( 'bureau', __( 'Commande livrée et signée', 'espace-traiteur' ) ),
@@ -71,6 +71,17 @@ class ETR_Push {
 			'affectation'      => array( 'livreur', __( 'Livraison ou reprise qui vous est confiée', 'espace-traiteur' ) ),
 			'rappel'           => array( 'terrain', __( 'Rappels de la veille (vers 17 h)', 'espace-traiteur' ) ),
 		);
+		// Fonctions activables (Espace traiteur › Fonctions).
+		if ( ETR_Modules::actif( 'messages' ) ) {
+			$types['message'] = array( 'bureau', __( 'Message d’un traiteur', 'espace-traiteur' ) );
+		}
+		if ( ETR_Modules::actif( 'devis' ) ) {
+			$types['devis'] = array( 'bureau', __( 'Devis accepté par un traiteur', 'espace-traiteur' ) );
+		}
+		if ( ETR_Modules::actif( 'relances' ) ) {
+			$types['relance'] = array( 'bureau', __( 'Relances : reprise en retard, acompte non reçu', 'espace-traiteur' ) );
+		}
+		return $types;
 	}
 
 	/**
@@ -502,6 +513,31 @@ class ETR_Push {
 			if ( $personnel ) {
 				self::$file[] = array( $user_id, $personnel );
 			}
+		}
+	}
+
+	/**
+	 * Notification à un traiteur (espace traiteur installé, fonction « push_traiteur »).
+	 *
+	 * @param int    $user_id    Traiteur.
+	 * @param string $titre      Titre.
+	 * @param string $texte      Texte.
+	 * @param int    $demande_id Demande ouverte au toucher.
+	 */
+	public static function notifier_traiteur( $user_id, $titre, $texte, $demande_id = 0 ) {
+		if ( ! ETR_Modules::actif( 'push_traiteur' ) || ! etr_est_traiteur( $user_id ) || ! self::appareils( $user_id ) ) {
+			return;
+		}
+		$message = array(
+			'title' => wp_strip_all_tags( $titre ),
+			'body'  => wp_strip_all_tags( $texte ),
+			'url'   => $demande_id ? etr_url( array( 'etr_vue' => 'demande', 'id' => (int) $demande_id ) ) : etr_url(),
+			'tag'   => $demande_id ? 'etr-demande-' . (int) $demande_id : 'etr',
+		);
+		/** Même filtre que pour l'équipe (groupe « traiteur »). */
+		$message = apply_filters( 'etr_push_message', $message, (int) $user_id, 'traiteur', $demande_id );
+		if ( $message ) {
+			self::$file[] = array( (int) $user_id, $message );
 		}
 	}
 

@@ -77,6 +77,10 @@ class ETR_Migrations {
 				'description' => __( 'Espace traiteur installable : adresse de son manifeste.', 'espace-traiteur' ),
 				'callback'    => array( __CLASS__, 'migrer_2_1_0' ), // Même opération : règles de réécriture.
 			),
+			'2.7.0' => array(
+				'description' => __( 'Fonctions activables : service worker des notifications de l’espace traiteur.', 'espace-traiteur' ),
+				'callback'    => array( __CLASS__, 'migrer_2_1_0' ), // Règles de réécriture (sw-traiteur.js).
+			),
 		);
 		return (array) apply_filters( 'etr_migrations', $etapes );
 	}
