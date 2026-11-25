@@ -27,6 +27,7 @@ class ETR_Push {
 	const META          = 'etr_push_appareils';
 	const API           = 'etr/v1';
 	const MAX_APPAREILS = 10;
+	const META_SANS     = 'etr_push_sans'; // Types de notifications désactivés par la personne.
 
 	/**
 	 * Services de notification acceptés (pas d'envoi vers une adresse quelconque).
@@ -50,6 +51,56 @@ class ETR_Push {
 		add_action( 'etr_demande_annulee', array( __CLASS__, 'demande_annulee' ) );
 		add_action( 'etr_statut_change', array( __CLASS__, 'statut_change' ), 10, 3 );
 		add_action( 'shutdown', array( __CLASS__, 'vider_file' ), 100 );
+	}
+
+	/**
+	 * Types de notifications : type => { groupe destinataire, libellé }.
+	 *
+	 * @return array[]
+	 */
+	public static function types() {
+		return array(
+			'nouvelle'         => array( 'bureau', __( 'Nouvelle demande d’un traiteur', 'espace-traiteur' ) ),
+			'annulee_traiteur' => array( 'bureau', __( 'Demande annulée par un traiteur', 'espace-traiteur' ) ),
+			'livree'           => array( 'bureau', __( 'Commande livrée et signée', 'espace-traiteur' ) ),
+			'reprise'          => array( 'bureau', __( 'Matériel repris (avec ou sans écarts)', 'espace-traiteur' ) ),
+			'incident'         => array( 'bureau', __( 'Incident signalé par le terrain', 'espace-traiteur' ) ),
+			'validee'          => array( 'terrain', __( 'Commande validée par le bureau', 'espace-traiteur' ) ),
+			'annulee'          => array( 'terrain', __( 'Commande validée puis annulée', 'espace-traiteur' ) ),
+			'prete'            => array( 'livreur', __( 'Commande prête à livrer', 'espace-traiteur' ) ),
+			'rappel'           => array( 'terrain', __( 'Rappels de la veille (vers 17 h)', 'espace-traiteur' ) ),
+		);
+	}
+
+	/**
+	 * Types que la personne peut recevoir (selon ses rôles), avec son choix.
+	 *
+	 * @param int $user_id Compte.
+	 * @return array[] type => { libellé, actif }
+	 */
+	public static function types_pour( $user_id ) {
+		$sans  = self::types_desactives( $user_id );
+		$types = array();
+		foreach ( self::types() as $type => $config ) {
+			if ( self::concerne( $user_id, $config[0] ) ) {
+				$types[ $type ] = array(
+					'libelle' => $config[1],
+					'actif'   => ! in_array( $type, $sans, true ),
+				);
+			}
+		}
+		return $types;
+	}
+
+	/**
+	 * Types désactivés par la personne.
+	 *
+	 * @param int $user_id Compte.
+	 * @return string[]
+	 */
+	public static function types_desactives( $user_id ) {
+		$sans = get_user_meta( $user_id, self::META_SANS, true );
+		return is_array( $sans ) ? $sans : array();
 	}
 
 	/**
@@ -249,6 +300,15 @@ class ETR_Push {
 		);
 		register_rest_route(
 			self::API,
+			'/notifications/preferences',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( __CLASS__, 'api_preferences' ),
+				'permission_callback' => $droits,
+			)
+		);
+		register_rest_route(
+			self::API,
 			'/notifications/test',
 			array(
 				'methods'             => 'POST',
@@ -311,6 +371,22 @@ class ETR_Push {
 	}
 
 	/**
+	 * POST : types de notifications désactivés ({ sans: [type, …] }).
+	 *
+	 * @param WP_REST_Request $requete Requête.
+	 * @return WP_REST_Response
+	 */
+	public static function api_preferences( $requete ) {
+		$sans = array_values( array_intersect( array_keys( self::types() ), array_map( 'sanitize_key', (array) $requete->get_param( 'sans' ) ) ) );
+		if ( $sans ) {
+			update_user_meta( get_current_user_id(), self::META_SANS, $sans );
+		} else {
+			delete_user_meta( get_current_user_id(), self::META_SANS );
+		}
+		return rest_ensure_response( array( 'sans' => $sans ) );
+	}
+
+	/**
 	 * POST : notification de test sur cet appareil.
 	 *
 	 * @param WP_REST_Request $requete Requête.
@@ -355,7 +431,7 @@ class ETR_Push {
 	public static function nouvelle_demande( $demande_id ) {
 		/* translators: %s : traiteur. */
 		$titre = sprintf( __( 'Nouvelle demande de %s', 'espace-traiteur' ), self::traiteur( $demande_id ) );
-		self::notifier( 'bureau', $titre, self::resume( $demande_id ), $demande_id );
+		self::notifier( 'bureau', $titre, self::resume( $demande_id ), $demande_id, '', 'nouvelle' );
 	}
 
 	/**
@@ -366,7 +442,7 @@ class ETR_Push {
 	public static function demande_annulee( $demande_id ) {
 		/* translators: %s : traiteur. */
 		$titre = sprintf( __( 'Demande annulée par %s', 'espace-traiteur' ), self::traiteur( $demande_id ) );
-		self::notifier( 'bureau', $titre, self::resume( $demande_id ), $demande_id );
+		self::notifier( 'bureau', $titre, self::resume( $demande_id ), $demande_id, '', 'annulee_traiteur' );
 	}
 
 	/**
@@ -379,10 +455,10 @@ class ETR_Push {
 	public static function statut_change( $demande_id, $ancien, $nouveau ) {
 		if ( 'validee' === $nouveau ) {
 			/* translators: %s : traiteur. */
-			self::notifier( 'terrain', sprintf( __( 'Commande validée : %s', 'espace-traiteur' ), self::traiteur( $demande_id ) ), self::resume( $demande_id, true ), $demande_id );
+			self::notifier( 'terrain', sprintf( __( 'Commande validée : %s', 'espace-traiteur' ), self::traiteur( $demande_id ) ), self::resume( $demande_id, true ), $demande_id, '', 'validee' );
 		} elseif ( in_array( $ancien, array( 'validee', 'livree' ), true ) && in_array( $nouveau, array( 'annulee', 'refusee' ), true ) ) {
 			/* translators: %s : traiteur. */
-			self::notifier( 'terrain', sprintf( __( 'Commande annulée : %s', 'espace-traiteur' ), self::traiteur( $demande_id ) ), self::resume( $demande_id, true ), $demande_id );
+			self::notifier( 'terrain', sprintf( __( 'Commande annulée : %s', 'espace-traiteur' ), self::traiteur( $demande_id ) ), self::resume( $demande_id, true ), $demande_id, '', 'annulee' );
 		}
 	}
 
@@ -394,8 +470,9 @@ class ETR_Push {
 	 * @param string $texte      Texte.
 	 * @param int    $demande_id Demande ouverte au toucher.
 	 * @param string $url        Page ouverte au toucher (sinon la demande, ou l'accueil).
+	 * @param string $type       Type (voir types()) : la personne peut l'avoir désactivé.
 	 */
-	public static function notifier( $groupe, $titre, $texte, $demande_id = 0, $url = '' ) {
+	public static function notifier( $groupe, $titre, $texte, $demande_id = 0, $url = '', $type = '' ) {
 		if ( '' === $url ) {
 			$url = $demande_id ? ETR_Gestion::url( array( 'vue' => 'demande', 'id' => (int) $demande_id ) ) : ETR_Gestion::url();
 		}
@@ -409,6 +486,9 @@ class ETR_Push {
 		foreach ( self::comptes_avec_appareil() as $user_id ) {
 			if ( $user_id === $moi || ! self::concerne( $user_id, $groupe ) ) {
 				continue;
+			}
+			if ( $type && in_array( $type, self::types_desactives( $user_id ), true ) ) {
+				continue; // Désactivé par la personne (page Notifications).
 			}
 			// Pastille sur l'icône de l'application, mise à jour même application fermée.
 			$message['badge'] = self::pastille( $user_id );

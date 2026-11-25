@@ -163,6 +163,7 @@ class ETR_Terrain {
 			echo '<p class="etr-arret__ligne etr-muted">' . self::icone( 'catalogue' ) . '<span>' . esc_html__( 'Colis pas encore comptés', 'espace-traiteur' ) . '</span></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
 		echo '<div class="etr-arret__actions">';
+		echo '<a class="etr-btn etr-btn--discret etr-btn--icone" href="' . esc_url( self::url( array( 'vue' => 'incident', 'id' => $id ) ) ) . '" data-hors-ligne aria-label="' . esc_attr__( 'Signaler un incident', 'espace-traiteur' ) . '" title="' . esc_attr__( 'Signaler un incident', 'espace-traiteur' ) . '">' . self::icone( 'alerte' ) . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		if ( $lieu ) {
 			echo '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_itineraire( $lieu ) ) . '" target="_blank" rel="noopener">' . self::icone( 'lieu' ) . '<span>' . esc_html__( 'Itinéraire', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
@@ -532,6 +533,94 @@ class ETR_Terrain {
 	 */
 	private static function zone_note() {
 		echo '<p class="etr-champ etr-panneau"><label for="etr-note">' . esc_html__( 'Remarque (facultatif)', 'espace-traiteur' ) . '</label><textarea id="etr-note" name="note" rows="3"></textarea></p>';
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Incidents et notes internes                                        */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Signaler un incident : type, description, photos.
+	 *
+	 * @param int $id Demande.
+	 */
+	public static function vue_incident( $id ) {
+		if ( ! ETR_Gestion::demande_visible( $id ) ) {
+			echo '<div class="etr-vide etr-vide--compact"><p>' . esc_html__( 'Cette demande n’existe pas ou ne vous est pas visible.', 'espace-traiteur' ) . '</p></div>';
+			return;
+		}
+		ETR_Gestion::entete( __( 'Signaler un incident', 'espace-traiteur' ), ETR_Operations::traiteur( $id ) . ' — ' . get_the_title( $id ), '', self::retour_demande( $id ) );
+		echo '<form class="etr-terrain-form" data-etr-envoi="incident" data-id="' . (int) $id . '" novalidate>';
+		echo '<section class="etr-panneau"><h2 class="etr-panneau__titre">' . esc_html__( 'Que se passe-t-il ?', 'espace-traiteur' ) . '</h2><div class="etr-choix" role="radiogroup" aria-label="' . esc_attr__( 'Type d’incident', 'espace-traiteur' ) . '">';
+		foreach ( ETR_Operations::types_incident() as $cle => $libelle ) {
+			echo '<label><input type="radio" name="type" value="' . esc_attr( $cle ) . '"><span>' . esc_html( $libelle ) . '</span></label>';
+		}
+		echo '</div>';
+		echo '<p class="etr-champ"><label for="etr-incident-texte">' . esc_html__( 'Description', 'espace-traiteur' ) . '</label><textarea id="etr-incident-texte" name="texte" rows="4" required placeholder="' . esc_attr__( 'Ex. : 3 assiettes cassées au déchargement, client prévenu.', 'espace-traiteur' ) . '"></textarea></p></section>';
+		self::zone_photos( __( 'Photos (facultatif)', 'espace-traiteur' ) );
+		echo '<div class="etr-barre-action"><p class="etr-prepa__message" data-envoi-message role="status"></p>';
+		echo '<button type="submit" class="etr-btn etr-btn--plein">' . self::icone( 'alerte' ) . '<span>' . esc_html__( 'Envoyer au bureau', 'espace-traiteur' ) . '</span></button></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '</form>';
+	}
+
+	/**
+	 * Incidents d'une demande (les non résolus d'abord) et bouton pour en signaler un.
+	 *
+	 * @param int $id Demande.
+	 */
+	public static function panneau_incidents( $id ) {
+		$incidents = ETR_Operations::incidents( $id );
+		$types     = ETR_Operations::types_incident();
+		$ouverts   = ETR_Operations::incidents_ouverts( $id );
+		echo '<section class="etr-panneau etr-incidents" id="incidents"><h2 class="etr-panneau__titre">' . esc_html__( 'Incidents', 'espace-traiteur' ) . ( $ouverts ? ' <span class="etr-compteur etr-compteur--alerte">' . esc_html( number_format_i18n( $ouverts ) ) . '</span>' : '' ) . '</h2>';
+		if ( $incidents ) {
+			echo '<ul class="etr-incidents__liste">';
+			uksort(
+				$incidents,
+				function ( $a, $b ) use ( $incidents ) {
+					return ( (int) ! empty( $incidents[ $a ]['resolu'] ) - (int) ! empty( $incidents[ $b ]['resolu'] ) ) ?: $b - $a;
+				}
+			);
+			foreach ( $incidents as $n => $incident ) {
+				$resolu = ! empty( $incident['resolu'] );
+				echo '<li class="etr-incident' . ( $resolu ? ' est-resolu' : '' ) . '"><p class="etr-incident__tete"><strong>' . esc_html( isset( $types[ $incident['type'] ] ) ? $types[ $incident['type'] ] : $incident['type'] ) . '</strong>';
+				/* translators: 1 : personne, 2 : date. */
+				echo '<small>' . esc_html( sprintf( __( '%1$s, le %2$s', 'espace-traiteur' ), etr_nom( get_userdata( $incident['par'] ) ), wp_date( 'j M, H:i', $incident['le'] ) ) ) . '</small></p>';
+				echo '<p class="etr-incident__texte">' . nl2br( esc_html( $incident['texte'] ) ) . '</p>';
+				self::photos_cr( isset( $incident['photos'] ) ? $incident['photos'] : array() );
+				if ( $resolu ) {
+					/* translators: 1 : personne, 2 : date. */
+					echo '<p class="etr-incident__resolu">' . self::icone( 'coche' ) . esc_html( sprintf( __( 'Résolu par %1$s le %2$s', 'espace-traiteur' ), etr_nom( get_userdata( $incident['resolu_par'] ) ), wp_date( 'j M, H:i', $incident['resolu'] ) ) ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput
+				} elseif ( ETR_Equipe::bureau() ) {
+					echo '<button type="button" class="etr-btn etr-btn--discret" data-resoudre="' . (int) $n . '" data-id="' . (int) $id . '">' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Marquer résolu', 'espace-traiteur' ) . '</span></button>'; // phpcs:ignore WordPress.Security.EscapeOutput
+				}
+				echo '</li>';
+			}
+			echo '</ul>';
+		} else {
+			echo '<p class="etr-muted">' . esc_html__( 'Aucun incident. En cas de casse, de retard ou d’accès impossible, prévenez le bureau ici.', 'espace-traiteur' ) . '</p>';
+		}
+		echo '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url( array( 'vue' => 'incident', 'id' => $id ) ) ) . '" data-hors-ligne>' . self::icone( 'alerte' ) . '<span>' . esc_html__( 'Signaler un incident', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '</section>';
+	}
+
+	/**
+	 * Notes internes de l'équipe (jamais visibles par le traiteur).
+	 *
+	 * @param int $id Demande.
+	 */
+	public static function panneau_notes( $id ) {
+		echo '<section class="etr-panneau etr-notes"><h2 class="etr-panneau__titre">' . esc_html__( 'Notes de l’équipe', 'espace-traiteur' ) . '</h2>';
+		echo '<p class="etr-muted">' . esc_html__( 'Visibles seulement par l’équipe, jamais par le traiteur.', 'espace-traiteur' ) . '</p>';
+		echo '<ul class="etr-notes__liste" data-notes>';
+		foreach ( array_reverse( ETR_Operations::notes( $id ) ) as $note ) {
+			echo '<li><p>' . nl2br( esc_html( $note['texte'] ) ) . '</p><small>' . esc_html( etr_nom( get_userdata( $note['par'] ) ) . ' · ' . wp_date( 'j M, H:i', $note['le'] ) ) . '</small></li>';
+		}
+		echo '</ul>';
+		echo '<form class="etr-notes__form" data-etr-note="' . (int) $id . '"><label class="screen-reader-text" for="etr-note-' . (int) $id . '">' . esc_html__( 'Nouvelle note', 'espace-traiteur' ) . '</label>';
+		echo '<textarea id="etr-note-' . (int) $id . '" name="texte" rows="2" placeholder="' . esc_attr__( 'Ex. : portail fermé après 18 h, sonner chez le gardien.', 'espace-traiteur' ) . '"></textarea>';
+		echo '<button type="submit" class="etr-btn etr-btn--discret">' . esc_html__( 'Ajouter', 'espace-traiteur' ) . '</button></form>';
+		echo '</section>';
 	}
 
 	/* ------------------------------------------------------------------ */

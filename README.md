@@ -123,6 +123,13 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Notes, incidents, recherche, préférences (2.3.0)
+
+- **Notes de l'équipe** sur chaque demande (fiche) : visibles seulement par l'équipe, jamais par le traiteur ; ajoutées sans recharger la page, gardées sur le téléphone sans réseau.
+- **Signaler un incident** (casse, retard, accès impossible, matériel manquant, autre) avec description et photos, depuis la fiche ou la tournée ; le bureau est notifié tout de suite. Le panneau « Incidents » liste les incidents ouverts d'abord ; le bureau les marque résolus. Fonctionne aussi hors connexion.
+- **Recherche globale** (loupe de l'en-tête, ou « Rechercher » dans le menu) : demandes par n°, événement, traiteur, lieu ou contact ; traiteurs pour le bureau ; raccourci vers le scanner.
+- **Préférences de notifications** : sur la page Notifications, un interrupteur par type d'alerte reçu (nouvelle demande, livrée, reprise, incident, commande prête, rappels…).
+
 ### Notifications (iPhone)
 
 - Sur iPhone (iOS 16.4 ou plus), elles fonctionnent dans l'application **installée sur l'écran d'accueil**. Chacun les active depuis la cloche (page *Notifications*) : l'iPhone demande l'autorisation, puis une notification de test arrive. Une invitation à les activer s'affiche dans l'app tant que la personne n'a pas répondu. Elles marchent aussi sur ordinateur (Chrome, Edge, Firefox, Safari).

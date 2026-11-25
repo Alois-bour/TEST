@@ -921,6 +921,8 @@ class ETR_Gestion {
 			'livrer'    => ETR_Equipe::livreur(),
 			'reprendre' => ETR_Equipe::livreur(),
 			'colis'     => ETR_Equipe::preparateur() || ETR_Equipe::livreur(),
+			'incident'  => true,
+			'recherche' => true,
 		);
 		if ( ! empty( $terrain[ $vue ] ) ) {
 			return $vue;
@@ -943,6 +945,8 @@ class ETR_Gestion {
 			'livrer'    => 'tournee',
 			'reprendre' => 'tournee',
 			'colis'     => 'scanner',
+			'incident'  => 'demandes',
+			'recherche' => '',
 		);
 		$actif  = isset( $parent[ $vue ] ) ? $parent[ $vue ] : $vue;
 
@@ -997,6 +1001,12 @@ class ETR_Gestion {
 				break;
 			case 'reprendre':
 				ETR_Terrain::vue_reprendre( isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0 ); // phpcs:ignore WordPress.Security.NonceVerification
+				break;
+			case 'incident':
+				ETR_Terrain::vue_incident( isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0 ); // phpcs:ignore WordPress.Security.NonceVerification
+				break;
+			case 'recherche':
+				self::vue_recherche();
 				break;
 			default:
 				self::vue_tableau();
@@ -1079,7 +1089,15 @@ class ETR_Gestion {
 
 		$alertes = self::alertes_recues();
 		echo '<section class="etr-panneau etr-notifs"><h2 class="etr-panneau__titre">' . esc_html__( 'Ce que vous recevez', 'espace-traiteur' ) . '</h2>';
-		if ( $alertes ) {
+		$types = ETR_Push::types_pour( get_current_user_id() );
+		if ( $types ) {
+			// Un interrupteur par type d'alerte (enregistré tout de suite, notifications.js).
+			echo '<ul class="etr-interrupteurs" data-etr-preferences>';
+			foreach ( $types as $type => $config ) {
+				echo '<li><label><span>' . esc_html( $config['libelle'] ) . '</span><input type="checkbox" role="switch" value="' . esc_attr( $type ) . '"' . checked( $config['actif'], true, false ) . '></label></li>';
+			}
+			echo '</ul>';
+		} elseif ( $alertes ) {
 			echo '<ul class="etr-notifs__liste">';
 			foreach ( $alertes as $alerte ) {
 				echo '<li>' . esc_html( $alerte ) . '</li>';
@@ -1162,7 +1180,10 @@ class ETR_Gestion {
 	 * @return array[] { url, libellé, icône }
 	 */
 	private static function liens_compte() {
-		$liens = array( array( self::url( array( 'vue' => 'notifications' ) ), __( 'Notifications', 'espace-traiteur' ), 'cloche' ) );
+		$liens = array(
+			array( self::url( array( 'vue' => 'recherche' ) ), __( 'Rechercher', 'espace-traiteur' ), 'recherche' ),
+			array( self::url( array( 'vue' => 'notifications' ) ), __( 'Notifications', 'espace-traiteur' ), 'cloche' ),
+		);
 		if ( ETR_Equipe::bureau() ) {
 			$liens[] = array( etr_url(), __( 'Voir l’espace traiteur', 'espace-traiteur' ), 'site' );
 			$liens[] = array( admin_url( 'edit.php?post_type=etr_demande&page=etr-reglages' ), __( 'Réglages', 'espace-traiteur' ), 'reglages' );
@@ -1198,6 +1219,7 @@ class ETR_Gestion {
 		echo '</a>';
 		// Titre compact : affiché dans l'en-tête quand le grand titre de la page a défilé (app.js).
 		echo '<p class="etr-app__titre-compact" aria-hidden="true"></p>';
+		echo '<a class="etr-app__chercher" href="' . esc_url( self::url( array( 'vue' => 'recherche' ) ) ) . '" aria-label="' . esc_attr__( 'Rechercher', 'espace-traiteur' ) . '">' . self::icone( 'recherche' ) . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput
 
 		// Libellés courts de la barre d'onglets (application installée sur téléphone).
 		$courts = array(
@@ -1275,6 +1297,7 @@ class ETR_Gestion {
 			'livree'     => __( 'Livraison enregistrée : la demande est « Livrée », le bureau et le traiteur sont prévenus.', 'espace-traiteur' ),
 			'reprise'    => __( 'Reprise enregistrée : tout est revenu, la demande est clôturée.', 'espace-traiteur' ),
 			'reprise_ecarts' => __( 'Reprise enregistrée avec des écarts : le bureau est prévenu.', 'espace-traiteur' ),
+			'incident'   => __( 'Incident envoyé : le bureau est prévenu.', 'espace-traiteur' ),
 			'enregistre' => __( 'Message enregistré. Le statut n’a pas changé : aucun e-mail n’a été envoyé.', 'espace-traiteur' ),
 			'tarif'      => __( 'Remise et frais de livraison enregistrés.', 'espace-traiteur' ),
 			'cree'       => __( 'Traiteur ajouté. Il a reçu un e-mail pour choisir son mot de passe.', 'espace-traiteur' ),
@@ -1649,6 +1672,62 @@ class ETR_Gestion {
 	}
 
 	/**
+	 * Recherche globale : demandes (n°, événement, traiteur, lieu, contact) et, pour le bureau, traiteurs.
+	 */
+	private static function vue_recherche() {
+		$q = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+		self::entete( __( 'Rechercher', 'espace-traiteur' ), __( 'Une demande (n°, événement, traiteur, lieu, contact) ou un traiteur.', 'espace-traiteur' ) );
+
+		echo '<form class="etr-recherche-globale" method="get" action="' . esc_url( self::url() ) . '" role="search">';
+		if ( ! get_option( 'permalink_structure' ) ) {
+			echo '<input type="hidden" name="etr_gestion" value="1">';
+		}
+		echo '<input type="hidden" name="vue" value="recherche">';
+		echo '<span class="etr-recherche-gestion__champ">' . self::icone( 'recherche' ); // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '<label class="screen-reader-text" for="etr-recherche-q">' . esc_html__( 'Rechercher', 'espace-traiteur' ) . '</label>';
+		echo '<input type="search" id="etr-recherche-q" name="q" value="' . esc_attr( $q ) . '" placeholder="' . esc_attr__( 'N°, traiteur, événement, lieu…', 'espace-traiteur' ) . '" enterkeyhint="search" autocomplete="off"' . ( '' === $q ? ' autofocus' : '' ) . '></span>';
+		echo '<button type="submit" class="etr-btn">' . esc_html__( 'Rechercher', 'espace-traiteur' ) . '</button>';
+		echo '</form>';
+		if ( ETR_Equipe::preparateur() || ETR_Equipe::livreur() ) {
+			echo '<p class="etr-recherche-globale__raccourci"><a class="etr-btn etr-btn--discret" href="' . esc_url( self::url( array( 'vue' => 'scanner' ) ) ) . '">' . self::icone( 'scan' ) . '<span>' . esc_html__( 'Scanner une étiquette', 'espace-traiteur' ) . '</span></a></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		}
+		if ( '' === $q ) {
+			return;
+		}
+
+		list( , $demandes ) = self::filtrer_demandes( '', 0, $q );
+		$traiteurs          = array();
+		if ( ETR_Equipe::bureau() ) {
+			$traiteurs = get_users(
+				array(
+					'role'           => 'traiteur',
+					'search'         => '*' . $q . '*',
+					'search_columns' => array( 'display_name', 'user_email', 'user_login', 'user_nicename' ),
+					'number'         => 20,
+				)
+			);
+		}
+		if ( ! $demandes && ! $traiteurs ) {
+			/* translators: %s : recherche. */
+			echo '<div class="etr-vide etr-vide--compact"><p>' . esc_html( sprintf( __( 'Rien ne correspond à « %s ».', 'espace-traiteur' ), $q ) ) . '</p></div>';
+			return;
+		}
+		if ( $demandes ) {
+			/* translators: %s : nombre. */
+			echo '<h2 class="etr-section-titre">' . esc_html__( 'Demandes', 'espace-traiteur' ) . ' <span class="etr-compteur">' . esc_html( number_format_i18n( count( $demandes ) ) ) . '</span></h2>';
+			self::table_demandes( array_slice( $demandes, 0, 30 ) );
+		}
+		if ( $traiteurs ) {
+			echo '<h2 class="etr-section-titre">' . esc_html__( 'Traiteurs', 'espace-traiteur' ) . ' <span class="etr-compteur">' . esc_html( number_format_i18n( count( $traiteurs ) ) ) . '</span></h2><ul class="etr-feuille__liste etr-recherche-globale__traiteurs">';
+			foreach ( $traiteurs as $user ) {
+				$tel = (string) get_user_meta( $user->ID, 'etr_telephone', true );
+				echo '<li><a href="' . esc_url( self::url( array( 'vue' => 'demandes', 'traiteur' => $user->ID ) ) ) . '">' . self::icone( 'invites' ) . '<span>' . esc_html( etr_nom( $user ) ) . '<small>' . esc_html( $user->user_email . ( $tel ? ' · ' . $tel : '' ) ) . '</small></span>' . self::icone( 'suite' ) . '</a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			}
+			echo '</ul>';
+		}
+	}
+
+	/**
 	 * Liste filtrable des demandes.
 	 */
 	private static function vue_demandes() {
@@ -1781,6 +1860,8 @@ class ETR_Gestion {
 		ETR_Terrain::panneau_suivi( $id ); // En tête : les actions du terrain (préparer, livrer, reprendre).
 		self::panneau_materiel( $id );
 		ETR_Terrain::panneaux_comptes_rendus( $id );
+		ETR_Terrain::panneau_incidents( $id );
+		ETR_Terrain::panneau_notes( $id );
 		self::panneaux_infos( $id );
 		echo '<section class="etr-panneau"><h2 class="etr-panneau__titre">' . esc_html__( 'Historique', 'espace-traiteur' ) . '</h2>' . ETR_Historique::html( $id ) . '</section>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans ETR_Historique::html().
 		echo '</div>';
