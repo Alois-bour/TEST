@@ -70,7 +70,7 @@ class ETR_Frontend {
 	 *
 	 * @return bool
 	 */
-	private static function sur_page_espace() {
+	public static function sur_page_espace() {
 		return is_singular() && has_shortcode( (string) get_post_field( 'post_content', get_queried_object_id() ), 'espace_traiteur' );
 	}
 
@@ -571,6 +571,7 @@ class ETR_Frontend {
 			'modifier'     => '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
 			'scan'         => '<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M7 12h10"/>',
 			'plus-onglet'  => '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+			'visage'       => '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9v4h-1M9.5 15.5c1.5 1 3.5 1 5 0"/>',
 			'cloche'       => '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
 		);
 		if ( ! isset( $traces[ $nom ] ) ) {
@@ -611,6 +612,8 @@ class ETR_Frontend {
 		echo '<div class="etr-espace etr-app' . ( self::plein_ecran() ? '' : ' etr-app--integre' ) . '">';
 		self::barre_laterale( 'nouvelle' === $vue ? 'nouvelle' : 'demandes' );
 		echo '<main class="etr-app__principal" id="etr-contenu">';
+		// Installer l'espace sur l'iPhone (affiché par traiteur-app.js dans Safari, si pas encore installé).
+		echo '<aside class="etr-installer" id="etr-installer-traiteur" hidden><span class="etr-installer__icone" aria-hidden="true"><img src="' . esc_url( ETR_PWA::icone( 180 ) ) . '" alt="" width="44" height="44"></span><p><strong>' . esc_html__( 'Votre espace sur l’iPhone', 'espace-traiteur' ) . '</strong><span>' . esc_html__( 'Dans Safari, touchez « Partager » puis « Sur l’écran d’accueil » : vos demandes et leur suivi en un toucher.', 'espace-traiteur' ) . '</span></p><button type="button" class="etr-installer__fermer" aria-label="' . esc_attr__( 'Fermer', 'espace-traiteur' ) . '">×</button></aside>';
 		self::messages();
 
 		if ( 'nouvelle' === $vue ) {
@@ -1089,6 +1092,7 @@ class ETR_Frontend {
 		self::entete_page( get_the_title( $demande ), $sous, '<div class="etr-page-entete__statut">' . etr_statut_badge( $statut ) . '</div>', $retour );
 
 		self::suivi( $statut );
+		do_action( 'etr_traiteur_demande_apres_suivi', $demande_id ); // Bon de livraison signé, suivi détaillé.
 
 		$reponse = get_post_meta( $demande_id, '_etr_reponse', true );
 		if ( $reponse ) {

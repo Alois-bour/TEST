@@ -73,6 +73,10 @@ class ETR_Migrations {
 				'description' => __( 'Application : adresses des écrans de démarrage iPhone.', 'espace-traiteur' ),
 				'callback'    => array( __CLASS__, 'migrer_2_1_0' ),
 			),
+			'2.6.0' => array(
+				'description' => __( 'Espace traiteur installable : adresse de son manifeste.', 'espace-traiteur' ),
+				'callback'    => array( __CLASS__, 'migrer_2_1_0' ), // Même opération : règles de réécriture.
+			),
 		);
 		return (array) apply_filters( 'etr_migrations', $etapes );
 	}

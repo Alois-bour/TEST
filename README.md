@@ -123,6 +123,32 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Espace traiteur installable, suivi détaillé (2.6.0)
+
+- L'**espace traiteur s'installe sur l'iPhone** du traiteur (Safari › Partager › « Sur l'écran d'accueil ») : manifeste dédié (nom, icône, plein écran), aide à l'installation affichée dans Safari tant que ce n'est pas fait.
+- **Suivi de la commande** sur la fiche de chaque demande : matériel préparé (heure), en route (premier colis chargé), livré (heure, personne qui a réceptionné), repris (complet ou écarts) ; dates prévues de livraison et de reprise tant qu'elles ne sont pas faites. Lien vers le **bon de livraison signé**.
+
+### Connexion par Face ID (2.5.0)
+
+- **Activer** : dans l'application, menu › « Connexion par Face ID » › « Activer Face ID sur cet appareil » (une invitation le propose aussi). L'iPhone crée une **clé d'accès** pour le site, gardée dans le trousseau et protégée par Face ID ; le site n'en garde que la partie publique. Aucune donnée du visage n'est transmise.
+- **Se connecter** : « Se connecter avec Face ID » sur l'écran de connexion, sans identifiant ni mot de passe. Le mot de passe reste valable.
+- **Gérer** : liste des appareils (ajout, dernière utilisation), « Retirer ».
+- **Sécurité** (norme WebAuthn, vérifiée sur le serveur, sans dépendance) : défi à usage unique (5 min), origine et domaine du site, présence et vérification de l'utilisateur (Face ID) exigées, signature ES256 ou RS256, compteur anti-clonage, accès à l'application vérifié à chaque connexion (un accès retiré bloque aussi Face ID), essais limités par adresse IP.
+
+### Tournées réparties, bon de livraison signé (2.4.0)
+
+- **Répartition des tournées** (bureau, écran Tournée) : chaque livraison ou reprise est confiée à un livreur (il est prévenu), et l'**ordre de passage** se règle avec ↑ ↓. Un livreur voit **ses étapes** et celles **à répartir** ; sa pastille et ses rappels de la veille ne comptent que celles-ci. « Commande prête » ne prévient que le livreur de la livraison (tous s'il n'y en a pas encore).
+- **Itinéraire de la tournée** : toutes les étapes dans l'ordre, en un toucher (Google Maps, départ de la position actuelle) ; l'itinéraire de chaque étape reste disponible (Plans).
+- **Bon de livraison signé (PDF)** : matériel livré, colis, date et heure, livreur, personne qui a réceptionné, **signature** et **photos**. Envoyé automatiquement au traiteur par e-mail (pièce jointe) dès la livraison, téléchargeable depuis la fiche (équipe) et depuis l'espace traiteur (le traiteur de la demande uniquement). Généré par le plugin, sans dépendance (extension GD pour la signature et les photos).
+- L'heure des rappels de la veille se règle avec le filtre `etr_heure_rappel_veille` (17 par défaut).
+
+### Notes, incidents, recherche, préférences (2.3.0)
+
+- **Notes de l'équipe** sur chaque demande (fiche) : visibles seulement par l'équipe, jamais par le traiteur ; ajoutées sans recharger la page, gardées sur le téléphone sans réseau.
+- **Signaler un incident** (casse, retard, accès impossible, matériel manquant, autre) avec description et photos, depuis la fiche ou la tournée ; le bureau est notifié tout de suite. Le panneau « Incidents » liste les incidents ouverts d'abord ; le bureau les marque résolus. Fonctionne aussi hors connexion.
+- **Recherche globale** (loupe de l'en-tête, ou « Rechercher » dans le menu) : demandes par n°, événement, traiteur, lieu ou contact ; traiteurs pour le bureau ; raccourci vers le scanner.
+- **Préférences de notifications** : sur la page Notifications, un interrupteur par type d'alerte reçu (nouvelle demande, livrée, reprise, incident, commande prête, rappels…).
+
 ### Notifications (iPhone)
 
 - Sur iPhone (iOS 16.4 ou plus), elles fonctionnent dans l'application **installée sur l'écran d'accueil**. Chacun les active depuis la cloche (page *Notifications*) : l'iPhone demande l'autorisation, puis une notification de test arrive. Une invitation à les activer s'affiche dans l'app tant que la personne n'a pas répondu. Elles marchent aussi sur ordinateur (Chrome, Edge, Firefox, Safari).

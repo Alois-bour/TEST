@@ -40,6 +40,38 @@
 	}
 
 	/* ------------------------------------------------------------------ */
+	/* Types d'alertes : un interrupteur par type, enregistré aussitôt    */
+	/* ------------------------------------------------------------------ */
+
+	var preferences = document.querySelector( '[data-etr-preferences]' );
+	if ( preferences ) {
+		preferences.addEventListener( 'change', function () {
+			var sans = Array.prototype.filter.call( preferences.querySelectorAll( 'input' ), function ( champ ) {
+				return ! champ.checked;
+			} ).map( function ( champ ) {
+				return champ.value;
+			} );
+			fetch( etrNotifs.api + 'preferences', {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': etrNotifs.nonce },
+				body: JSON.stringify( { sans: sans } )
+			} ).then( function ( r ) {
+				if ( ! r.ok ) {
+					throw new Error();
+				}
+				if ( window.etrToast ) {
+					window.etrToast( 'Préférences enregistrées.' );
+				}
+			} ).catch( function () {
+				if ( window.etrToast ) {
+					window.etrToast( 'Préférences non enregistrées : vérifiez la connexion.', 'erreur' );
+				}
+			} );
+		} );
+	}
+
+	/* ------------------------------------------------------------------ */
 	/* Page « Notifications »                                             */
 	/* ------------------------------------------------------------------ */
 

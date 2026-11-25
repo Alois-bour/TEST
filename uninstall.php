@@ -29,6 +29,8 @@ delete_option( 'etr_journal_liens' );
 delete_option( 'etr_push_vapid' );
 delete_option( 'etr_rappel_veille' );
 delete_metadata( 'user', 0, 'etr_push_appareils', '', true );
+delete_metadata( 'user', 0, 'etr_push_sans', '', true );
+delete_metadata( 'user', 0, 'etr_cles_acces', '', true );
 delete_option( 'etr_afficher_prix' );
 delete_option( 'etr_email_equipe' );
 delete_option( 'etr_logo' );

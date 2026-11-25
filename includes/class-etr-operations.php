@@ -27,6 +27,8 @@ class ETR_Operations {
 	const META_COLIS     = '_etr_colis';
 	const META_LIVRAISON = '_etr_livraison';
 	const META_REPRISE   = '_etr_reprise';
+	const META_NOTES     = '_etr_notes';
+	const META_INCIDENTS = '_etr_incidents';
 	const MAX_PHOTOS     = 8;
 	const MAX_COLIS      = 200;
 	const HEURE_RAPPEL   = 17;
@@ -39,6 +41,7 @@ class ETR_Operations {
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
 		add_filter( 'etr_routes_api_equipe', array( __CLASS__, 'routes_autorisees' ) );
 		add_action( 'etr_rappels_horaires', array( __CLASS__, 'rappels_veille' ) );
+		add_action( 'etr_traiteur_demande_apres_suivi', array( 'ETR_Terrain', 'suivi_traiteur' ), 5 );
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -250,7 +253,147 @@ class ETR_Operations {
 				$tournee['reprises'][] = $id;
 			}
 		}
+		// Ordre de passage fixé par le bureau (les étapes sans ordre à la fin).
+		foreach ( array( 'livraisons' => 'livraison', 'reprises' => 'reprise' ) as $cle => $etape ) {
+			usort(
+				$tournee[ $cle ],
+				function ( $a, $b ) use ( $etape ) {
+					$oa = (int) get_post_meta( $a, '_etr_ordre_' . $etape, true );
+					$ob = (int) get_post_meta( $b, '_etr_ordre_' . $etape, true );
+					return ( $oa ? $oa : PHP_INT_MAX ) <=> ( $ob ? $ob : PHP_INT_MAX ) ?: $a <=> $b;
+				}
+			);
+		}
 		return $tournee;
+	}
+
+	/**
+	 * Tournée d'un livreur : ses étapes et celles qui ne sont confiées à personne.
+	 *
+	 * @param string $jour    AAAA-MM-JJ.
+	 * @param int    $user_id Livreur.
+	 * @return array { livraisons: int[], reprises: int[] }
+	 */
+	public static function tournee_de( $jour, $user_id ) {
+		$tournee = self::tournee( $jour );
+		foreach ( array( 'livraisons' => 'livraison', 'reprises' => 'reprise' ) as $cle => $etape ) {
+			$tournee[ $cle ] = array_values(
+				array_filter(
+					$tournee[ $cle ],
+					function ( $id ) use ( $etape, $user_id ) {
+						$livreur = self::livreur_de( $id, $etape );
+						return ! $livreur || $livreur === (int) $user_id;
+					}
+				)
+			);
+		}
+		return $tournee;
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Affectation des étapes                                             */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Livreurs (accès actif).
+	 *
+	 * @return string[] user_id => nom.
+	 */
+	public static function livreurs() {
+		$livreurs = array();
+		foreach ( get_users( array( 'role__in' => array( 'etr_livreur' ), 'orderby' => 'display_name' ) ) as $user ) {
+			if ( ! ETR_Equipe::acces_retire( $user->ID ) ) {
+				$livreurs[ $user->ID ] = etr_nom( $user );
+			}
+		}
+		return $livreurs;
+	}
+
+	/**
+	 * Livreur à qui une étape est confiée (0 : à répartir).
+	 *
+	 * @param int    $id    Demande.
+	 * @param string $etape livraison | reprise.
+	 * @return int
+	 */
+	public static function livreur_de( $id, $etape ) {
+		return (int) get_post_meta( $id, '_etr_livreur_' . ( 'reprise' === $etape ? 'reprise' : 'livraison' ), true );
+	}
+
+	/**
+	 * Confie une étape à un livreur (0 : à répartir) ; il est prévenu.
+	 *
+	 * @param int    $id      Demande.
+	 * @param string $etape   livraison | reprise.
+	 * @param int    $livreur Livreur.
+	 * @return true|WP_Error
+	 */
+	public static function affecter( $id, $etape, $livreur ) {
+		$etape    = 'reprise' === $etape ? 'reprise' : 'livraison';
+		$livreurs = self::livreurs();
+		if ( $livreur && ! isset( $livreurs[ $livreur ] ) ) {
+			return new WP_Error( 'etr_livreur', __( 'Livreur inconnu.', 'espace-traiteur' ), array( 'status' => 400 ) );
+		}
+		if ( self::livreur_de( $id, $etape ) === $livreur ) {
+			return true;
+		}
+		if ( $livreur ) {
+			update_post_meta( $id, '_etr_livreur_' . $etape, $livreur );
+		} else {
+			delete_post_meta( $id, '_etr_livreur_' . $etape );
+		}
+		$libelle = 'livraison' === $etape ? __( 'Livraison', 'espace-traiteur' ) : __( 'Reprise', 'espace-traiteur' );
+		ETR_Historique::ajouter(
+			$id,
+			'tournee',
+			$livreur
+				/* translators: 1 : livraison ou reprise, 2 : livreur. */
+				? sprintf( __( '%1$s confiée à %2$s', 'espace-traiteur' ), $libelle, $livreurs[ $livreur ] )
+				/* translators: %s : livraison ou reprise. */
+				: sprintf( __( '%s à répartir', 'espace-traiteur' ), $libelle )
+		);
+		if ( $livreur ) {
+			list( $jour_livraison, $jour_reprise ) = self::jours( $id );
+			$jour                                  = 'livraison' === $etape ? $jour_livraison : $jour_reprise;
+			ETR_Push::notifier(
+				'livreur',
+				/* translators: 1 : livraison ou reprise, 2 : traiteur. */
+				sprintf( __( '%1$s pour vous : %2$s', 'espace-traiteur' ), $libelle, self::traiteur( $id ) ),
+				get_the_title( $id ) . ( $jour ? ' · ' . etr_format_date( $jour ) : '' ),
+				$id,
+				'',
+				'affectation',
+				array( $livreur )
+			);
+		}
+		return true;
+	}
+
+	/**
+	 * Ordre de passage des étapes d'un jour.
+	 *
+	 * @param string $etape livraison | reprise.
+	 * @param int[]  $ids   Demandes, dans l'ordre.
+	 */
+	public static function ordonner( $etape, $ids ) {
+		$etape = 'reprise' === $etape ? 'reprise' : 'livraison';
+		foreach ( array_values( $ids ) as $rang => $id ) {
+			if ( ETR_Gestion::demande_visible( $id ) ) {
+				update_post_meta( $id, '_etr_ordre_' . $etape, $rang + 1 );
+			}
+		}
+	}
+
+	/**
+	 * Destinataires d'une étape : son livreur, ou tous s'il n'y en a pas (tableau vide).
+	 *
+	 * @param int    $id    Demande.
+	 * @param string $etape livraison | reprise.
+	 * @return int[]
+	 */
+	private static function destinataires_etape( $id, $etape ) {
+		$livreur = self::livreur_de( $id, $etape );
+		return $livreur ? array( $livreur ) : array();
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -325,7 +468,10 @@ class ETR_Operations {
 			sprintf( __( 'Commande prête : %s', 'espace-traiteur' ), self::traiteur( $id ) ),
 			/* translators: 1 : événement, 2 : date, 3 : colis. */
 			sprintf( __( '%1$s · livraison le %2$s · %3$s colis', 'espace-traiteur' ), get_the_title( $id ), $jour ? etr_format_date( $jour ) : '—', number_format_i18n( $prepa['colis'] ) ) . ( $manque ? ' · ' . __( 'incomplète', 'espace-traiteur' ) : '' ),
-			$id
+			$id,
+			'',
+			'prete',
+			self::destinataires_etape( $id, 'livraison' )
 		);
 		return $prepa;
 	}
@@ -412,13 +558,16 @@ class ETR_Operations {
 		/* translators: %s : personne qui a signé. */
 		ETR_Historique::ajouter( $id, 'livraison', sprintf( __( 'Livrée, réceptionnée et signée par %s', 'espace-traiteur' ), $signataire ) . ( $note ? ' — ' . $note : '' ) );
 		etr_changer_statut( $id, 'livree' );
+		do_action( 'etr_livree', $id ); // Bon de livraison signé envoyé au traiteur (ETR_Bon_Livraison).
 		ETR_Push::notifier(
 			'bureau',
 			/* translators: %s : traiteur. */
 			sprintf( __( 'Livrée : %s', 'espace-traiteur' ), self::traiteur( $id ) ),
 			/* translators: 1 : événement, 2 : signataire. */
 			sprintf( __( '%1$s · signée par %2$s', 'espace-traiteur' ), get_the_title( $id ), $signataire ) . ( $fichiers['photos'] ? ' · ' . sprintf( _n( '%s photo', '%s photos', count( $fichiers['photos'] ), 'espace-traiteur' ), number_format_i18n( count( $fichiers['photos'] ) ) ) : '' ),
-			$id
+			$id,
+			'',
+			'livree'
 		);
 		return true;
 	}
@@ -487,7 +636,9 @@ class ETR_Operations {
 				/* translators: %s : traiteur. */
 				: sprintf( __( 'Matériel repris : %s', 'espace-traiteur' ), self::traiteur( $id ) ),
 			get_the_title( $id ) . ' · ' . ( $ecarts ? $ecarts : ( $cloturee ? __( 'complet, demande clôturée', 'espace-traiteur' ) : __( 'complet', 'espace-traiteur' ) ) ),
-			$id
+			$id,
+			'',
+			'reprise'
 		);
 		return array(
 			'manquants' => $manquants,
@@ -495,6 +646,169 @@ class ETR_Operations {
 			'ecarts'    => '' !== $ecarts,
 			'cloturee'  => $cloturee,
 		);
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Notes internes et incidents                                        */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Types d'incidents.
+	 *
+	 * @return string[]
+	 */
+	public static function types_incident() {
+		return array(
+			'casse'    => __( 'Casse', 'espace-traiteur' ),
+			'retard'   => __( 'Retard', 'espace-traiteur' ),
+			'acces'    => __( 'Accès impossible', 'espace-traiteur' ),
+			'manquant' => __( 'Matériel manquant', 'espace-traiteur' ),
+			'autre'    => __( 'Autre', 'espace-traiteur' ),
+		);
+	}
+
+	/**
+	 * Notes internes de l'équipe (jamais montrées au traiteur).
+	 *
+	 * @param int $id Demande.
+	 * @return array[] { le, par, texte, jeton }
+	 */
+	public static function notes( $id ) {
+		$notes = get_post_meta( $id, self::META_NOTES, true );
+		return is_array( $notes ) ? $notes : array();
+	}
+
+	/**
+	 * Ajoute une note (un renvoi du même jeton n'ajoute rien).
+	 *
+	 * @param int    $id    Demande.
+	 * @param string $texte Note.
+	 * @param string $jeton Jeton de l'envoi.
+	 * @return array|WP_Error Note.
+	 */
+	public static function ajouter_note( $id, $texte, $jeton ) {
+		if ( '' === trim( $texte ) ) {
+			return new WP_Error( 'etr_note', __( 'La note est vide.', 'espace-traiteur' ), array( 'status' => 400 ) );
+		}
+		$notes = self::notes( $id );
+		foreach ( $notes as $note ) {
+			if ( $jeton && isset( $note['jeton'] ) && $note['jeton'] === $jeton ) {
+				return $note;
+			}
+		}
+		$note    = array(
+			'le'    => time(),
+			'par'   => get_current_user_id(),
+			'texte' => $texte,
+			'jeton' => $jeton,
+		);
+		$notes[] = $note;
+		update_post_meta( $id, self::META_NOTES, $notes );
+		return $note;
+	}
+
+	/**
+	 * Incidents d'une demande.
+	 *
+	 * @param int $id Demande.
+	 * @return array[] { le, par, type, texte, photos, resolu, resolu_par, jeton }
+	 */
+	public static function incidents( $id ) {
+		$incidents = get_post_meta( $id, self::META_INCIDENTS, true );
+		return is_array( $incidents ) ? $incidents : array();
+	}
+
+	/**
+	 * Nombre d'incidents non résolus.
+	 *
+	 * @param int $id Demande.
+	 * @return int
+	 */
+	public static function incidents_ouverts( $id ) {
+		return count(
+			array_filter(
+				self::incidents( $id ),
+				function ( $incident ) {
+					return empty( $incident['resolu'] );
+				}
+			)
+		);
+	}
+
+	/**
+	 * Signale un incident (photos facultatives) ; le bureau est prévenu.
+	 *
+	 * @param int    $id     Demande.
+	 * @param string $type   Type (types_incident()).
+	 * @param string $texte  Description.
+	 * @param array  $photos Entrées de $_FILES.
+	 * @param string $jeton  Jeton de l'envoi.
+	 * @return true|WP_Error
+	 */
+	public static function signaler( $id, $type, $texte, $photos, $jeton ) {
+		$types = self::types_incident();
+		if ( ! isset( $types[ $type ] ) ) {
+			return new WP_Error( 'etr_incident', __( 'Choisissez le type d’incident.', 'espace-traiteur' ), array( 'status' => 400 ) );
+		}
+		if ( '' === trim( $texte ) ) {
+			return new WP_Error( 'etr_incident', __( 'Décrivez l’incident en quelques mots.', 'espace-traiteur' ), array( 'status' => 400 ) );
+		}
+		$incidents = self::incidents( $id );
+		foreach ( $incidents as $incident ) {
+			if ( $jeton && isset( $incident['jeton'] ) && $incident['jeton'] === $jeton ) {
+				return true; // Déjà reçu (renvoi après coupure).
+			}
+		}
+		$fichiers = self::enregistrer_fichiers( $id, 'incident', '', $photos, false );
+		if ( is_wp_error( $fichiers ) ) {
+			return $fichiers;
+		}
+		$incidents[] = array(
+			'le'         => time(),
+			'par'        => get_current_user_id(),
+			'type'       => $type,
+			'texte'      => $texte,
+			'photos'     => $fichiers['photos'],
+			'resolu'     => 0,
+			'resolu_par' => 0,
+			'jeton'      => $jeton,
+		);
+		update_post_meta( $id, self::META_INCIDENTS, $incidents );
+		/* translators: 1 : type, 2 : description. */
+		ETR_Historique::ajouter( $id, 'incident', sprintf( __( 'Incident signalé (%1$s) : %2$s', 'espace-traiteur' ), $types[ $type ], $texte ) );
+		ETR_Push::notifier(
+			'bureau',
+			/* translators: 1 : type, 2 : traiteur. */
+			sprintf( __( 'Incident : %1$s — %2$s', 'espace-traiteur' ), $types[ $type ], self::traiteur( $id ) ),
+			get_the_title( $id ) . ' · ' . $texte,
+			$id,
+			'',
+			'incident'
+		);
+		return true;
+	}
+
+	/**
+	 * Marque un incident résolu (bureau).
+	 *
+	 * @param int $id Demande.
+	 * @param int $n  Rang de l'incident.
+	 * @return true|WP_Error
+	 */
+	public static function resoudre( $id, $n ) {
+		$incidents = self::incidents( $id );
+		if ( ! isset( $incidents[ $n ] ) ) {
+			return new WP_Error( 'etr_incident', __( 'Incident introuvable.', 'espace-traiteur' ), array( 'status' => 404 ) );
+		}
+		if ( empty( $incidents[ $n ]['resolu'] ) ) {
+			$incidents[ $n ]['resolu']     = time();
+			$incidents[ $n ]['resolu_par'] = get_current_user_id();
+			update_post_meta( $id, self::META_INCIDENTS, $incidents );
+			$types = self::types_incident();
+			/* translators: %s : type. */
+			ETR_Historique::ajouter( $id, 'incident', sprintf( __( 'Incident résolu (%s)', 'espace-traiteur' ), isset( $types[ $incidents[ $n ]['type'] ] ) ? $types[ $incidents[ $n ]['type'] ] : '' ) );
+		}
+		return true;
 	}
 
 	/**
@@ -578,7 +892,9 @@ class ETR_Operations {
 	public static function rappels_veille() {
 		$maintenant = current_datetime();
 		$jour       = $maintenant->format( 'Y-m-d' );
-		if ( (int) $maintenant->format( 'G' ) < self::HEURE_RAPPEL || get_option( 'etr_rappel_veille' ) === $jour ) {
+		/** Heure des rappels de la veille (17 h par défaut). */
+		$heure = (int) apply_filters( 'etr_heure_rappel_veille', self::HEURE_RAPPEL );
+		if ( (int) $maintenant->format( 'G' ) < $heure || get_option( 'etr_rappel_veille' ) === $jour ) {
 			return;
 		}
 		update_option( 'etr_rappel_veille', $jour, false );
@@ -591,9 +907,14 @@ class ETR_Operations {
 			)
 		);
 
-		$nb_l = count( $tournee['livraisons'] );
-		$nb_r = count( $tournee['reprises'] );
-		if ( $nb_l || $nb_r ) {
+		// Chaque livreur reçoit sa tournée (ses étapes et celles à répartir).
+		foreach ( array_keys( self::livreurs() ) as $livreur ) {
+			$sienne = self::tournee_de( $demain, $livreur );
+			$nb_l   = count( $sienne['livraisons'] );
+			$nb_r   = count( $sienne['reprises'] );
+			if ( ! $nb_l && ! $nb_r ) {
+				continue;
+			}
 			$parties = array();
 			if ( $nb_l ) {
 				/* translators: %s : nombre. */
@@ -603,9 +924,9 @@ class ETR_Operations {
 				/* translators: %s : nombre. */
 				$parties[] = sprintf( _n( '%s reprise', '%s reprises', $nb_r, 'espace-traiteur' ), number_format_i18n( $nb_r ) );
 			}
-			$noms = array_map( array( __CLASS__, 'traiteur' ), array_merge( $tournee['livraisons'], $tournee['reprises'] ) );
+			$noms = array_map( array( __CLASS__, 'traiteur' ), array_merge( $sienne['livraisons'], $sienne['reprises'] ) );
 			/* translators: %s : « 2 livraisons, 1 reprise ». */
-			ETR_Push::notifier( 'livreur', sprintf( __( 'Demain : %s', 'espace-traiteur' ), implode( ', ', $parties ) ), implode( ' · ', array_unique( $noms ) ), 0, $url );
+			ETR_Push::notifier( 'livreur', sprintf( __( 'Demain : %s', 'espace-traiteur' ), implode( ', ', $parties ) ), implode( ' · ', array_unique( $noms ) ), 0, $url, 'rappel', array( $livreur ) );
 		}
 
 		$a_finir = array_values(
@@ -623,7 +944,8 @@ class ETR_Operations {
 				sprintf( _n( 'À préparer pour demain : %s commande', 'À préparer pour demain : %s commandes', count( $a_finir ), 'espace-traiteur' ), number_format_i18n( count( $a_finir ) ) ),
 				implode( ' · ', array_map( array( __CLASS__, 'traiteur' ), $a_finir ) ),
 				1 === count( $a_finir ) ? $a_finir[0] : 0,
-				1 === count( $a_finir ) ? '' : $url
+				1 === count( $a_finir ) ? '' : $url,
+				'rappel'
 			);
 		}
 	}
@@ -653,6 +975,11 @@ class ETR_Operations {
 			$base . '/preparation/prete' => array( 'api_prete', 'preparateur' ),
 			$base . '/livraison'         => array( 'api_livrer', 'livreur' ),
 			$base . '/reprise'           => array( 'api_reprendre', 'livreur' ),
+			$base . '/affectation'       => array( 'api_affecter', 'bureau' ),
+			'/terrain/ordre'             => array( 'api_ordonner', 'bureau' ),
+			$base . '/note'              => array( 'api_note', 'equipe' ),
+			$base . '/incident'          => array( 'api_incident', 'equipe' ),
+			$base . '/incident/(?P<n>\d+)/resolu' => array( 'api_resoudre', 'bureau' ),
 			'/terrain/scan'              => array( 'api_scanner', 'terrain' ),
 		);
 		foreach ( $def as $route => $config ) {
@@ -674,7 +1001,7 @@ class ETR_Operations {
 	/**
 	 * Droit d'agir (le bureau peut tout faire).
 	 *
-	 * @param string $droit preparateur | livreur | terrain.
+	 * @param string $droit preparateur | livreur | terrain | equipe | bureau.
 	 * @return bool
 	 */
 	public static function autorise( $droit ) {
@@ -686,6 +1013,12 @@ class ETR_Operations {
 		}
 		if ( 'livreur' === $droit ) {
 			return ETR_Equipe::livreur();
+		}
+		if ( 'equipe' === $droit ) {
+			return true; // Toute l'équipe (accès déjà vérifié).
+		}
+		if ( 'bureau' === $droit ) {
+			return ETR_Equipe::bureau();
 		}
 		return ETR_Equipe::preparateur() || ETR_Equipe::livreur();
 	}
@@ -881,6 +1214,111 @@ class ETR_Operations {
 				}
 				$resultat['url'] = ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id, 'etr_msg' => $resultat['ecarts'] ? 'reprise_ecarts' : 'reprise' ) );
 				return rest_ensure_response( $resultat );
+			}
+		);
+	}
+
+	/**
+	 * POST affectation : { etape, livreur } (bureau).
+	 *
+	 * @param WP_REST_Request $requete Requête.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function api_affecter( $requete ) {
+		$id = (int) $requete['id'];
+		if ( ! ETR_Gestion::demande_visible( $id ) ) {
+			return new WP_Error( 'etr_demande', __( 'Demande introuvable.', 'espace-traiteur' ), array( 'status' => 404 ) );
+		}
+		$resultat = self::affecter( $id, (string) $requete->get_param( 'etape' ), (int) $requete->get_param( 'livreur' ) );
+		return is_wp_error( $resultat ) ? $resultat : rest_ensure_response( array( 'ok' => true ) );
+	}
+
+	/**
+	 * POST ordre : { etape, ids } (bureau).
+	 *
+	 * @param WP_REST_Request $requete Requête.
+	 * @return WP_REST_Response
+	 */
+	public static function api_ordonner( $requete ) {
+		self::ordonner( (string) $requete->get_param( 'etape' ), array_map( 'intval', (array) $requete->get_param( 'ids' ) ) );
+		return rest_ensure_response( array( 'ok' => true ) );
+	}
+
+	/**
+	 * POST note : { texte, jeton }.
+	 *
+	 * @param WP_REST_Request $requete Requête.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function api_note( $requete ) {
+		$id    = (int) $requete['id'];
+		$texte = sanitize_textarea_field( (string) $requete->get_param( 'texte' ) );
+		$jeton = self::jeton( $requete );
+		if ( ! ETR_Gestion::demande_visible( $id ) ) {
+			return new WP_Error( 'etr_demande', __( 'Demande introuvable.', 'espace-traiteur' ), array( 'status' => 404 ) );
+		}
+		return self::sous_verrou(
+			$id,
+			function () use ( $id, $texte, $jeton ) {
+				$note = self::ajouter_note( $id, $texte, $jeton );
+				if ( is_wp_error( $note ) ) {
+					return $note;
+				}
+				return rest_ensure_response(
+					array(
+						'auteur' => etr_nom( get_userdata( $note['par'] ) ),
+						'le'     => wp_date( 'j M, H:i', $note['le'] ),
+						'texte'  => $note['texte'],
+					)
+				);
+			}
+		);
+	}
+
+	/**
+	 * POST incident (multipart) : type, texte, photos[], jeton.
+	 *
+	 * @param WP_REST_Request $requete Requête.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function api_incident( $requete ) {
+		$id    = (int) $requete['id'];
+		$jeton = self::jeton( $requete );
+		if ( ! ETR_Gestion::demande_visible( $id ) ) {
+			return new WP_Error( 'etr_demande', __( 'Demande introuvable.', 'espace-traiteur' ), array( 'status' => 404 ) );
+		}
+		return self::sous_verrou(
+			$id,
+			function () use ( $id, $jeton, $requete ) {
+				$resultat = self::signaler(
+					$id,
+					sanitize_key( (string) $requete->get_param( 'type' ) ),
+					sanitize_textarea_field( (string) $requete->get_param( 'texte' ) ),
+					self::photos( $requete ),
+					$jeton
+				);
+				return is_wp_error( $resultat ) ? $resultat : rest_ensure_response( array( 'url' => ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id, 'etr_msg' => 'incident' ) ) ) );
+			}
+		);
+	}
+
+	/**
+	 * POST incident/{n}/resolu (bureau).
+	 *
+	 * @param WP_REST_Request $requete Requête.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function api_resoudre( $requete ) {
+		$id = (int) $requete['id'];
+		$n  = (int) $requete['n'];
+		if ( ! ETR_Gestion::demande_visible( $id ) ) {
+			return new WP_Error( 'etr_demande', __( 'Demande introuvable.', 'espace-traiteur' ), array( 'status' => 404 ) );
+		}
+		return self::sous_verrou(
+			$id,
+			function () use ( $id, $n ) {
+				$resultat = self::resoudre( $id, $n );
+				return is_wp_error( $resultat ) ? $resultat : rest_ensure_response( array( 'ok' => true ) );
 			}
 		);
 	}

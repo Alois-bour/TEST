@@ -559,6 +559,106 @@
 	}
 
 	/* ------------------------------------------------------------------ */
+	/* Tournée (bureau) : livreur de chaque étape, ordre de passage        */
+	/* ------------------------------------------------------------------ */
+
+	function toastOuMessage( texte, type ) {
+		if ( window.etrToast ) {
+			window.etrToast( texte, type );
+		}
+	}
+
+	document.addEventListener( 'change', function ( e ) {
+		var choix = e.target.closest( '[data-affecter]' );
+		if ( ! choix ) {
+			return;
+		}
+		choix.disabled = true;
+		api( choix.getAttribute( 'data-id' ) + '/affectation', { etape: choix.getAttribute( 'data-etape' ), livreur: entier( choix.value ) } ).then( function () {
+			toastOuMessage( entier( choix.value ) ? 'Étape confiée à ' + choix.options[ choix.selectedIndex ].text + ' (prévenu).' : 'Étape à répartir.' );
+		} ).catch( function ( erreur ) {
+			toastOuMessage( erreur.message, 'erreur' );
+		} ).then( function () {
+			choix.disabled = false;
+		} );
+	} );
+
+	document.addEventListener( 'click', function ( e ) {
+		var bouton = e.target.closest( '[data-deplacer]' );
+		if ( ! bouton ) {
+			return;
+		}
+		var arret = bouton.closest( '.etr-arret' );
+		var liste = arret.parentNode;
+		if ( entier( bouton.getAttribute( 'data-deplacer' ) ) < 0 && arret.previousElementSibling ) {
+			liste.insertBefore( arret, arret.previousElementSibling );
+		} else if ( entier( bouton.getAttribute( 'data-deplacer' ) ) > 0 && arret.nextElementSibling ) {
+			liste.insertBefore( arret.nextElementSibling, arret );
+		} else {
+			return;
+		}
+		var ids = Array.prototype.map.call( liste.querySelectorAll( '.etr-arret' ), function ( a ) {
+			return entier( a.getAttribute( 'data-demande' ) );
+		} );
+		api( 'ordre', { etape: liste.getAttribute( 'data-ordre' ), ids: ids } ).then( function () {
+			toastOuMessage( 'Ordre de passage enregistré.' );
+		} ).catch( function ( erreur ) {
+			toastOuMessage( erreur.message, 'erreur' );
+		} );
+	} );
+
+	/* ------------------------------------------------------------------ */
+	/* Notes de l'équipe, incidents résolus                               */
+	/* ------------------------------------------------------------------ */
+
+	document.querySelectorAll( '[data-etr-note]' ).forEach( function ( form ) {
+		var id    = form.getAttribute( 'data-etr-note' );
+		var liste = form.parentNode.querySelector( '[data-notes]' );
+		form.addEventListener( 'submit', function ( e ) {
+			e.preventDefault();
+			var champ = form.elements.texte;
+			var texte = champ.value.trim();
+			if ( ! texte ) {
+				champ.focus();
+				return;
+			}
+			var jeton  = Date.now().toString( 36 ) + '-' + Math.random().toString( 36 ).slice( 2, 12 );
+			var bouton = form.querySelector( 'button' );
+			bouton.disabled = true;
+			apiOuAttente( id + '/note', { texte: texte, jeton: jeton }, false, { libelle: 'Note, demande n° ' + id, demande: entier( id ), type: 'note' } ).then( function ( r ) {
+				var li = document.createElement( 'li' );
+				li.innerHTML = '<p></p><small></small>';
+				li.querySelector( 'p' ).textContent = texte;
+				li.querySelector( 'small' ).textContent = r.horsLigne ? 'Vous · envoi en attente du réseau' : r.auteur + ' · ' + r.le;
+				liste.insertBefore( li, liste.firstChild );
+				champ.value = '';
+			} ).catch( function ( erreur ) {
+				if ( window.etrToast ) {
+					window.etrToast( erreur.message, 'erreur' );
+				}
+			} ).then( function () {
+				bouton.disabled = false;
+			} );
+		} );
+	} );
+
+	document.addEventListener( 'click', function ( e ) {
+		var bouton = e.target.closest( '[data-resoudre]' );
+		if ( ! bouton ) {
+			return;
+		}
+		bouton.disabled = true;
+		api( bouton.getAttribute( 'data-id' ) + '/incident/' + bouton.getAttribute( 'data-resoudre' ) + '/resolu', {} ).then( function () {
+			window.location.reload();
+		} ).catch( function ( erreur ) {
+			bouton.disabled = false;
+			if ( window.etrToast ) {
+				window.etrToast( erreur.message, 'erreur' );
+			}
+		} );
+	} );
+
+	/* ------------------------------------------------------------------ */
 	/* Signature, photos, envoi (livraison et reprise)                    */
 	/* ------------------------------------------------------------------ */
 
@@ -774,7 +874,7 @@
 		bloc.className = 'etr-panneau etr-hors-ligne-ok';
 		bloc.setAttribute( 'role', 'status' );
 		bloc.innerHTML = '<h2 class="etr-panneau__titre"></h2><p></p><a class="etr-btn etr-btn--plein"></a>';
-		bloc.querySelector( 'h2' ).textContent = type === 'livraison' ? 'Livraison enregistrée sur le téléphone' : 'Reprise enregistrée sur le téléphone';
+		bloc.querySelector( 'h2' ).textContent = { livraison: 'Livraison enregistrée sur le téléphone', reprise: 'Reprise enregistrée sur le téléphone', incident: 'Incident enregistré sur le téléphone' }[ type ];
 		bloc.querySelector( 'p' ).textContent = 'Pas de réseau ici : elle sera envoyée automatiquement dès le retour de la connexion (signature et photos comprises). Vous pouvez continuer la tournée.';
 		var lien = bloc.querySelector( 'a' );
 		lien.textContent = 'Retour à la tournée';
@@ -859,6 +959,16 @@
 				message( msg, 'Indiquez le nom de la personne qui a signé.', 'erreur' );
 				return;
 			}
+			var choixIncident = form.querySelector( 'input[name="type"]:checked' );
+			if ( type === 'incident' && ! choixIncident ) {
+				message( msg, 'Choisissez le type d’incident.', 'erreur' );
+				return;
+			}
+			if ( type === 'incident' && ! form.elements.texte.value.trim() ) {
+				message( msg, 'Décrivez l’incident en quelques mots.', 'erreur' );
+				form.elements.texte.focus();
+				return;
+			}
 
 			if ( photos.enCours && photos.enCours() ) {
 				message( msg, 'Patientez : les photos sont en cours de préparation.', 'info' );
@@ -869,6 +979,10 @@
 			donnees.append( 'jeton', jeton );
 			donnees.append( 'signataire', nom );
 			donnees.append( 'note', form.elements.note ? form.elements.note.value : '' );
+			if ( type === 'incident' ) {
+				donnees.append( 'type', choixIncident.value );
+				donnees.append( 'texte', form.elements.texte.value );
+			}
 			if ( signature && ! signature.vide() ) {
 				donnees.append( 'signature', signature.image() );
 			}
@@ -881,7 +995,7 @@
 
 			bouton.disabled = true;
 			message( msg, photos.length ? 'Envoi des photos…' : 'Enregistrement…', 'info' );
-			var libelle = type === 'livraison' ? 'Livraison n° ' + id + ( nom ? ', signée par ' + nom : '' ) : 'Reprise n° ' + id;
+			var libelle = type === 'livraison' ? 'Livraison n° ' + id + ( nom ? ', signée par ' + nom : '' ) : ( type === 'incident' ? 'Incident, demande n° ' + id : 'Reprise n° ' + id );
 			apiOuAttente( id + '/' + type, donnees, true, { libelle: libelle, demande: entier( id ), type: type } ).then( function ( r ) {
 				if ( r.horsLigne ) {
 					confirmationHorsLigne( form, type );

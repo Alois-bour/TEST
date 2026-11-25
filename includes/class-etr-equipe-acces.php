@@ -397,6 +397,11 @@ class ETR_Equipe_Acces {
 		}
 		// phpcs:enable
 		self::entete( __( 'Bonjour', 'espace-traiteur' ), __( 'Connectez-vous pour voir le planning, les demandes et les livraisons.', 'espace-traiteur' ) );
+		if ( ETR_Cles_Acces::disponible() ) {
+			// Face ID : affiché par cles-acces.js si l'appareil le permet.
+			echo '<div class="etr-auth__cle" data-etr-cle-connexion hidden><button type="button" class="etr-auth__bouton etr-auth__bouton--cle"><svg class="etr-icone" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9v4h-1M9.5 15.5c1.5 1 3.5 1 5 0"/></svg><span>' . esc_html__( 'Se connecter avec Face ID', 'espace-traiteur' ) . '</span></button>';
+			echo '<p class="etr-auth__message etr-auth__message--erreur" data-cle-message role="alert" hidden></p><p class="etr-auth__ou"><span>' . esc_html__( 'ou avec votre mot de passe', 'espace-traiteur' ) . '</span></p></div>';
+		}
 		echo '<form method="post" action="' . esc_url( ETR_Gestion::url() ) . '" class="etr-auth__form" novalidate>';
 		echo '<input type="hidden" name="etr_gestion_action" value="connexion">';
 		echo '<div class="etr-auth__champ"><label for="user_login">' . esc_html__( 'Identifiant ou e-mail', 'espace-traiteur' ) . '</label><div class="etr-auth__saisie"><input type="text" name="log" id="user_login" value="' . esc_attr( $login ) . '" autocomplete="username" autocapitalize="none" spellcheck="false" required' . ( $login ? '' : ' autofocus' ) . '></div></div>';
