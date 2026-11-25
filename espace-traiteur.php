@@ -22,6 +22,7 @@ require_once ETR_DIR . 'includes/functions.php';
 require_once ETR_DIR . 'includes/catalogue.php';
 require_once ETR_DIR . 'includes/class-etr-modules.php';
 require_once ETR_DIR . 'includes/class-etr-mail.php';
+require_once ETR_DIR . 'includes/class-etr-apparence.php';
 require_once ETR_DIR . 'includes/class-etr-installer.php';
 require_once ETR_DIR . 'includes/class-etr-migrations.php';
 require_once ETR_DIR . 'includes/class-etr-post-types.php';
@@ -74,6 +75,7 @@ add_action(
 		ETR_Cles_Acces::init();
 		ETR_Modules::init();
 		ETR_Mail::init();
+		ETR_Apparence::init();
 		ETR_Traiteur_Direct::init();
 		ETR_Materiel::init();
 		ETR_Devis::init();

@@ -187,6 +187,7 @@ class ETR_Admin {
 
 		echo '<tr><th scope="row">' . esc_html__( 'Espace des traiteurs', 'espace-traiteur' ) . '</th><td><input type="hidden" name="etr_espace_plein_ecran" value="0"><label><input type="checkbox" name="etr_espace_plein_ecran" value="1"' . checked( get_option( 'etr_espace_plein_ecran', '1' ), '1', false ) . '> ' . esc_html__( 'Application plein écran une fois connecté (sans l’en-tête ni le pied de page du site)', 'espace-traiteur' ) . '</label></td></tr>';
 
+		ETR_Apparence::champs_reglages();
 		echo '<tr><th scope="row" colspan="2"><h2 style="margin:16px 0 0">' . esc_html__( 'Page de connexion', 'espace-traiteur' ) . '</h2></th></tr>';
 		echo '<tr><th scope="row">' . esc_html__( 'Affichage', 'espace-traiteur' ) . '</th><td><input type="hidden" name="etr_connexion_plein_ecran" value="0"><label><input type="checkbox" name="etr_connexion_plein_ecran" value="1"' . checked( get_option( 'etr_connexion_plein_ecran', '1' ), '1', false ) . '> ' . esc_html__( 'Plein écran (sans l’en-tête ni le pied de page du site)', 'espace-traiteur' ) . '</label></td></tr>';
 		self::champ_media( 'etr_logo', __( 'Logo', 'espace-traiteur' ), __( 'Affiché au-dessus du formulaire. Sans choix : le logo du site est utilisé automatiquement.', 'espace-traiteur' ), ETR_Comptes::logo_id( true ) );
