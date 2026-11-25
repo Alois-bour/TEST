@@ -35,6 +35,9 @@ class ETR_Devis {
 		add_action( 'etr_traiteur_demande_fin', array( __CLASS__, 'encart_traiteur' ), 5 );
 		add_action( 'etr_traiteur_action', array( __CLASS__, 'action_traiteur' ) );
 		add_action( 'template_redirect', array( __CLASS__, 'telechargement' ), 5 );
+		// Demande ou tarif modifiés : le devis envoyé n'est plus à jour.
+		add_action( 'etr_demande_modifiee', array( __CLASS__, 'devis_perime' ) );
+		add_action( 'etr_tarif_change', array( __CLASS__, 'devis_perime' ) );
 
 		// Prix de remplacement sur les produits WooCommerce.
 		add_action( 'woocommerce_product_options_inventory_product_data', array( __CLASS__, 'champ_produit' ), 20 );
@@ -112,6 +115,9 @@ class ETR_Devis {
 			if ( ! empty( $devis['accepte'] ) ) {
 				/* translators: 1 : nom, 2 : date et heure. */
 				echo '<p class="etr-pastille-etat etr-pastille-etat--ok">' . esc_html( sprintf( __( 'Accepté par %1$s le %2$s', 'espace-traiteur' ), $devis['accepte']['nom'], wp_date( 'j F Y à H:i', (int) $devis['accepte']['le'] ) ) ) . '</p>';
+				if ( ! empty( $devis['change_apres'] ) ) {
+					echo '<p class="etr-notice etr-notice--erreur">' . esc_html__( 'Le tarif a changé après l’acceptation : le devis accepté reste celui envoyé. Renvoyez un devis si le nouveau montant doit être accepté.', 'espace-traiteur' ) . '</p>';
+				}
 			} elseif ( current_time( 'Y-m-d' ) > $devis['valable'] ) {
 				echo '<p class="etr-pastille-etat">' . esc_html__( 'Expiré sans réponse', 'espace-traiteur' ) . '</p>';
 			} else {
@@ -144,14 +150,27 @@ class ETR_Devis {
 	 */
 	public static function envoyer_devis( $id ) {
 		$chiffrage = etr_chiffrage( $id );
+		// Copie figée du devis : le PDF et l'acceptation portent sur ce qui a été envoyé,
+		// même si les prix du catalogue changent ensuite.
+		$lignes = array();
+		foreach ( etr_get_lignes( $id ) as $index => $ligne ) {
+			$lignes[] = array(
+				'titre'    => $ligne['titre'],
+				'quantite' => (int) $ligne['quantite'],
+				'unitaire' => $chiffrage['lignes'][ $index ]['unitaire'],
+				'total'    => $chiffrage['lignes'][ $index ]['total'],
+			);
+		}
 		update_post_meta(
 			$id,
 			self::META_DEVIS,
 			array(
-				'envoye'  => time(),
-				'total'   => $chiffrage['total'],
-				'valable' => wp_date( 'Y-m-d', time() + DAY_IN_SECONDS * (int) get_option( 'etr_devis_validite', 30 ) ),
-				'accepte' => array(),
+				'envoye'    => time(),
+				'total'     => $chiffrage['total'],
+				'valable'   => wp_date( 'Y-m-d', time() + DAY_IN_SECONDS * (int) get_option( 'etr_devis_validite', 30 ) ),
+				'accepte'   => array(),
+				'lignes'    => $lignes,
+				'chiffrage' => array_intersect_key( $chiffrage, array_flip( array( 'sous_total', 'remise_pct', 'remise', 'livraison', 'total' ) ) ),
 			)
 		);
 		delete_post_meta( $id, '_etr_devis_relance' );
@@ -161,6 +180,26 @@ class ETR_Devis {
 		/* translators: 1 : montant, 2 : date. */
 		$texte = sprintf( __( 'Votre devis pour « %1$s » est en pièce jointe (%2$s). Vous pouvez l’accepter en ligne dans votre espace :', 'espace-traiteur' ), get_the_title( $id ), self::prix( $chiffrage['total'] ) );
 		return self::envoyer_pdf( $id, 'devis', __( 'Votre devis', 'espace-traiteur' ), $texte );
+	}
+
+	/**
+	 * La demande ou son tarif ont changé : un devis pas encore accepté est retiré (à renvoyer) ;
+	 * un devis déjà accepté est gardé tel quel, avec un avertissement au bureau.
+	 *
+	 * @param int $id Demande.
+	 */
+	public static function devis_perime( $id ) {
+		$devis = self::devis( $id );
+		if ( ! $devis ) {
+			return;
+		}
+		if ( empty( $devis['accepte'] ) ) {
+			delete_post_meta( $id, self::META_DEVIS );
+			ETR_Historique::ajouter( $id, 'devis', __( 'Devis retiré : la demande ou son tarif ont changé, il est à renvoyer', 'espace-traiteur' ) );
+			return;
+		}
+		$devis['change_apres'] = time();
+		update_post_meta( $id, self::META_DEVIS, $devis );
 	}
 
 	/**
@@ -264,7 +303,7 @@ class ETR_Devis {
 		foreach ( $champs as $cle => $champ ) {
 			$valeur = $a[ $cle ];
 			if ( 'text' === $champ[1] && null !== $valeur ) {
-				$valeur = number_format_i18n( (float) $valeur, 2 );
+				$valeur = number_format( (float) $valeur, 2, ',', '' ); // Sans séparateur de milliers : relu tel quel.
 			}
 			echo '<p class="etr-champ"><label for="etr-acompte-' . esc_attr( $cle ) . '">' . esc_html( $champ[0] ) . '</label><input type="' . esc_attr( $champ[1] ) . '" id="etr-acompte-' . esc_attr( $cle ) . '" name="etr_acompte[' . esc_attr( $cle ) . ']" value="' . esc_attr( (string) $valeur ) . '"' . ( 'text' === $champ[1] ? ' inputmode="decimal"' : '' ) . '></p>';
 		}
@@ -661,17 +700,31 @@ class ETR_Devis {
 		$lignes = array();
 		$totaux = array();
 		if ( $devis ) {
-			$chiffrage = etr_chiffrage( $id );
-			foreach ( etr_get_lignes( $id ) as $index => $ligne ) {
-				$prix     = $chiffrage['lignes'][ $index ];
-				$lignes[] = array( $ligne['titre'], number_format_i18n( (int) $ligne['quantite'] ), null === $prix['unitaire'] ? '—' : self::prix( $prix['unitaire'] ), null === $prix['total'] ? __( 'à chiffrer', 'espace-traiteur' ) : self::prix( $prix['total'] ) );
+			// Le devis envoyé (copie figée) ; sinon, aperçu du bureau avec les prix du moment.
+			if ( ! empty( $info['lignes'] ) && ! empty( $info['chiffrage'] ) ) {
+				$chiffrage = $info['chiffrage'];
+				$detail    = $info['lignes'];
+			} else {
+				$chiffrage = etr_chiffrage( $id );
+				$detail    = array();
+				foreach ( etr_get_lignes( $id ) as $index => $ligne ) {
+					$detail[] = array(
+						'titre'    => $ligne['titre'],
+						'quantite' => (int) $ligne['quantite'],
+						'unitaire' => $chiffrage['lignes'][ $index ]['unitaire'],
+						'total'    => $chiffrage['lignes'][ $index ]['total'],
+					);
+				}
+			}
+			foreach ( $detail as $ligne ) {
+				$lignes[] = array( $ligne['titre'], number_format_i18n( (int) $ligne['quantite'] ), null === $ligne['unitaire'] ? '—' : self::prix( $ligne['unitaire'] ), null === $ligne['total'] ? __( 'à chiffrer', 'espace-traiteur' ) : self::prix( $ligne['total'] ) );
 			}
 			if ( $chiffrage['remise_pct'] || null !== $chiffrage['livraison'] ) {
 				$totaux[] = array( __( 'Sous-total du matériel', 'espace-traiteur' ), self::prix( $chiffrage['sous_total'] ), false );
 			}
 			if ( $chiffrage['remise_pct'] ) {
 				/* translators: %s : pourcentage. */
-				$totaux[] = array( sprintf( __( 'Remise (%s %%)', 'espace-traiteur' ), number_format_i18n( $chiffrage['remise_pct'], fmod( $chiffrage['remise_pct'], 1 ) ? 2 : 0 ) ), '− ' . self::prix( $chiffrage['remise'] ), false );
+				$totaux[] = array( sprintf( __( 'Remise (%s %%)', 'espace-traiteur' ), number_format_i18n( $chiffrage['remise_pct'], fmod( $chiffrage['remise_pct'], 1 ) ? 2 : 0 ) ), '– ' . self::prix( $chiffrage['remise'] ), false );
 			}
 			if ( null !== $chiffrage['livraison'] ) {
 				$totaux[] = array( __( 'Livraison et reprise', 'espace-traiteur' ), self::prix( $chiffrage['livraison'] ), false );
@@ -837,10 +890,10 @@ class ETR_Devis {
 
 			// Acompte non reçu à 7 jours de la livraison.
 			$a = self::acompte( $id );
-			if ( ETR_Modules::actif( 'acompte' ) && 'validee' === $statut && null !== $a['acompte'] && ! $a['acompte_recu'] && $livraison && $livraison <= $dans_7 && $livraison >= $jour && ! get_post_meta( $id, '_etr_relance_acompte', true ) ) {
+			if ( ETR_Modules::actif( 'acompte' ) && 'validee' === $statut && null !== $a['acompte'] && ! $a['acompte_recu'] && $livraison && $livraison <= $dans_7 && $livraison >= $jour && get_post_meta( $id, '_etr_relance_acompte', true ) !== $livraison ) {
 				/* translators: 1 : événement, 2 : montant, 3 : date. */
 				ETR_Push::notifier( 'bureau', __( 'Acompte non reçu', 'espace-traiteur' ), sprintf( __( '%1$s · %2$s · livraison le %3$s', 'espace-traiteur' ), get_the_title( $id ), self::prix( $a['acompte'] ), etr_format_date( $livraison ) ), $id, '', 'relance' );
-				update_post_meta( $id, '_etr_relance_acompte', time() );
+				update_post_meta( $id, '_etr_relance_acompte', $livraison ); // Une fois par date de livraison.
 			}
 		}
 	}

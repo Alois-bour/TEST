@@ -134,6 +134,8 @@ class ETR_Frontend {
 				array(
 					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 					'nonce'   => wp_create_nonce( 'etr_disponibilites' ),
+					'aujourdhui' => current_time( 'Y-m-d' ),
+					'ecarts'  => etr_ecarts_dates(),
 					'i18n'    => array(
 						'chargement' => __( 'Calcul des disponibilités…', 'espace-traiteur' ),
 						'erreur'     => __( 'Impossible de calculer les disponibilités pour le moment.', 'espace-traiteur' ),
@@ -277,12 +279,7 @@ class ETR_Frontend {
 			}
 			$donnees[ $cle ] = $valeur;
 		}
-		if ( ! empty( $donnees['date_evenement'] ) && $donnees['date_evenement'] < current_time( 'Y-m-d' ) ) {
-			self::$erreurs[] = __( 'La date de l’événement ne peut pas être passée.', 'espace-traiteur' );
-		}
-		if ( ! empty( $donnees['date_livraison'] ) && ! empty( $donnees['date_reprise'] ) && $donnees['date_reprise'] < $donnees['date_livraison'] ) {
-			self::$erreurs[] = __( 'La date de reprise doit être postérieure à la date de livraison.', 'espace-traiteur' );
-		}
+		self::$erreurs = array_merge( self::$erreurs, etr_erreurs_dates( $donnees['date_evenement'], $donnees['date_livraison'], $donnees['date_reprise'], current_time( 'Y-m-d' ) ) );
 		if ( self::$erreurs ) {
 			return;
 		}
@@ -335,6 +332,7 @@ class ETR_Frontend {
 		} finally {
 			$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
 		}
+		do_action( 'etr_demande_modifiee', $demande_id ); // Historique ; un devis envoyé n'est plus à jour.
 		wp_safe_redirect( etr_url( array( 'etr_vue' => 'demande', 'id' => $demande_id, 'etr_msg' => 'modifiee' ) ) );
 		exit;
 	}
@@ -370,13 +368,8 @@ class ETR_Frontend {
 			$donnees[ $cle ] = $valeur;
 		}
 
-		$aujourdhui = current_time( 'Y-m-d' );
-		if ( ! empty( $donnees['date_evenement'] ) && $donnees['date_evenement'] < $aujourdhui ) {
-			self::$erreurs[] = __( 'La date de l’événement ne peut pas être passée.', 'espace-traiteur' );
-		}
-		if ( ! empty( $donnees['date_livraison'] ) && ! empty( $donnees['date_reprise'] ) && $donnees['date_reprise'] < $donnees['date_livraison'] ) {
-			self::$erreurs[] = __( 'La date de reprise doit être postérieure à la date de livraison.', 'espace-traiteur' );
-		}
+		$aujourdhui    = current_time( 'Y-m-d' );
+		self::$erreurs = array_merge( self::$erreurs, etr_erreurs_dates( $donnees['date_evenement'], $donnees['date_livraison'], $donnees['date_reprise'], $aujourdhui ) );
 
 		if ( self::$erreurs ) {
 			return;

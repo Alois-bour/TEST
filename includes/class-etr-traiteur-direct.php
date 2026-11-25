@@ -86,10 +86,22 @@ class ETR_Traiteur_Direct {
 	/* ------------------------------------------------------------------ */
 
 	/**
+	 * Notifications du traiteur possibles : fonction active, serveur capable, et service worker
+	 * avec sa propre portée. Sans permaliens, l'espace traiteur et l'application de l'équipe
+	 * vivent tous deux à « / » : un service worker remplacerait l'autre.
+	 *
+	 * @return bool
+	 */
+	private static function push_possible() {
+		return ETR_Modules::actif( 'push_traiteur' ) && ETR_Push::disponible() && get_option( 'permalink_structure' )
+			&& 0 !== strpos( ETR_PWA::perimetre_traiteur(), trailingslashit( ETR_PWA::perimetre() ) ) && '/' !== ETR_PWA::perimetre_traiteur();
+	}
+
+	/**
 	 * Carte « Recevoir les notifications » (affichée par traiteur-push.js si l'appareil le permet).
 	 */
 	public static function carte_push() {
-		if ( ! ETR_Modules::actif( 'push_traiteur' ) || ! ETR_Push::disponible() ) {
+		if ( ! self::push_possible() ) {
 			return;
 		}
 		echo '<aside class="etr-installer" id="etr-push-traiteur" hidden><span class="etr-installer__icone" aria-hidden="true">' . ETR_Frontend::icone( 'message' ) . '</span><p><strong>' . esc_html__( 'Être prévenu sur cet iPhone', 'espace-traiteur' ) . '</strong><span data-push-etat>' . esc_html__( 'Demande validée, livreur en route, livraison, messages de notre équipe.', 'espace-traiteur' ) . '</span></p><button type="button" class="etr-btn" data-push-activer>' . esc_html__( 'Activer', 'espace-traiteur' ) . '</button><button type="button" class="etr-installer__fermer" aria-label="' . esc_attr__( 'Fermer', 'espace-traiteur' ) . '">×</button></aside>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique.
@@ -99,7 +111,7 @@ class ETR_Traiteur_Direct {
 	 * Script d'abonnement (page de l'espace, traiteur connecté).
 	 */
 	public static function script_push() {
-		if ( ! ETR_Modules::actif( 'push_traiteur' ) || ! ETR_Push::disponible() || ! etr_est_traiteur() || ! ETR_Frontend::sur_page_espace() ) {
+		if ( ! self::push_possible() || ! etr_est_traiteur() || ! ETR_Frontend::sur_page_espace() ) {
 			return;
 		}
 		wp_enqueue_script( 'espace-traiteur-push', ETR_URL . 'assets/js/traiteur-push.js', array(), ETR_VERSION, true );

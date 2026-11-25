@@ -23,9 +23,7 @@ class ETR_Bon_Livraison {
 	 * Hooks.
 	 */
 	public static function init() {
-		if ( ! ETR_Modules::actif( 'bon_livraison' ) ) {
-			return;
-		}
+		// Fonction activable : vérifiée à chaque usage (un filtre « etr_module_actif » du thème compte).
 		add_action( 'etr_livree', array( __CLASS__, 'envoyer' ) );
 		add_action( 'template_redirect', array( __CLASS__, 'telechargement_traiteur' ), 5 );
 		add_action( 'etr_traiteur_demande_apres_suivi', array( __CLASS__, 'lien_traiteur' ) );
@@ -62,7 +60,7 @@ class ETR_Bon_Livraison {
 	 * @param int $id Demande.
 	 */
 	public static function lien_traiteur( $id ) {
-		if ( ! ETR_Operations::livraison( $id ) ) {
+		if ( ! ETR_Modules::actif( 'bon_livraison' ) || ! ETR_Operations::livraison( $id ) ) {
 			return;
 		}
 		echo '<p class="etr-bon-livraison"><a class="etr-lien" href="' . esc_url( self::url_traiteur( $id ) ) . '">' . esc_html__( 'Télécharger le bon de livraison signé (PDF)', 'espace-traiteur' ) . '</a></p>';
@@ -72,7 +70,7 @@ class ETR_Bon_Livraison {
 	 * Téléchargement par le traiteur (ou l'équipe) depuis le site : ?etr_bon_livraison=ID.
 	 */
 	public static function telechargement_traiteur() {
-		if ( ! isset( $_GET['etr_bon_livraison'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+		if ( ! isset( $_GET['etr_bon_livraison'] ) || ! ETR_Modules::actif( 'bon_livraison' ) ) { // phpcs:ignore WordPress.Security.NonceVerification
 			return;
 		}
 		$id      = absint( $_GET['etr_bon_livraison'] ); // phpcs:ignore WordPress.Security.NonceVerification
@@ -118,6 +116,9 @@ class ETR_Bon_Livraison {
 	 * @return bool
 	 */
 	public static function envoyer( $id ) {
+		if ( ! ETR_Modules::actif( 'bon_livraison' ) ) {
+			return false;
+		}
 		$user = get_userdata( (int) get_post_field( 'post_author', $id ) );
 		if ( ! $user || ! is_email( $user->user_email ) || ! ETR_Operations::livraison( $id ) ) {
 			return false;
