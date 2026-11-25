@@ -466,7 +466,7 @@ class ETR_Devis {
 	 * @param int $id Demande.
 	 */
 	public static function encart_traiteur( $id ) {
-		if ( (int) get_post_field( 'post_author', $id ) !== get_current_user_id() ) {
+		if ( ! etr_peut_voir_demande( $id ) ) {
 			return;
 		}
 		$blocs = array();
@@ -516,7 +516,7 @@ class ETR_Devis {
 		if ( ! isset( $_POST['etr_nonce'] ) || ! wp_verify_nonce( sanitize_key( wp_unslash( $_POST['etr_nonce'] ) ), 'etr_accepter_devis_' . $id ) ) {
 			wp_die( esc_html__( 'Lien expiré : rechargez la page.', 'espace-traiteur' ), '', array( 'response' => 403 ) );
 		}
-		if ( ! $id || 'etr_demande' !== get_post_type( $id ) || (int) get_post_field( 'post_author', $id ) !== get_current_user_id() ) {
+		if ( ! $id || 'etr_demande' !== get_post_type( $id ) || ! etr_peut_voir_demande( $id ) ) {
 			wp_die( esc_html__( 'Demande introuvable.', 'espace-traiteur' ), '', array( 'response' => 404 ) );
 		}
 		$nom = isset( $_POST['etr_nom'] ) ? mb_substr( trim( sanitize_text_field( wp_unslash( $_POST['etr_nom'] ) ) ), 0, 100 ) : '';
@@ -559,7 +559,7 @@ class ETR_Devis {
 		$id      = absint( $_GET['id'] ); // phpcs:ignore WordPress.Security.NonceVerification
 		$user_id = get_current_user_id();
 		$equipe  = ETR_Equipe::acces() && ETR_Equipe::bureau() && ETR_Gestion::demande_visible( $id );
-		$auteur  = (int) get_post_field( 'post_author', $id ) === $user_id;
+		$auteur  = etr_peut_voir_demande( $id, $user_id );
 		$permis  = $user_id && 'etr_demande' === get_post_type( $id ) && 'publish' === get_post_status( $id ) && ( $auteur || $equipe );
 		if ( 'devis' === $type ) {
 			$permis = $permis && ETR_Modules::actif( 'devis' ) && ( $equipe || self::devis( $id ) );

@@ -604,6 +604,60 @@ function etr_est_traiteur( $user_id = 0 ) {
 }
 
 /**
+ * Compte principal de la société d'un traiteur (fonction « Plusieurs comptes par société ») :
+ * un collaborateur renvoie le compte qui l'a invité, sinon le traiteur lui-même.
+ *
+ * @param int $user_id Traiteur (courant par défaut).
+ * @return int
+ */
+function etr_societe_id( $user_id = 0 ) {
+	$user_id = $user_id ? (int) $user_id : get_current_user_id();
+	if ( ! class_exists( 'ETR_Modules' ) || ! ETR_Modules::actif( 'multi_comptes' ) ) {
+		return $user_id;
+	}
+	$principal = (int) get_user_meta( $user_id, 'etr_societe', true );
+	return $principal && etr_est_traiteur( $principal ) ? $principal : $user_id;
+}
+
+/**
+ * Comptes de la société d'un traiteur (le principal et ses collaborateurs).
+ *
+ * @param int $user_id Traiteur (courant par défaut).
+ * @return int[]
+ */
+function etr_comptes_societe( $user_id = 0 ) {
+	$user_id   = $user_id ? (int) $user_id : get_current_user_id();
+	$principal = etr_societe_id( $user_id );
+	if ( ! class_exists( 'ETR_Modules' ) || ! ETR_Modules::actif( 'multi_comptes' ) ) {
+		return array( $user_id );
+	}
+	$membres = get_users(
+		array(
+			'meta_key'   => 'etr_societe', // phpcs:ignore WordPress.DB.SlowDBQuery -- quelques comptes.
+			'meta_value' => $principal, // phpcs:ignore WordPress.DB.SlowDBQuery
+			'fields'     => 'ID',
+		)
+	);
+	return array_values( array_unique( array_merge( array( $principal, $user_id ), array_map( 'intval', $membres ) ) ) );
+}
+
+/**
+ * Le traiteur peut-il voir (et gérer) cette demande ? La sienne, ou celle d'un compte de sa société.
+ *
+ * @param int $demande_id Demande.
+ * @param int $user_id    Traiteur (courant par défaut).
+ * @return bool
+ */
+function etr_peut_voir_demande( $demande_id, $user_id = 0 ) {
+	$user_id = $user_id ? (int) $user_id : get_current_user_id();
+	if ( ! $user_id || 'etr_demande' !== get_post_type( $demande_id ) ) {
+		return false;
+	}
+	$auteur = (int) get_post_field( 'post_author', $demande_id );
+	return $auteur === $user_id || in_array( $auteur, etr_comptes_societe( $user_id ), true );
+}
+
+/**
  * L'utilisateur gère-t-il les demandes et le catalogue ?
  *
  * @param int $user_id ID utilisateur (courant par défaut).

@@ -78,6 +78,9 @@ class ETR_Push {
 		if ( ETR_Modules::actif( 'devis' ) ) {
 			$types['devis'] = array( 'bureau', __( 'Devis accepté par un traiteur', 'espace-traiteur' ) );
 		}
+		if ( ETR_Modules::actif( 'avis' ) ) {
+			$types['avis'] = array( 'bureau', __( 'Avis d’un traiteur', 'espace-traiteur' ) );
+		}
 		if ( ETR_Modules::actif( 'relances' ) ) {
 			$types['relance'] = array( 'bureau', __( 'Relances : reprise en retard, acompte non reçu', 'espace-traiteur' ) );
 		}

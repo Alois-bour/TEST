@@ -566,6 +566,7 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 .etr-app .etr-champ label { display: block; margin: 0 0 6px; font-size: 14px; font-weight: 500; color: var(--etr-encre); }
 .etr-champ__option { font-weight: 400; color: var(--etr-gris); font-size: 13px; }
 .etr-app input[type="text"],
+.etr-app input[type="email"],
 .etr-app .etr-champ select,
 .etr-app input[type="date"],
 .etr-app input[type="number"],
@@ -850,6 +851,12 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 	.etr-app .etr-app__liens a { padding: 8px; }
 	.etr-app .etr-app__nav a { min-height: 38px; padding: 6px 12px; font-size: 14px; }
 	.etr-app .etr-app__nav a[aria-current="page"] { box-shadow: 0 0 0 1px var(--etr-trait); }
+	/* Plus de deux écrans : le menu défile au doigt, sans élargir la page. */
+	.etr-app__nav { min-width: 0; max-width: calc(100% + 8px); }
+	.etr-app .etr-app__nav ul { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+	.etr-app .etr-app__nav ul::-webkit-scrollbar { display: none; }
+	.etr-app .etr-app__nav li { flex: none; }
+	.etr-app .etr-app__nav a { white-space: nowrap; }
 	.etr-app__principal { padding: 28px 20px 64px; }
 	.etr-app--integre .etr-app__principal { padding-left: 0; padding-right: 0; }
 	.etr-app .etr-page-entete { margin-bottom: 28px; }
@@ -1286,3 +1293,40 @@ body.etr-plein-ecran { margin: 0; padding: 0; background: var(--etr-fond-carte, 
 .etr-puce-date:hover:not(:disabled) { border-color: var(--etr-olive); }
 .etr-puce-date.est-choisi { border-color: var(--etr-olive); background: var(--etr-olive); color: #fff; }
 .etr-puce-date:disabled { opacity: .4; cursor: default; }
+
+/* Packs, suggestions, disponibilités, équipe, avis (3.0.0) */
+.etr-aide-quantites { display: grid; gap: 10px; margin: 0 0 18px; padding: 14px 16px; border: 1px solid var(--etr-trait); border-radius: 12px; background: var(--etr-olive-clair, #eef1e8); }
+.etr-aide-quantites__packs label { display: block; margin: 0 0 6px; font-weight: 600; color: var(--etr-encre); }
+.etr-aide-quantites__packs > span { display: flex; flex-wrap: wrap; gap: 8px; }
+.etr-aide-quantites__packs select { flex: 1 1 220px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--etr-trait); border-radius: 8px; background: #fff; font: inherit; }
+.etr-aide-quantites small { display: block; color: var(--etr-gris); }
+.etr-aide-quantites__suggestion { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.etr-aide-quantites__message { margin: 0; font-weight: 600; color: var(--etr-olive-fonce, #3a4630); }
+.etr-aide-quantites__message:empty { display: none; }
+.etr-dispo-calendrier__choix { margin: 0 0 16px; }
+.etr-dispo-calendrier__choix select { width: 100%; max-width: 420px; min-height: 46px; padding: 8px 12px; border: 1px solid var(--etr-trait); border-radius: 8px; background: #fff; font: inherit; }
+.etr-dispo-calendrier__nav { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; font-size: 17px; }
+.etr-dispo-calendrier { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; max-width: 640px; }
+.etr-dispo-calendrier__entete { padding: 4px 0; text-align: center; font-size: 12px; color: var(--etr-gris); text-transform: capitalize; }
+.etr-dispo-calendrier__jour { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 54px; border-radius: 10px; font-size: 13px; }
+.etr-dispo-calendrier__jour b { font-weight: 600; }
+.etr-dispo-calendrier__jour small { font-size: 12px; }
+.est-libre { background: #e4efd9; color: #2f5320; }
+.est-limite { background: #fbefd5; color: #7a5210; }
+.est-complet { background: #f6dcd8; color: #8a1f1b; }
+.etr-dispo-calendrier__jour.est-passe { color: #b8b2a8; }
+.etr-dispo-calendrier__legende span { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+.etr-societe { list-style: none; margin: 0; padding: 0; }
+.etr-societe li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--etr-trait-doux, #efeae2); }
+.etr-societe li:last-child { border-bottom: 0; }
+.etr-avis__etoiles { margin: 0 0 8px; font-size: 22px; letter-spacing: 2px; color: #c08a1e; }
+.etr-avis__notes { display: inline-flex; flex-direction: row-reverse; gap: 2px; margin: 0 0 12px; padding: 0; border: 0; }
+.etr-avis__notes legend { display: block; width: 100%; margin: 0 0 6px; font-weight: 600; }
+.etr-avis__notes input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.etr-avis__notes label { font-size: 34px; line-height: 1; color: #d9d3c8; cursor: pointer; }
+.etr-avis__notes input:checked ~ label,
+.etr-avis__notes label:hover,
+.etr-avis__notes label:hover ~ label { color: #c08a1e; }
+.etr-avis__notes input:focus-visible + label { outline: 2px solid var(--etr-olive); border-radius: 4px; }
+.etr-societe__ajout .etr-grille { margin: 0 0 14px; }
+.etr-societe__ajout .etr-champ input { display: block; width: 100%; }

@@ -416,7 +416,7 @@ class ETR_Traiteur_Direct {
 	 * @param int $id Demande.
 	 */
 	public static function panneau_messages_traiteur( $id ) {
-		if ( ! ETR_Modules::actif( 'messages' ) || (int) get_post_field( 'post_author', $id ) !== get_current_user_id() ) {
+		if ( ! ETR_Modules::actif( 'messages' ) || ! etr_peut_voir_demande( $id ) ) {
 			return;
 		}
 		echo '<section class="etr-panneau etr-messages-panneau" id="etr-messages"><h2 class="etr-panneau__titre">' . esc_html__( 'Messages avec notre équipe', 'espace-traiteur' ) . '</h2>';
@@ -441,7 +441,7 @@ class ETR_Traiteur_Direct {
 		if ( ! isset( $_POST['etr_nonce'] ) || ! wp_verify_nonce( sanitize_key( wp_unslash( $_POST['etr_nonce'] ) ), 'etr_message_' . $id ) ) {
 			wp_die( esc_html__( 'Lien expiré : rechargez la page.', 'espace-traiteur' ), '', array( 'response' => 403 ) );
 		}
-		if ( ! $id || 'etr_demande' !== get_post_type( $id ) || (int) get_post_field( 'post_author', $id ) !== get_current_user_id() ) {
+		if ( ! $id || 'etr_demande' !== get_post_type( $id ) || ! etr_peut_voir_demande( $id ) ) {
 			wp_die( esc_html__( 'Demande introuvable.', 'espace-traiteur' ), '', array( 'response' => 404 ) );
 		}
 		$texte = isset( $_POST['etr_message'] ) ? trim( sanitize_textarea_field( wp_unslash( $_POST['etr_message'] ) ) ) : '';
@@ -470,7 +470,7 @@ class ETR_Traiteur_Direct {
 	 * @param int $id Demande.
 	 */
 	public static function bouton_recommander( $id ) {
-		if ( ! ETR_Modules::actif( 'recommander' ) || (int) get_post_field( 'post_author', $id ) !== get_current_user_id() || ! etr_get_lignes( $id ) ) {
+		if ( ! ETR_Modules::actif( 'recommander' ) || ! etr_peut_voir_demande( $id ) || ! etr_get_lignes( $id ) ) {
 			return;
 		}
 		echo '<p class="etr-recommander"><a class="etr-btn etr-btn--secondaire" href="' . esc_url( etr_url( array( 'etr_vue' => 'nouvelle', 'depuis' => $id ) ) ) . '">' . ETR_Frontend::icone( 'plus' ) . '<span>' . esc_html__( 'Commander à nouveau', 'espace-traiteur' ) . '</span></a> <span class="etr-muted">' . esc_html__( 'Même événement et même matériel ; vous choisissez les nouvelles dates.', 'espace-traiteur' ) . '</span></p>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique.
@@ -487,6 +487,6 @@ class ETR_Traiteur_Direct {
 			return $modele;
 		}
 		$id = absint( $_GET['depuis'] ); // phpcs:ignore WordPress.Security.NonceVerification
-		return 'etr_demande' === get_post_type( $id ) && (int) get_post_field( 'post_author', $id ) === get_current_user_id() ? $id : $modele;
+		return etr_peut_voir_demande( $id ) ? $id : $modele;
 	}
 }

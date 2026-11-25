@@ -171,7 +171,7 @@ class ETR_Frontend {
 		$demande_id = isset( $_POST['demande_id'] ) ? absint( $_POST['demande_id'] ) : 0;
 		if ( $demande_id ) {
 			$demande = get_post( $demande_id );
-			if ( ! $demande || (int) $demande->post_author !== get_current_user_id() || 'en_attente' !== etr_get_statut( $demande_id ) ) {
+			if ( ! $demande || ! etr_peut_voir_demande( $demande_id ) || 'en_attente' !== etr_get_statut( $demande_id ) ) {
 				$demande_id = 0;
 			}
 		}
@@ -257,7 +257,7 @@ class ETR_Frontend {
 			return;
 		}
 		$demande = get_post( $demande_id );
-		if ( ! $demande || 'etr_demande' !== $demande->post_type || (int) $demande->post_author !== get_current_user_id() || 'en_attente' !== etr_get_statut( $demande_id ) ) {
+		if ( ! $demande || 'etr_demande' !== $demande->post_type || ! etr_peut_voir_demande( $demande_id ) || 'en_attente' !== etr_get_statut( $demande_id ) ) {
 			self::$erreurs[] = __( 'Cette demande ne peut plus être modifiée.', 'espace-traiteur' );
 			return;
 		}
@@ -493,7 +493,7 @@ class ETR_Frontend {
 			return;
 		}
 		$demande = get_post( $demande_id );
-		if ( ! $demande || 'etr_demande' !== $demande->post_type || (int) $demande->post_author !== get_current_user_id() ) {
+		if ( ! $demande || 'etr_demande' !== $demande->post_type || ! etr_peut_voir_demande( $demande->ID ) ) {
 			return;
 		}
 		if ( 'en_attente' !== etr_get_statut( $demande_id ) ) {
@@ -625,7 +625,7 @@ class ETR_Frontend {
 		}
 
 		echo '<div class="etr-espace etr-app' . ( self::plein_ecran() ? '' : ' etr-app--integre' ) . '">';
-		self::barre_laterale( 'nouvelle' === $vue ? 'nouvelle' : 'demandes' );
+		self::barre_laterale( in_array( $vue, array( 'nouvelle', 'disponibilites', 'societe' ), true ) ? $vue : 'demandes' );
 		echo '<main class="etr-app__principal" id="etr-contenu">';
 		// Installer l'espace sur l'iPhone (affiché par traiteur-app.js dans Safari, si pas encore installé).
 		echo '<aside class="etr-installer" id="etr-installer-traiteur" hidden><span class="etr-installer__icone" aria-hidden="true"><img src="' . esc_url( ETR_PWA::icone( 180 ) ) . '" alt="" width="44" height="44"></span><p><strong>' . esc_html__( 'Votre espace sur l’iPhone', 'espace-traiteur' ) . '</strong><span>' . esc_html__( 'Dans Safari, touchez « Partager » puis « Sur l’écran d’accueil » : vos demandes et leur suivi en un toucher.', 'espace-traiteur' ) . '</span></p><button type="button" class="etr-installer__fermer" aria-label="' . esc_attr__( 'Fermer', 'espace-traiteur' ) . '">×</button></aside>';
@@ -638,6 +638,8 @@ class ETR_Frontend {
 			self::vue_formulaire( absint( $_GET['id'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
 		} elseif ( 'demande' === $vue ) {
 			self::vue_demande( absint( $_GET['id'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
+		} elseif ( $vue && has_action( 'etr_traiteur_vue_' . $vue ) ) {
+			do_action( 'etr_traiteur_vue_' . $vue ); // Écrans des fonctions activables.
 		} else {
 			self::vue_tableau_de_bord();
 		}
@@ -679,6 +681,8 @@ class ETR_Frontend {
 			'demandes' => array( etr_url(), __( 'Mes demandes', 'espace-traiteur' ), 'demandes' ),
 			'nouvelle' => array( etr_url( array( 'etr_vue' => 'nouvelle' ) ), __( 'Nouvelle demande', 'espace-traiteur' ), 'plus' ),
 		);
+		/** Écrans ajoutés par les fonctions activables (disponibilités, équipe de la société). */
+		$liens = (array) apply_filters( 'etr_traiteur_menu', $liens );
 		foreach ( $liens as $cle => $lien ) {
 			echo '<li><a href="' . esc_url( $lien[0] ) . '"' . ( $cle === $actif ? ' aria-current="page"' : '' ) . '>' . self::icone( $lien[2] ) . '<span>' . esc_html( $lien[1] ) . '</span></a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique.
 		}
@@ -825,7 +829,7 @@ class ETR_Frontend {
 			array(
 				'post_type'   => 'etr_demande',
 				'post_status' => 'publish',
-				'author'      => $user_id,
+				'author__in'  => etr_comptes_societe( $user_id ), // Toute la société (plusieurs comptes).
 				'numberposts' => -1,
 				'fields'      => 'ids',
 			)
@@ -887,7 +891,7 @@ class ETR_Frontend {
 		$args = array(
 			'post_type'      => 'etr_demande',
 			'post_status'    => 'publish',
-			'author'         => $user_id,
+			'author__in'     => etr_comptes_societe( $user_id ),
 			'posts_per_page' => 20,
 			'paged'          => $page,
 			'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery
@@ -1096,7 +1100,7 @@ class ETR_Frontend {
 		$demande = get_post( $demande_id );
 		$retour  = '<a class="etr-retour" href="' . esc_url( etr_url() ) . '">' . self::icone( 'retour' ) . '<span>' . esc_html__( 'Mes demandes', 'espace-traiteur' ) . '</span></a>';
 
-		if ( ! $demande || 'etr_demande' !== $demande->post_type || ( (int) $demande->post_author !== get_current_user_id() && ! etr_est_gestionnaire() ) ) {
+		if ( ! $demande || 'etr_demande' !== $demande->post_type || ( ! etr_peut_voir_demande( $demande->ID ) && ! etr_est_gestionnaire() ) ) {
 			echo $retour; // phpcs:ignore WordPress.Security.EscapeOutput
 			echo '<div class="etr-vide etr-vide--compact"><p>' . esc_html__( 'Cette demande n’existe pas ou n’est pas liée à votre compte.', 'espace-traiteur' ) . '</p></div>';
 			return;
@@ -1181,7 +1185,7 @@ class ETR_Frontend {
 
 		do_action( 'etr_traiteur_demande_fin', $demande_id ); // Fonctions activables : devis, messages, commander à nouveau…
 
-		if ( 'en_attente' === $statut && (int) $demande->post_author === get_current_user_id() ) {
+		if ( 'en_attente' === $statut && etr_peut_voir_demande( $demande_id ) ) {
 			echo '<p><a class="etr-btn etr-btn--secondaire" href="' . esc_url( etr_url( array( 'etr_vue' => 'modifier', 'id' => $demande_id ) ) ) . '">' . esc_html__( 'Modifier la demande', 'espace-traiteur' ) . '</a></p>';
 			echo '<form method="post" class="etr-annuler" onsubmit="return confirm(\'' . esc_js( __( 'Annuler cette demande ? Le matériel sera libéré.', 'espace-traiteur' ) ) . '\');">';
 			wp_nonce_field( 'etr_annuler_' . $demande_id, 'etr_nonce' );
@@ -1198,7 +1202,7 @@ class ETR_Frontend {
 	 */
 	private static function vue_formulaire( $demande_id = 0 ) {
 		$demande = $demande_id ? get_post( $demande_id ) : null;
-		if ( $demande && ( 'etr_demande' !== $demande->post_type || (int) $demande->post_author !== get_current_user_id() || 'en_attente' !== etr_get_statut( $demande_id ) ) ) {
+		if ( $demande && ( 'etr_demande' !== $demande->post_type || ! etr_peut_voir_demande( $demande_id ) || 'en_attente' !== etr_get_statut( $demande_id ) ) ) {
 			$demande = null;
 		}
 		self::$demande_modifiee_id = $demande ? (int) $demande_id : 0;
@@ -1350,6 +1354,7 @@ class ETR_Frontend {
 		}
 
 		echo '<p class="etr-dispo-info' . ( $debut ? ' etr-dispo-info--dates' : '' ) . '" aria-live="polite">' . self::icone( 'calendrier' ) . '<span class="etr-dispo-info__texte">' . esc_html( $debut ? self::texte_periode( $debut, $fin ) : __( 'Choisissez la date de l’événement pour voir les quantités disponibles.', 'espace-traiteur' ) ) . '</span></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		do_action( 'etr_formulaire_catalogue_haut' ); // Packs, quantités suggérées.
 
 		// Outils de recherche et de filtre (activés par le script).
 		echo '<div class="etr-outils" hidden>';
