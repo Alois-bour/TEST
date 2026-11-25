@@ -1330,3 +1330,5 @@ body.etr-plein-ecran { margin: 0; padding: 0; background: var(--etr-fond-carte, 
 .etr-avis__notes input:focus-visible + label { outline: 2px solid var(--etr-olive); border-radius: 4px; }
 .etr-societe__ajout .etr-grille { margin: 0 0 14px; }
 .etr-societe__ajout .etr-champ input { display: block; width: 100%; }
+.etr-stripe__form { margin: 0 0 10px; }
+.etr-stripe__secure { font-size: 12.5px; }

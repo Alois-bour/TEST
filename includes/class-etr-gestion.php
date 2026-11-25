@@ -1382,6 +1382,7 @@ class ETR_Gestion {
 			'reactive'   => __( 'Accès réactivé.', 'espace-traiteur' ),
 			'fait'       => __( 'Enregistré.', 'espace-traiteur' ),
 			'ordre_optimise' => __( 'Ordre de passage optimisé.', 'espace-traiteur' ),
+			'facture_envoyee' => __( 'Facture envoyée au traiteur.', 'espace-traiteur' ),
 			'message_envoye' => __( 'Message envoyé : le traiteur est prévenu.', 'espace-traiteur' ),
 			'dates'      => __( 'Dates enregistrées : le traiteur est prévenu.', 'espace-traiteur' ),
 			'devis_envoye' => __( 'Devis envoyé au traiteur.', 'espace-traiteur' ),
@@ -1393,13 +1394,14 @@ class ETR_Gestion {
 			'membre_cree_sans_mail' => __( 'Personne ajoutée, mais l’e-mail d’invitation n’est pas parti. Vérifiez la configuration des e-mails du site, puis renvoyez l’invitation depuis la liste.', 'espace-traiteur' ),
 			'roles_vides'    => __( 'Une personne doit garder au moins un rôle. Pour lui fermer l’application, utilisez « Retirer l’accès ».', 'espace-traiteur' ),
 			'dates_erreur'   => __( 'Dates non enregistrées.', 'espace-traiteur' ),
+			'stripe_erreur'  => __( 'Opération Stripe non effectuée.', 'espace-traiteur' ),
 			'ordre_impossible' => __( 'Optimisation impossible : adresse de départ introuvable (Espace traiteur › Fonctions › Estimation de la livraison).', 'espace-traiteur' ),
 		);
 		if ( isset( $succes[ $msg ] ) ) {
 			echo '<div class="etr-notice etr-notice--succes" role="status">' . self::icone( 'coche' ) . '<p>' . esc_html( $succes[ $msg ] ) . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		} elseif ( isset( $alertes[ $msg ] ) ) {
 			$raison = in_array( $msg, array( 'cree_sans_mail', 'mail_echec', 'membre_cree_sans_mail' ), true ) ? etr_raison_echec_mail() : '';
-			if ( 'dates_erreur' === $msg ) {
+			if ( 'dates_erreur' === $msg || 'stripe_erreur' === $msg ) {
 				$raison = (string) get_transient( 'etr_erreur_dates_' . get_current_user_id() );
 				delete_transient( 'etr_erreur_dates_' . get_current_user_id() );
 			}

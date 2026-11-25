@@ -1180,3 +1180,7 @@ html:active-view-transition-type(onglet)::view-transition-new(etr-contenu) { ani
 .etr-inventaire__ecart.est-positif { color: var(--etr-olive); }
 .etr-pastille-etat--alerte { background: #f6dcd8; color: #8a1f1b; }
 .etr-stock-bas { border-color: #e9b9b2; }
+.etr-facture__payee { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }
+.etr-stripe__debit { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.etr-factures__filtre { margin: 0 0 14px; }
+.etr-factures__total { font-weight: 600; }
