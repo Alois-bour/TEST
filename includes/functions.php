@@ -358,6 +358,58 @@ function etr_periode( $date_evenement, $date_livraison = '', $date_reprise = '' 
 }
 
 /**
+ * Écart maximal (jours) entre la livraison et l'événement, puis entre l'événement et la reprise,
+ * pour une demande saisie par un traiteur.
+ *
+ * @return array{avant:int,apres:int}
+ */
+function etr_ecarts_dates() {
+	return array(
+		'avant' => max( 0, (int) apply_filters( 'etr_jours_livraison_avant', 7 ) ),
+		'apres' => max( 0, (int) apply_filters( 'etr_jours_reprise_apres', 7 ) ),
+	);
+}
+
+/**
+ * Cohérence des dates d'une demande : événement à venir, livraison au plus tard le jour de
+ * l'événement (et pas trop tôt), reprise au plus tôt le jour de l'événement et après la livraison.
+ *
+ * @param string $evenement  Date de l'événement (AAAA-MM-JJ).
+ * @param string $livraison  Livraison souhaitée (vide = jour de l'événement).
+ * @param string $reprise    Reprise souhaitée (vide = jour de l'événement).
+ * @param string $aujourdhui Date du jour.
+ * @return string[] Erreurs, vide si tout est cohérent.
+ */
+function etr_erreurs_dates( $evenement, $livraison, $reprise, $aujourdhui ) {
+	$erreurs = array();
+	$ecarts  = etr_ecarts_dates();
+	if ( etr_date_valide( $evenement ) && $evenement < $aujourdhui ) {
+		$erreurs[] = __( 'La date de l’événement ne peut pas être passée.', 'espace-traiteur' );
+	}
+	if ( etr_date_valide( $livraison ) ) {
+		if ( $livraison < $aujourdhui ) {
+			$erreurs[] = __( 'La date de livraison ne peut pas être passée.', 'espace-traiteur' );
+		} elseif ( etr_date_valide( $evenement ) && $livraison > $evenement ) {
+			$erreurs[] = __( 'La livraison doit avoir lieu au plus tard le jour de l’événement.', 'espace-traiteur' );
+		} elseif ( etr_date_valide( $evenement ) && $livraison < gmdate( 'Y-m-d', strtotime( $evenement . ' -' . $ecarts['avant'] . ' days' ) ) ) {
+			/* translators: %s : nombre de jours. */
+			$erreurs[] = sprintf( _n( 'La livraison peut avoir lieu au plus tôt %s jour avant l’événement.', 'La livraison peut avoir lieu au plus tôt %s jours avant l’événement.', $ecarts['avant'], 'espace-traiteur' ), number_format_i18n( $ecarts['avant'] ) );
+		}
+	}
+	if ( etr_date_valide( $reprise ) ) {
+		if ( etr_date_valide( $evenement ) && $reprise < $evenement ) {
+			$erreurs[] = __( 'La reprise doit avoir lieu au plus tôt le jour de l’événement.', 'espace-traiteur' );
+		} elseif ( etr_date_valide( $livraison ) && $reprise < $livraison ) {
+			$erreurs[] = __( 'La reprise ne peut pas avoir lieu avant la livraison.', 'espace-traiteur' );
+		} elseif ( etr_date_valide( $evenement ) && $reprise > gmdate( 'Y-m-d', strtotime( $evenement . ' +' . $ecarts['apres'] . ' days' ) ) ) {
+			/* translators: %s : nombre de jours. */
+			$erreurs[] = sprintf( _n( 'La reprise peut avoir lieu au plus tard %s jour après l’événement.', 'La reprise peut avoir lieu au plus tard %s jours après l’événement.', $ecarts['apres'], 'espace-traiteur' ), number_format_i18n( $ecarts['apres'] ) );
+		}
+	}
+	return $erreurs;
+}
+
+/**
  * Période d'une demande enregistrée.
  *
  * @param int $demande_id ID.

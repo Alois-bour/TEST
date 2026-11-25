@@ -274,6 +274,182 @@
 			} );
 	}
 
+	/* Dates : cohérence et aide au choix --------------------------------- */
+	/*
+	 * Livraison au plus tard le jour de l'événement (et au plus tôt N jours avant),
+	 * reprise au plus tôt le jour de l'événement et après la livraison (au plus tard N jours après).
+	 * Raccourcis « La veille », « Le jour même », « Le lendemain » ; date écrite en toutes lettres.
+	 * Le serveur refait les mêmes contrôles (etr_erreurs_dates).
+	 */
+	( function () {
+		var evt = champ( 'date_evenement' );
+		var liv = champ( 'date_livraison' );
+		var rep = champ( 'date_reprise' );
+		if ( ! evt || ! liv || ! rep ) {
+			return;
+		}
+		var auj    = etrDispo.aujourdhui;
+		var ecarts = etrDispo.ecarts || { avant: 7, apres: 7 };
+		var format = window.Intl ? new Intl.DateTimeFormat( 'fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' } ) : null;
+
+		function decaler( date, jours ) {
+			var d = new Date( date + 'T00:00:00Z' );
+			d.setUTCDate( d.getUTCDate() + jours );
+			return d.toISOString().slice( 0, 10 );
+		}
+		function plusTard( a, b ) {
+			return a > b ? a : b;
+		}
+		function lisible( date ) {
+			return format && date ? format.format( new Date( date + 'T00:00:00Z' ) ) : '';
+		}
+
+		// Sous chaque champ : la date en toutes lettres, un message, des raccourcis.
+		function aide( input, raccourcis ) {
+			var zone = document.createElement( 'span' );
+			zone.className = 'etr-date-aide';
+			zone.innerHTML = '<span class="etr-date-aide__lisible"></span><span class="etr-date-aide__message" role="status"></span>';
+			if ( raccourcis.length ) {
+				var puces = document.createElement( 'span' );
+				puces.className = 'etr-date-aide__puces';
+				raccourcis.forEach( function ( r ) {
+					var b = document.createElement( 'button' );
+					b.type = 'button';
+					b.className = 'etr-puce-date';
+					b.textContent = r.libelle;
+					b.addEventListener( 'click', function () {
+						input.value = r.date();
+						input.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+					} );
+					r.bouton = b;
+					puces.appendChild( b );
+				} );
+				zone.appendChild( puces );
+			}
+			input.insertAdjacentElement( 'afterend', zone );
+			return { lisible: zone.querySelector( '.etr-date-aide__lisible' ), message: zone.querySelector( '.etr-date-aide__message' ), raccourcis: raccourcis };
+		}
+
+		var raccLiv = [
+			{ libelle: 'La veille', date: function () { return decaler( evt.value, -1 ); } },
+			{ libelle: 'Le jour même', date: function () { return evt.value; } },
+		];
+		var raccRep = [
+			{ libelle: 'Le jour même', date: function () { return evt.value; } },
+			{ libelle: 'Le lendemain', date: function () { return decaler( evt.value, 1 ); } },
+		];
+		var aides = { evt: aide( evt, [] ), liv: aide( liv, raccLiv ), rep: aide( rep, raccRep ) };
+
+		function signaler( input, a, texte ) {
+			input.setCustomValidity( texte || '' );
+			a.message.textContent = texte || '';
+			a.message.classList.toggle( 'est-erreur', !! texte );
+			input.closest( '.etr-champ' ).classList.toggle( 'etr-champ--erreur', !! texte );
+		}
+
+		function borner( input, min, max ) {
+			input.min = min || '';
+			input.max = max || '';
+		}
+
+		function controler() {
+			var e = evt.value;
+			borner( evt, auj, '' );
+			if ( ! e ) {
+				borner( liv, auj, '' );
+				borner( rep, auj, '' );
+			} else {
+				var livMin = plusTard( auj, decaler( e, -ecarts.avant ) );
+				borner( liv, livMin, e );
+				borner( rep, plusTard( e, liv.value || e ), decaler( e, ecarts.apres ) );
+			}
+			[ [ evt, aides.evt ], [ liv, aides.liv ], [ rep, aides.rep ] ].forEach( function ( c ) {
+				c[ 1 ].lisible.textContent = lisible( c[ 0 ].value );
+			} );
+
+			signaler( evt, aides.evt, e && e < auj ? 'La date de l’événement ne peut pas être passée.' : '' );
+			var mLiv = '';
+			if ( liv.value ) {
+				if ( liv.value < auj ) {
+					mLiv = 'La date de livraison ne peut pas être passée.';
+				} else if ( e && liv.value > e ) {
+					mLiv = 'La livraison doit avoir lieu au plus tard le jour de l’événement.';
+				} else if ( e && liv.value < decaler( e, -ecarts.avant ) ) {
+					mLiv = 'La livraison peut avoir lieu au plus tôt ' + ecarts.avant + ' jours avant l’événement.';
+				}
+			}
+			signaler( liv, aides.liv, mLiv );
+			var mRep = '';
+			if ( rep.value ) {
+				if ( e && rep.value < e ) {
+					mRep = 'La reprise doit avoir lieu au plus tôt le jour de l’événement.';
+				} else if ( liv.value && rep.value < liv.value ) {
+					mRep = 'La reprise ne peut pas avoir lieu avant la livraison.';
+				} else if ( e && rep.value > decaler( e, ecarts.apres ) ) {
+					mRep = 'La reprise peut avoir lieu au plus tard ' + ecarts.apres + ' jours après l’événement.';
+				}
+			}
+			signaler( rep, aides.rep, mRep );
+			if ( ! liv.value && e && ! mLiv ) {
+				aides.liv.message.textContent = 'Sans date : livraison le jour de l’événement.';
+			}
+			if ( ! rep.value && e && ! mRep ) {
+				aides.rep.message.textContent = 'Sans date : reprise le jour de l’événement.';
+			}
+			if ( retraits.liv && ! liv.value ) {
+				aides.liv.message.textContent = retraits.liv;
+			}
+			if ( retraits.rep && ! rep.value ) {
+				aides.rep.message.textContent = retraits.rep;
+			}
+
+			// Raccourcis : seulement avec une date d'événement, et s'ils respectent les règles.
+			[ [ raccLiv, liv ], [ raccRep, rep ] ].forEach( function ( r ) {
+				r[ 0 ].forEach( function ( racc ) {
+					var d = e ? racc.date() : '';
+					racc.bouton.disabled = ! d || ( r[ 1 ].min && d < r[ 1 ].min ) || ( r[ 1 ].max && d > r[ 1 ].max );
+					racc.bouton.classList.toggle( 'est-choisi', !! d && r[ 1 ].value === d );
+				} );
+			} );
+		}
+
+		// L'événement change : une livraison ou une reprise devenue incohérente est retirée, et on le
+		// dit sous le champ jusqu'à ce que la personne y choisisse une nouvelle date.
+		var retraits = { liv: '', rep: '' };
+		var auto     = false;
+		function retirer( input, cle, texte ) {
+			input.value    = '';
+			retraits[ cle ] = texte;
+			auto           = true;
+			input.dispatchEvent( new Event( 'change', { bubbles: true } ) ); // Disponibilités recalculées.
+			auto           = false;
+		}
+		evt.addEventListener( 'change', function () {
+			var e = evt.value;
+			if ( e && liv.value && ( liv.value > e || liv.value < decaler( e, -ecarts.avant ) ) ) {
+				retirer( liv, 'liv', 'Date de livraison retirée : elle ne correspondait plus à l’événement.' );
+			}
+			if ( e && rep.value && ( rep.value < e || rep.value > decaler( e, ecarts.apres ) ) ) {
+				retirer( rep, 'rep', 'Date de reprise retirée : elle ne correspondait plus à l’événement.' );
+			}
+			controler();
+		} );
+		[ [ liv, 'liv' ], [ rep, 'rep' ] ].forEach( function ( c ) {
+			c[ 0 ].addEventListener( 'change', function () {
+				if ( ! auto ) {
+					retraits[ c[ 1 ] ] = '';
+				}
+				controler();
+			} );
+		} );
+		[ evt, liv, rep ].forEach( function ( input ) {
+			input.addEventListener( 'input', function () {
+				controler();
+			} );
+		} );
+		controler();
+	}() );
+
 	cles.forEach( function ( cle ) {
 		var c = champ( cle );
 		if ( c ) {

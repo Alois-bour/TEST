@@ -109,23 +109,44 @@ class ETR_Materiel {
 	 * @return string|WP_Error Message de confirmation.
 	 */
 	public static function deplacer( $id, $etape, $date ) {
+		return self::deplacer_etapes( $id, array( $etape => $date ) );
+	}
+
+	/**
+	 * Change une ou deux dates d'un coup : tout est vérifié avant d'enregistrer quoi que ce soit
+	 * (dates cohérentes, matériel disponible sur la nouvelle période), puis un seul message au traiteur.
+	 *
+	 * @param int   $id      Demande.
+	 * @param array $etapes  { livraison?: AAAA-MM-JJ, reprise?: AAAA-MM-JJ }.
+	 * @return string|WP_Error Message de confirmation.
+	 */
+	public static function deplacer_etapes( $id, $etapes ) {
 		if ( ! ETR_Gestion::demande_visible( $id ) ) {
 			return new WP_Error( 'etr_demande', __( 'Demande introuvable.', 'espace-traiteur' ), array( 'status' => 404 ) );
 		}
-		if ( ! self::deplacable( $id, $etape ) ) {
-			return new WP_Error( 'etr_statut', __( 'Cette étape est déjà faite ou la demande est terminée.', 'espace-traiteur' ), array( 'status' => 409 ) );
+		$etapes = array_intersect_key( (array) $etapes, array( 'livraison' => 1, 'reprise' => 1 ) );
+		if ( ! $etapes ) {
+			return new WP_Error( 'etr_date', __( 'Aucune date à changer.', 'espace-traiteur' ), array( 'status' => 400 ) );
 		}
-		if ( ! etr_date_valide( $date ) ) {
-			return new WP_Error( 'etr_date', __( 'Date invalide.', 'espace-traiteur' ), array( 'status' => 400 ) );
+		foreach ( $etapes as $etape => $date ) {
+			if ( ! self::deplacable( $id, $etape ) ) {
+				return new WP_Error( 'etr_statut', __( 'Cette étape est déjà faite ou la demande est terminée.', 'espace-traiteur' ), array( 'status' => 409 ) );
+			}
+			if ( ! etr_date_valide( $date ) ) {
+				return new WP_Error( 'etr_date', __( 'Date invalide.', 'espace-traiteur' ), array( 'status' => 400 ) );
+			}
 		}
 		$evenement = (string) get_post_meta( $id, '_etr_date_evenement', true );
-		$livraison = 'livraison' === $etape ? $date : (string) get_post_meta( $id, '_etr_date_livraison', true );
-		$reprise   = 'reprise' === $etape ? $date : (string) get_post_meta( $id, '_etr_date_reprise', true );
-		if ( etr_date_valide( $evenement ) && ( ( 'livraison' === $etape && $date > $evenement ) || ( 'reprise' === $etape && $date < $evenement ) ) ) {
-			return new WP_Error( 'etr_date', 'livraison' === $etape ? __( 'La livraison doit avoir lieu au plus tard le jour de l’événement.', 'espace-traiteur' ) : __( 'La reprise doit avoir lieu au plus tôt le jour de l’événement.', 'espace-traiteur' ), array( 'status' => 400 ) );
+		$livraison = isset( $etapes['livraison'] ) ? $etapes['livraison'] : (string) get_post_meta( $id, '_etr_date_livraison', true );
+		$reprise   = isset( $etapes['reprise'] ) ? $etapes['reprise'] : (string) get_post_meta( $id, '_etr_date_reprise', true );
+		if ( etr_date_valide( $evenement ) && etr_date_valide( $livraison ) && $livraison > $evenement ) {
+			return new WP_Error( 'etr_date', __( 'La livraison doit avoir lieu au plus tard le jour de l’événement.', 'espace-traiteur' ), array( 'status' => 400 ) );
+		}
+		if ( etr_date_valide( $evenement ) && etr_date_valide( $reprise ) && $reprise < $evenement ) {
+			return new WP_Error( 'etr_date', __( 'La reprise doit avoir lieu au plus tôt le jour de l’événement.', 'espace-traiteur' ), array( 'status' => 400 ) );
 		}
 		if ( etr_date_valide( $livraison ) && etr_date_valide( $reprise ) && $livraison > $reprise ) {
-			return new WP_Error( 'etr_date', __( 'La reprise ne peut pas précéder la livraison.', 'espace-traiteur' ), array( 'status' => 400 ) );
+			return new WP_Error( 'etr_date', __( 'La reprise ne peut pas avoir lieu avant la livraison.', 'espace-traiteur' ), array( 'status' => 400 ) );
 		}
 
 		// Le matériel doit rester disponible sur la nouvelle période.
@@ -147,20 +168,25 @@ class ETR_Materiel {
 		}
 
 		$ancienne = ETR_Operations::jours( $id );
-		update_post_meta( $id, '_etr_date_' . $etape, $date );
-		$texte = sprintf(
-			/* translators: 1 : ancienne date, 2 : nouvelle date. */
-			'livraison' === $etape ? __( 'Livraison déplacée du %1$s au %2$s', 'espace-traiteur' ) : __( 'Reprise déplacée du %1$s au %2$s', 'espace-traiteur' ),
-			etr_format_date( 'livraison' === $etape ? $ancienne[0] : $ancienne[1] ),
-			etr_format_date( $date )
-		);
+		$textes   = array();
+		foreach ( $etapes as $etape => $date ) {
+			update_post_meta( $id, '_etr_date_' . $etape, $date );
+			$textes[] = sprintf(
+				/* translators: 1 : ancienne date, 2 : nouvelle date. */
+				'livraison' === $etape ? __( 'Livraison déplacée du %1$s au %2$s', 'espace-traiteur' ) : __( 'Reprise déplacée du %1$s au %2$s', 'espace-traiteur' ),
+				etr_format_date( 'livraison' === $etape ? $ancienne[0] : $ancienne[1] ),
+				etr_format_date( $date )
+			);
+		}
+		$texte = implode( ' ; ', $textes );
 		ETR_Historique::ajouter( $id, 'dates', $texte );
-		ETR_Traiteur_Direct::prevenir(
-			$id,
-			'livraison' === $etape ? __( 'Date de livraison modifiée', 'espace-traiteur' ) : __( 'Date de reprise modifiée', 'espace-traiteur' ),
-			/* translators: 1 : événement, 2 : changement. */
-			sprintf( __( '%1$s : %2$s.', 'espace-traiteur' ), get_the_title( $id ), $texte )
-		);
+		if ( count( $etapes ) > 1 ) {
+			$titre = __( 'Dates de livraison et de reprise modifiées', 'espace-traiteur' );
+		} else {
+			$titre = isset( $etapes['livraison'] ) ? __( 'Date de livraison modifiée', 'espace-traiteur' ) : __( 'Date de reprise modifiée', 'espace-traiteur' );
+		}
+		/* translators: 1 : événement, 2 : changement. */
+		ETR_Traiteur_Direct::prevenir( $id, $titre, sprintf( __( '%1$s : %2$s.', 'espace-traiteur' ), get_the_title( $id ), $texte ) );
 		return $texte;
 	}
 
@@ -209,20 +235,16 @@ class ETR_Materiel {
 			$saisies = isset( $_POST['etr_dates'] ) && is_array( $_POST['etr_dates'] ) ? wp_unslash( $_POST['etr_dates'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- chaque valeur est nettoyée ci-dessous.
 			list( $livraison, $reprise ) = ETR_Operations::jours( $id );
 			$actuelles = array( 'livraison' => $livraison, 'reprise' => $reprise );
-			$erreur    = '';
-			// Reprise d'abord si elle recule, sinon livraison d'abord : chaque étape reste cohérente.
-			$ordre = ( isset( $saisies['livraison'] ) && sanitize_text_field( $saisies['livraison'] ) > $actuelles['livraison'] ) ? array( 'reprise', 'livraison' ) : array( 'livraison', 'reprise' );
-			foreach ( $ordre as $etape ) {
+			$changes   = array();
+			foreach ( $actuelles as $etape => $actuelle ) {
 				$date = isset( $saisies[ $etape ] ) ? sanitize_text_field( $saisies[ $etape ] ) : '';
-				if ( '' === $date || $date === $actuelles[ $etape ] ) {
-					continue;
-				}
-				$ok = self::deplacer( $id, $etape, $date );
-				if ( is_wp_error( $ok ) ) {
-					$erreur = $ok->get_error_message();
-					break;
+				if ( '' !== $date && $date !== $actuelle ) {
+					$changes[ $etape ] = $date;
 				}
 			}
+			// Les deux dates sont vérifiées ensemble : tout est enregistré, ou rien.
+			$ok     = $changes ? self::deplacer_etapes( $id, $changes ) : '';
+			$erreur = is_wp_error( $ok ) ? $ok->get_error_message() : '';
 			if ( $erreur ) {
 				set_transient( 'etr_erreur_dates_' . get_current_user_id(), $erreur, 60 );
 			}
@@ -235,7 +257,11 @@ class ETR_Materiel {
 			$quantite = isset( $_POST['quantite'] ) ? absint( $_POST['quantite'] ) : 0;
 			$sens     = isset( $_POST['sens'] ) && 'sortir' === $_POST['sens'] ? 1 : -1;
 			if ( $article && $quantite && etr_get_article( $article ) ) {
-				self::modifier_reparation( $article, $sens * $quantite );
+				if ( $sens < 0 ) {
+					self::remettre_en_stock( $article, $quantite );
+				} else {
+					self::modifier_reparation( $article, $quantite );
+				}
 			}
 			wp_safe_redirect( ETR_Gestion::url( array( 'vue' => 'catalogue', 'etr_msg' => 'fait' ) ) );
 			exit;
@@ -288,7 +314,26 @@ class ETR_Materiel {
 	}
 
 	/**
-	 * Reprise : la casse part en réparation (une reprise refaite ne compte que la différence).
+	 * Casse d'une demande : article => { casse : constatée à la reprise, reste : encore en réparation }.
+	 *
+	 * @param int $id Demande.
+	 * @return array<int,array{casse:int,reste:int}>
+	 */
+	private static function casse_demande( $id ) {
+		$deja   = get_post_meta( $id, self::META_CASSE_STOCK, true );
+		$propre = array();
+		foreach ( is_array( $deja ) ? $deja : array() as $article => $valeur ) {
+			$propre[ (int) $article ] = is_array( $valeur )
+				? array( 'casse' => (int) $valeur['casse'], 'reste' => (int) $valeur['reste'] )
+				: array( 'casse' => (int) $valeur, 'reste' => (int) $valeur );
+		}
+		return $propre;
+	}
+
+	/**
+	 * Reprise : la casse part en réparation. Une reprise refaite ne compte que la différence, et
+	 * ne retire jamais plus que ce que cette demande a encore en réparation (le reste a déjà été
+	 * remis en stock, ou appartient à d'autres demandes).
 	 *
 	 * @param int   $id     Demande.
 	 * @param array $lignes index => { rendu, casse }.
@@ -297,8 +342,7 @@ class ETR_Materiel {
 		if ( ! ETR_Modules::actif( 'reparation' ) ) {
 			return;
 		}
-		$deja    = get_post_meta( $id, self::META_CASSE_STOCK, true );
-		$deja    = is_array( $deja ) ? $deja : array();
+		$deja    = self::casse_demande( $id );
 		$nouveau = array();
 		foreach ( etr_get_lignes( $id ) as $index => $ligne ) {
 			$casse = isset( $lignes[ $index ]['casse'] ) ? (int) $lignes[ $index ]['casse'] : 0;
@@ -307,13 +351,67 @@ class ETR_Materiel {
 				$nouveau[ $article ] = ( isset( $nouveau[ $article ] ) ? $nouveau[ $article ] : 0 ) + $casse;
 			}
 		}
+		$etat = array();
 		foreach ( array_unique( array_merge( array_keys( $deja ), array_keys( $nouveau ) ) ) as $article ) {
-			$ecart = ( isset( $nouveau[ $article ] ) ? $nouveau[ $article ] : 0 ) - ( isset( $deja[ $article ] ) ? $deja[ $article ] : 0 );
-			if ( $ecart ) {
+			$avant = isset( $deja[ $article ] ) ? $deja[ $article ] : array( 'casse' => 0, 'reste' => 0 );
+			$casse = isset( $nouveau[ $article ] ) ? $nouveau[ $article ] : 0;
+			$ecart = $casse - $avant['casse'];
+			$reste = $avant['reste'];
+			if ( $ecart > 0 ) {
 				self::modifier_reparation( $article, $ecart );
+				$reste += $ecart;
+			} elseif ( $ecart < 0 ) {
+				$retrait = min( - $ecart, $reste );
+				if ( $retrait ) {
+					self::modifier_reparation( $article, - $retrait );
+					$reste -= $retrait;
+				}
+			}
+			if ( $casse || $reste ) {
+				$etat[ $article ] = array( 'casse' => $casse, 'reste' => $reste );
 			}
 		}
-		update_post_meta( $id, self::META_CASSE_STOCK, $nouveau );
+		if ( $etat ) {
+			update_post_meta( $id, self::META_CASSE_STOCK, $etat );
+		} else {
+			delete_post_meta( $id, self::META_CASSE_STOCK );
+		}
+	}
+
+	/**
+	 * Remise en stock par le bureau : retire la quantité de la réparation et de ce qui reste
+	 * en réparation pour les demandes (les plus anciennes d'abord).
+	 *
+	 * @param int $article  Article.
+	 * @param int $quantite Quantité remise en stock.
+	 */
+	public static function remettre_en_stock( $article, $quantite ) {
+		self::modifier_reparation( $article, - $quantite );
+		$ids = get_posts(
+			array(
+				'post_type'     => 'etr_demande',
+				'post_status'   => 'any',
+				'numberposts'   => -1,
+				'fields'        => 'ids',
+				'no_found_rows' => true,
+				'orderby'       => 'ID',
+				'order'         => 'ASC',
+				'meta_key'      => self::META_CASSE_STOCK, // phpcs:ignore WordPress.DB.SlowDBQuery -- demandes avec de la casse.
+			)
+		);
+		foreach ( $ids as $id ) {
+			if ( $quantite <= 0 ) {
+				break;
+			}
+			$etat = self::casse_demande( $id );
+			if ( empty( $etat[ $article ]['reste'] ) ) {
+				continue;
+			}
+			$retrait                    = min( $quantite, $etat[ $article ]['reste'] );
+			$etat[ $article ]['reste'] -= $retrait;
+			$quantite                  -= $retrait;
+			update_post_meta( $id, self::META_CASSE_STOCK, $etat );
+		}
 	}
 
 	/**

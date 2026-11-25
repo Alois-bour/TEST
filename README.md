@@ -123,6 +123,12 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Dates cohérentes et sélecteur de dates (2.7.1)
+
+- **Règles** (vérifiées dans le formulaire et sur le serveur) : événement à venir ; livraison au plus tard le jour de l'événement, au plus tôt 7 jours avant ; reprise au plus tôt le jour de l'événement, après la livraison, au plus tard 7 jours après. Écarts réglables : filtres `etr_jours_livraison_avant` et `etr_jours_reprise_apres`.
+- **Sélecteur** : calendrier limité aux jours possibles, date écrite en toutes lettres (« Samedi 5 décembre 2026 »), raccourcis « La veille », « Le jour même », « Le lendemain », message d'erreur sous le champ. Si l'événement change, une livraison ou une reprise devenue impossible est retirée, avec un message.
+- **Corrections** : devis figé à l'envoi (PDF et acceptation sur le montant envoyé ; retiré s'il n'est pas encore accepté et que la demande ou le tarif changent) ; matériel en réparation compté par demande (une reprise refaite ne remet jamais en stock la casse d'une autre demande) ; acompte de 1 000 € ou plus bien relu ; deux dates changées ensemble : tout ou rien ; relance d'acompte réarmée si la livraison est déplacée ; bon de livraison réglable par filtre ; notifications du traiteur seulement avec des permaliens ; l'historique note de nouveau les modifications du traiteur.
+
 ### Fonctions activables (2.7.0)
 
 Chaque fonction ci-dessous s'active ou se désactive dans **Espace traiteur › Fonctions**. Désactivée, elle disparaît de l'application de l'équipe et de l'espace des traiteurs, et ses routes sont refusées. Ses données sont gardées. Les fonctions qui touchent à l'argent ou envoient des e-mails nouveaux sont désactivées par défaut.

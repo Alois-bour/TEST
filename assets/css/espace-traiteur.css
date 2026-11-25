@@ -1256,3 +1256,32 @@ body.etr-plein-ecran { margin: 0; padding: 0; background: var(--etr-fond-carte, 
 .etr-recommander { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 18px 0; }
 .etr-en-route { display: flex; gap: 10px; align-items: center; }
 .etr-en-route svg { flex: none; width: 20px; height: 20px; }
+
+/* Sélecteur de dates (2.7.1) : champ lisible sur iPhone, date en toutes lettres, raccourcis. */
+.etr-app input[type="date"] {
+	-webkit-appearance: none;
+	appearance: none;
+	position: relative;
+	min-height: 50px;
+	padding-right: 44px;
+	text-align: left;
+	font-variant-numeric: tabular-nums;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='none' stroke='%236b655f' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Crect x='3.5' y='5' width='17' height='15.5' rx='2.5'/%3E%3Cpath d='M3.5 10h17M8 3v4M16 3v4'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 14px center;
+	cursor: pointer;
+}
+.etr-app input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 1.4em; }
+.etr-app input[type="date"]::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: auto; height: auto; opacity: 0; cursor: pointer; }
+.etr-app input[type="date"]:invalid,
+.etr-champ--erreur input[type="date"] { border-color: var(--etr-rouge, #b3261e); }
+.etr-date-aide { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; font-size: 13px; color: var(--etr-gris); }
+.etr-date-aide__lisible { color: var(--etr-encre); font-weight: 500; }
+.etr-date-aide__lisible:empty, .etr-date-aide__message:empty { display: none; }
+.etr-date-aide__lisible::first-letter { text-transform: uppercase; }
+.etr-date-aide__message.est-erreur { color: var(--etr-rouge, #b3261e); font-weight: 500; }
+.etr-date-aide__puces { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.etr-puce-date { min-height: 34px; padding: 6px 12px; border: 1px solid var(--etr-trait); border-radius: 999px; background: var(--etr-fond-carte, #fff); color: var(--etr-encre); font: 500 13px/1 var(--etr-sans); cursor: pointer; }
+.etr-puce-date:hover:not(:disabled) { border-color: var(--etr-olive); }
+.etr-puce-date.est-choisi { border-color: var(--etr-olive); background: var(--etr-olive); color: #fff; }
+.etr-puce-date:disabled { opacity: .4; cursor: default; }
