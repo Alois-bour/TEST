@@ -38,6 +38,14 @@ class ETR_Modules {
 					'reparation'     => array( __( 'Matériel en réparation', 'espace-traiteur' ), __( 'La casse constatée à la reprise sort du stock disponible jusqu’à ce que le bureau la remette en stock (écran Catalogue). Évite de louer du matériel cassé.', 'espace-traiteur' ) ),
 				),
 			),
+			'logistique' => array(
+				__( 'Logistique', 'espace-traiteur' ),
+				array(
+					'volume'            => array( __( 'Volume du camion', 'espace-traiteur' ), __( 'Volume de chaque produit (fiche produit › Inventaire) ; sur chaque demande, volume total et part du camion, alerte quand il faut plusieurs trajets (compté aussi dans l’estimation de la livraison) ; volume à charger sur la tournée du jour.', 'espace-traiteur' ) ),
+					'creneaux'          => array( __( 'Créneaux de livraison et de reprise', 'espace-traiteur' ), __( 'Le traiteur choisit un créneau (matin, après-midi…) ; nombre d’étapes limité par créneau et par jour si vous le souhaitez ; créneau affiché sur la fiche et la tournée.', 'espace-traiteur' ) ),
+					'tournee_optimisee' => array( __( 'Tournée optimisée', 'espace-traiteur' ), __( 'Bouton « Optimiser l’ordre de passage » sur la tournée (bureau) : étapes rangées par créneau, puis au plus court depuis le dépôt (adresse de départ de l’estimation de la livraison).', 'espace-traiteur' ) ),
+				),
+			),
 			'traiteur' => array(
 				__( 'Le traiteur informé en direct', 'espace-traiteur' ),
 				array(
@@ -82,6 +90,9 @@ class ETR_Modules {
 	public static function defauts() {
 		return array(
 			'deplacer_dates'   => true,
+			'volume'           => true,
+			'creneaux'         => false,
+			'tournee_optimisee' => true,
 			'reparation'       => false,
 			'push_traiteur'    => true,
 			'en_route'         => true,

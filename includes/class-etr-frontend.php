@@ -270,6 +270,9 @@ class ETR_Frontend {
 			if ( 'number' === $champ['type'] && '' !== $valeur ) {
 				$valeur = (string) absint( $valeur );
 			}
+			if ( 'select' === $champ['type'] && ! in_array( $valeur, (array) $champ['options'], true ) ) {
+				$valeur = '';
+			}
 			if ( 'date' === $champ['type'] && '' !== $valeur && ! etr_date_valide( $valeur ) ) {
 				self::$erreurs[] = sprintf( __( 'La date « %s » est invalide.', 'espace-traiteur' ), $champ['label'] );
 				$valeur          = '';
@@ -280,6 +283,7 @@ class ETR_Frontend {
 			$donnees[ $cle ] = $valeur;
 		}
 		self::$erreurs = array_merge( self::$erreurs, etr_erreurs_dates( $donnees['date_evenement'], $donnees['date_livraison'], $donnees['date_reprise'], current_time( 'Y-m-d' ) ) );
+		self::$erreurs = (array) apply_filters( 'etr_demande_validation', self::$erreurs, $donnees, $demande_id ); // Créneaux complets…
 		if ( self::$erreurs ) {
 			return;
 		}
@@ -356,6 +360,9 @@ class ETR_Frontend {
 			if ( 'number' === $champ['type'] && '' !== $valeur ) {
 				$valeur = (string) absint( $valeur );
 			}
+			if ( 'select' === $champ['type'] && ! in_array( $valeur, (array) $champ['options'], true ) ) {
+				$valeur = '';
+			}
 			if ( 'date' === $champ['type'] && '' !== $valeur && ! etr_date_valide( $valeur ) ) {
 				/* translators: %s : libellé du champ. */
 				self::$erreurs[] = sprintf( __( 'La date « %s » est invalide.', 'espace-traiteur' ), $champ['label'] );
@@ -370,6 +377,7 @@ class ETR_Frontend {
 
 		$aujourdhui    = current_time( 'Y-m-d' );
 		self::$erreurs = array_merge( self::$erreurs, etr_erreurs_dates( $donnees['date_evenement'], $donnees['date_livraison'], $donnees['date_reprise'], $aujourdhui ) );
+		self::$erreurs = (array) apply_filters( 'etr_demande_validation', self::$erreurs, $donnees, 0 );
 
 		if ( self::$erreurs ) {
 			return;
@@ -1110,7 +1118,7 @@ class ETR_Frontend {
 		$champs     = etr_champs_demande();
 		$groupes    = array(
 			__( 'Événement', 'espace-traiteur' )           => array( 'evenement', 'date_evenement', 'nb_invites', 'lieu', 'contact' ),
-			__( 'Livraison et reprise', 'espace-traiteur' ) => array( 'date_livraison', 'date_reprise' ),
+			__( 'Livraison et reprise', 'espace-traiteur' ) => array( 'date_livraison', 'creneau_livraison', 'date_reprise', 'creneau_reprise' ),
 		);
 		$deja       = array_merge( ...array_values( $groupes ) );
 		$complement = array_diff( array_keys( $champs ), $deja );
@@ -1216,7 +1224,7 @@ class ETR_Frontend {
 		$champs   = etr_champs_demande();
 		$sections = array(
 			array( __( 'Votre événement', 'espace-traiteur' ), '', array( 'evenement', 'date_evenement', 'nb_invites', 'lieu', 'contact' ) ),
-			array( __( 'Livraison et reprise', 'espace-traiteur' ), __( 'Le matériel vous est réservé de la livraison à la reprise. Sans date, il l’est pour le jour de l’événement.', 'espace-traiteur' ), array( 'date_livraison', 'date_reprise' ) ),
+			array( __( 'Livraison et reprise', 'espace-traiteur' ), __( 'Le matériel vous est réservé de la livraison à la reprise. Sans date, il l’est pour le jour de l’événement.', 'espace-traiteur' ), array( 'date_livraison', 'creneau_livraison', 'date_reprise', 'creneau_reprise' ) ),
 		);
 		$places   = array();
 		$numero   = 0;
@@ -1287,6 +1295,12 @@ class ETR_Frontend {
 
 		if ( 'textarea' === $champ['type'] ) {
 			printf( '<textarea id="%1$s" name="etr[%2$s]" rows="3"%3$s>%4$s</textarea>', esc_attr( $id ), esc_attr( $cle ), $requis ? ' required' : '', esc_textarea( $valeur ) );
+		} elseif ( 'select' === $champ['type'] ) {
+			echo '<select id="' . esc_attr( $id ) . '" name="etr[' . esc_attr( $cle ) . ']"' . ( $requis ? ' required' : '' ) . '><option value="">' . esc_html__( '— Indifférent —', 'espace-traiteur' ) . '</option>';
+			foreach ( (array) $champ['options'] as $option ) {
+				echo '<option value="' . esc_attr( $option ) . '"' . selected( $valeur, $option, false ) . '>' . esc_html( $option ) . '</option>';
+			}
+			echo '</select>';
 		} else {
 			$extra = '';
 			if ( 'number' === $champ['type'] ) {

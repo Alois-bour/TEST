@@ -1376,6 +1376,7 @@ class ETR_Gestion {
 			'desactive'  => __( 'Accès désactivé : le traiteur est déconnecté et ne peut plus se connecter.', 'espace-traiteur' ),
 			'reactive'   => __( 'Accès réactivé.', 'espace-traiteur' ),
 			'fait'       => __( 'Enregistré.', 'espace-traiteur' ),
+			'ordre_optimise' => __( 'Ordre de passage optimisé.', 'espace-traiteur' ),
 			'message_envoye' => __( 'Message envoyé : le traiteur est prévenu.', 'espace-traiteur' ),
 			'dates'      => __( 'Dates enregistrées : le traiteur est prévenu.', 'espace-traiteur' ),
 			'devis_envoye' => __( 'Devis envoyé au traiteur.', 'espace-traiteur' ),
@@ -1387,6 +1388,7 @@ class ETR_Gestion {
 			'membre_cree_sans_mail' => __( 'Personne ajoutée, mais l’e-mail d’invitation n’est pas parti. Vérifiez la configuration des e-mails du site, puis renvoyez l’invitation depuis la liste.', 'espace-traiteur' ),
 			'roles_vides'    => __( 'Une personne doit garder au moins un rôle. Pour lui fermer l’application, utilisez « Retirer l’accès ».', 'espace-traiteur' ),
 			'dates_erreur'   => __( 'Dates non enregistrées.', 'espace-traiteur' ),
+			'ordre_impossible' => __( 'Optimisation impossible : adresse de départ introuvable (Espace traiteur › Fonctions › Estimation de la livraison).', 'espace-traiteur' ),
 		);
 		if ( isset( $succes[ $msg ] ) ) {
 			echo '<div class="etr-notice etr-notice--succes" role="status">' . self::icone( 'coche' ) . '<p>' . esc_html( $succes[ $msg ] ) . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput

@@ -126,6 +126,7 @@ class ETR_Terrain {
 		if ( $itineraire ) {
 			echo '<p class="etr-tournee__route"><a class="etr-btn" href="' . esc_url( $itineraire ) . '" target="_blank" rel="noopener">' . self::icone( 'lieu' ) . '<span>' . esc_html__( 'Itinéraire de la tournée', 'espace-traiteur' ) . '</span></a><small>' . esc_html__( 'Toutes les étapes, dans l’ordre (Google Maps).', 'espace-traiteur' ) . '</small></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
+		do_action( 'etr_tournee_haut', $jour, $tournee, $bureau ); // Volume du jour, optimisation de l'ordre.
 		$livreurs = $bureau ? ETR_Operations::livreurs() : array();
 		foreach ( array( 'livraisons' => __( 'Livraisons', 'espace-traiteur' ), 'reprises' => __( 'Reprises', 'espace-traiteur' ) ) as $cle => $titre ) {
 			if ( ! $tournee[ $cle ] ) {
@@ -193,6 +194,7 @@ class ETR_Terrain {
 		} elseif ( ! $confiee ) {
 			echo '<p class="etr-arret__libre">' . esc_html__( 'À répartir : pas encore confiée à un livreur', 'espace-traiteur' ) . '</p>';
 		}
+		do_action( 'etr_tournee_carte_infos', $id, $etape ); // Créneau, volume.
 		if ( $lieu ) {
 			echo '<p class="etr-arret__ligne">' . self::icone( 'lieu' ) . '<span>' . nl2br( esc_html( $lieu ) ) . '</span></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}

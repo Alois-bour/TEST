@@ -45,6 +45,7 @@ require_once ETR_DIR . 'includes/class-etr-materiel.php';
 require_once ETR_DIR . 'includes/class-etr-devis.php';
 require_once ETR_DIR . 'includes/class-etr-pilotage.php';
 require_once ETR_DIR . 'includes/class-etr-estimation.php';
+require_once ETR_DIR . 'includes/class-etr-logistique.php';
 require_once ETR_DIR . 'includes/class-etr-admin.php';
 require_once ETR_DIR . 'includes/class-etr-frontend.php';
 require_once ETR_DIR . 'includes/class-etr-statistiques.php';
@@ -81,6 +82,7 @@ add_action(
 		ETR_Devis::init();
 		ETR_Pilotage::init();
 		ETR_Estimation::init();
+		ETR_Logistique::init();
 		ETR_Admin::init();
 		ETR_Frontend::init();
 		ETR_Gestion::init();

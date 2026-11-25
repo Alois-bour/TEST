@@ -566,6 +566,7 @@ ol.etr-historique { margin: 0; padding: 0 0 0 18px; list-style: none; border-lef
 .etr-app .etr-champ label { display: block; margin: 0 0 6px; font-size: 14px; font-weight: 500; color: var(--etr-encre); }
 .etr-champ__option { font-weight: 400; color: var(--etr-gris); font-size: 13px; }
 .etr-app input[type="text"],
+.etr-app .etr-champ select,
 .etr-app input[type="date"],
 .etr-app input[type="number"],
 .etr-app input[type="search"],
