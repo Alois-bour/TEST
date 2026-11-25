@@ -105,12 +105,30 @@ L'espace de gestion (`/gestion-traiteur/`) s'installe comme une application sur 
 - La personne qui fait l'action n'est jamais notifiée. Toucher une alerte ouvre la demande. Un appareil désactivé ou désinstallé est retiré automatiquement. L'envoi se fait après l'affichage de la page, sans la ralentir.
 - Sécurité : envoi uniquement vers les services de notification connus (Apple, Google, Mozilla, Microsoft) ; enregistrement par l'API `etr/v1/notifications/` réservé à l'équipe connectée, avec jeton.
 
+### Terrain : préparation, étiquettes, tournées (2.0.0)
+
+Le parcours d'une commande validée, entièrement sur le téléphone :
+
+1. **Préparation** (préparateurs) : depuis la fiche, « Préparer » ouvre la liste du matériel. Un toucher coche une ligne (tout est prêt), les boutons − / + règlent une quantité partielle ; chaque changement est enregistré aussitôt. On indique le **nombre de colis**, puis « Commande prête » : les livreurs reçoivent une notification. Une commande incomplète demande confirmation et le manque est noté dans l'historique.
+2. **Étiquettes QR** : une par colis, planche A4 de 8 étiquettes (99 × 67 mm, type Avery L7165) avec le colis (2 / 5), le traiteur, l'événement, la date et le lieu de livraison.
+3. **Scanner** (onglet) : la caméra lit les étiquettes, en mode « Chargement » ou « Retour ». Chaque colis est compté une fois (« 3 / 5 chargés »), avec un son et un message ; une étiquette d'une autre commande ou périmée est refusée. Saisie manuelle possible si l'étiquette est abîmée. Lue avec l'appareil photo de l'iPhone, l'étiquette ouvre la page du colis avec les mêmes boutons.
+4. **Tournée** (livreurs, onglet par défaut) : livraisons et reprises du jour (jour suivant / précédent), adresse avec bouton **Itinéraire** (Plans), téléphone du contact cliquable, état de la préparation et des colis.
+5. **Livraison** : nom de la personne qui réceptionne, **signature au doigt**, photos (réduites sur le téléphone avant l'envoi), remarque. La demande passe en « Livrée » ; le bureau reçoit une notification et le traiteur l'e-mail habituel.
+6. **Reprise** : pour chaque article, quantité rendue et cassée (tout est prérempli), photos, remarque, signature facultative. Sans écart, la demande est clôturée ; sinon elle reste « Livrée » avec le détail des écarts et le bureau est prévenu. Une reprise peut être refaite (matériel retrouvé).
+7. **Rappels de la veille** (vers 17 h) : « Demain : 2 livraisons, 1 reprise » aux livreurs, « À préparer pour demain : … » aux préparateurs pour les commandes pas encore prêtes.
+
+La fiche d'une demande affiche en tête le **Suivi** (préparation, colis, livraison, reprise) et les actions possibles selon le rôle, puis les comptes rendus (signature, photos, écarts).
+
+- **Droits** vérifiés par l'API (`etr/v1/terrain/`) : préparation par les préparateurs, livraison et reprise par les livreurs (le bureau peut tout faire), seulement sur les demandes visibles et au bon statut.
+- **Photos et signatures** : rangées dans `wp-content/uploads/etr-prive/` (accès direct bloqué par un `.htaccess` Apache, noms aléatoires), servies uniquement par l'application à l'équipe qui voit la demande, supprimées avec la demande. Sur un serveur Nginx, ajouter une règle `location ^~ /wp-content/uploads/etr-prive/ { deny all; }`.
+- **Bibliothèques** (dans `assets/vendor/`, licences jointes) : *QR Code Generator* (MIT) pour les étiquettes, *jsQR* (Apache 2.0) pour la lecture, chargée seulement sur l'écran Scanner.
+
 ### Feuille de route
 
 1. ✅ Rôles et application installable (1.8.0).
 2. ✅ Notifications sur l'iPhone (1.9.0) : nouvelle demande et demande annulée pour le bureau ; commande validée, puis annulée ou refusée, pour les préparateurs et les livreurs.
-3. Préparation : bon à cocher sur le téléphone, étiquettes QR, scan à la sortie et au retour.
-4. Tournées : livraisons et reprises du jour, itinéraire, signature, photos, comptage des retours.
+3. ✅ Préparation (2.0.0) : liste à cocher sur le téléphone, colis, étiquettes QR, scan au chargement et au retour.
+4. ✅ Tournées (2.0.0) : livraisons et reprises du jour, itinéraire, signature, photos, comptage des retours et de la casse, rappels de la veille.
 
 ## Page de connexion
 

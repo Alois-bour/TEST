@@ -150,6 +150,17 @@ class ETR_Gestion {
 			self::action_membre();
 		}
 
+		// Photos et signatures (fichiers privés), étiquettes QR (page autonome).
+		// phpcs:disable WordPress.Security.NonceVerification -- simples lectures, droits vérifiés.
+		$vue_demandee = isset( $_GET['vue'] ) ? sanitize_key( wp_unslash( $_GET['vue'] ) ) : '';
+		if ( 'fichier' === $vue_demandee ) {
+			ETR_Fichiers::servir( isset( $_GET['f'] ) ? sanitize_file_name( wp_unslash( $_GET['f'] ) ) : '' );
+		}
+		if ( 'etiquettes' === $vue_demandee ) {
+			ETR_Terrain::etiquettes( isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0 );
+		}
+		// phpcs:enable
+
 		// Bons imprimables : page autonome, hors application.
 		if ( isset( $_GET['vue'], $_GET['id'] ) && 'bon' === $_GET['vue'] ) { // phpcs:ignore WordPress.Security.NonceVerification
 			$id = absint( $_GET['id'] ); // phpcs:ignore WordPress.Security.NonceVerification
@@ -566,7 +577,20 @@ class ETR_Gestion {
 		wp_localize_script( 'espace-traiteur-app', 'etrApp', ETR_PWA::config_script() );
 		if ( ETR_Equipe_Acces::ecran() ) {
 			wp_enqueue_script( 'espace-traiteur-connexion', ETR_URL . 'assets/js/connexion.js', array(), ETR_VERSION, true );
-		} elseif ( is_user_logged_in() && ETR_Push::disponible() ) {
+		} elseif ( is_user_logged_in() ) {
+			wp_enqueue_script( 'espace-traiteur-terrain', ETR_URL . 'assets/js/terrain.js', array(), ETR_VERSION, true );
+			wp_localize_script(
+				'espace-traiteur-terrain',
+				'etrTerrain',
+				array(
+					'api'       => esc_url_raw( rest_url( ETR_Push::API . '/terrain/' ) ),
+					'nonce'     => wp_create_nonce( 'wp_rest' ),
+					'jsqr'      => ETR_URL . 'assets/vendor/jsqr.min.js?ver=' . ETR_VERSION,
+					'maxPhotos' => ETR_Operations::MAX_PHOTOS,
+				)
+			);
+		}
+		if ( ! ETR_Equipe_Acces::ecran() && is_user_logged_in() && ETR_Push::disponible() ) {
 			wp_enqueue_script( 'espace-traiteur-notifications', ETR_URL . 'assets/js/notifications.js', array( 'espace-traiteur-app' ), ETR_VERSION, true );
 			wp_localize_script(
 				'espace-traiteur-notifications',
@@ -838,12 +862,14 @@ class ETR_Gestion {
 			'catalogue'    => array( __( 'Catalogue', 'espace-traiteur' ), 'catalogue' ),
 			'statistiques' => array( __( 'Statistiques', 'espace-traiteur' ), 'demandes' ),
 			'equipe'       => array( __( 'Équipe', 'espace-traiteur' ), 'invites' ),
+			'tournee'      => array( __( 'Tournée', 'espace-traiteur' ), 'camion' ),
+			'scanner'      => array( __( 'Scanner', 'espace-traiteur' ), 'scan' ),
 		);
 		if ( ETR_Equipe::bureau() ) {
 			return $toutes;
 		}
-		// Préparateur et livreur : le planning d'abord, sans prix ni gestion.
-		$cles = array( 'planning', 'demandes' );
+		// Livreur : la tournée d'abord ; préparateur : le planning. Sans prix ni gestion.
+		$cles = ETR_Equipe::livreur() ? array( 'tournee', 'planning', 'demandes', 'scanner' ) : array( 'planning', 'demandes', 'scanner' );
 		if ( ETR_Equipe::preparateur() ) {
 			$cles[] = 'catalogue';
 		}
@@ -875,6 +901,16 @@ class ETR_Gestion {
 		if ( 'notifications' === $vue ) {
 			return 'notifications'; // Pour toute l'équipe, depuis la cloche (pas d'onglet).
 		}
+		// Écrans du terrain (hors onglets) : droits vérifiés ici, puis par l'API à l'enregistrement.
+		$terrain = array(
+			'preparer'  => ETR_Equipe::preparateur(),
+			'livrer'    => ETR_Equipe::livreur(),
+			'reprendre' => ETR_Equipe::livreur(),
+			'colis'     => ETR_Equipe::preparateur() || ETR_Equipe::livreur(),
+		);
+		if ( ! empty( $terrain[ $vue ] ) ) {
+			return $vue;
+		}
 		return array_key_exists( $vue, $vues ) ? $vue : $defaut;
 	}
 
@@ -886,8 +922,15 @@ class ETR_Gestion {
 			ETR_Equipe_Acces::afficher();
 			return;
 		}
-		$vue   = self::vue_courante();
-		$actif = 'demande' === $vue ? 'demandes' : $vue;
+		$vue    = self::vue_courante();
+		$parent = array(
+			'demande'   => 'demandes',
+			'preparer'  => 'demandes',
+			'livrer'    => 'tournee',
+			'reprendre' => 'tournee',
+			'colis'     => 'scanner',
+		);
+		$actif  = isset( $parent[ $vue ] ) ? $parent[ $vue ] : $vue;
 
 		echo '<div class="etr-app etr-gestion">';
 		self::barre_laterale( $actif );
@@ -922,6 +965,24 @@ class ETR_Gestion {
 				break;
 			case 'notifications':
 				self::vue_notifications();
+				break;
+			case 'tournee':
+				ETR_Terrain::vue_tournee();
+				break;
+			case 'scanner':
+				ETR_Terrain::vue_scanner();
+				break;
+			case 'colis':
+				ETR_Terrain::vue_colis();
+				break;
+			case 'preparer':
+				ETR_Terrain::vue_preparer( isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0 ); // phpcs:ignore WordPress.Security.NonceVerification
+				break;
+			case 'livrer':
+				ETR_Terrain::vue_livrer( isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0 ); // phpcs:ignore WordPress.Security.NonceVerification
+				break;
+			case 'reprendre':
+				ETR_Terrain::vue_reprendre( isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0 ); // phpcs:ignore WordPress.Security.NonceVerification
 				break;
 			default:
 				self::vue_tableau();
@@ -1111,7 +1172,7 @@ class ETR_Gestion {
 	 * @param string $action HTML échappé (bouton, badge).
 	 * @param string $retour HTML échappé (lien de retour).
 	 */
-	private static function entete( $titre, $sous = '', $action = '', $retour = '' ) {
+	public static function entete( $titre, $sous = '', $action = '', $retour = '' ) {
 		echo '<div class="etr-page-entete">';
 		echo '<div class="etr-page-entete__texte">';
 		echo $retour; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé par l'appelant.
@@ -1131,6 +1192,9 @@ class ETR_Gestion {
 		$msg    = isset( $_GET['etr_msg'] ) ? sanitize_key( wp_unslash( $_GET['etr_msg'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$succes = array(
 			'statut'     => __( 'Statut enregistré. Le traiteur a été prévenu par e-mail.', 'espace-traiteur' ),
+			'livree'     => __( 'Livraison enregistrée : la demande est « Livrée », le bureau et le traiteur sont prévenus.', 'espace-traiteur' ),
+			'reprise'    => __( 'Reprise enregistrée : tout est revenu, la demande est clôturée.', 'espace-traiteur' ),
+			'reprise_ecarts' => __( 'Reprise enregistrée avec des écarts : le bureau est prévenu.', 'espace-traiteur' ),
 			'enregistre' => __( 'Message enregistré. Le statut n’a pas changé : aucun e-mail n’a été envoyé.', 'espace-traiteur' ),
 			'tarif'      => __( 'Remise et frais de livraison enregistrés.', 'espace-traiteur' ),
 			'cree'       => __( 'Traiteur ajouté. Il a reçu un e-mail pour choisir son mot de passe.', 'espace-traiteur' ),
@@ -1609,7 +1673,9 @@ class ETR_Gestion {
 
 		echo '<div class="etr-dossier">';
 		echo '<div class="etr-dossier__principal">';
+		ETR_Terrain::panneau_suivi( $id ); // En tête : les actions du terrain (préparer, livrer, reprendre).
 		self::panneau_materiel( $id );
+		ETR_Terrain::panneaux_comptes_rendus( $id );
 		self::panneaux_infos( $id );
 		echo '<section class="etr-panneau"><h2 class="etr-panneau__titre">' . esc_html__( 'Historique', 'espace-traiteur' ) . '</h2>' . ETR_Historique::html( $id ) . '</section>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans ETR_Historique::html().
 		echo '</div>';

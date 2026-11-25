@@ -661,3 +661,20 @@ function etr_verifier_cle( $cle, $login ) {
 	ETR_Journal_Liens::lien_ouvert( $login, $cle, $user );
 	return $user;
 }
+
+/**
+ * Change le statut d'une demande (et prévient : historique, e-mail au traiteur, notifications).
+ *
+ * @param int    $demande_id Demande.
+ * @param string $nouveau    Statut.
+ * @return bool Le statut a-t-il changé ?
+ */
+function etr_changer_statut( $demande_id, $nouveau ) {
+	$ancien = etr_get_statut( $demande_id );
+	if ( $ancien === $nouveau || ! array_key_exists( $nouveau, etr_statuts() ) ) {
+		return false;
+	}
+	update_post_meta( $demande_id, '_etr_statut', $nouveau );
+	do_action( 'etr_statut_change', $demande_id, $ancien, $nouveau );
+	return true;
+}
