@@ -26,7 +26,7 @@ delete_option( 'etr_version' );
 delete_option( 'etr_page_id' );
 delete_option( 'etr_categories' );
 delete_option( 'etr_journal_liens' );
-foreach ( array( 'etr_modules', 'etr_hors_service', 'etr_relances_jour', 'etr_cgv_url', 'etr_devis_validite', 'etr_estimation', 'etr_estimation_depart', 'etr_couleurs', 'etr_logistique', 'etr_traiteur_plus', 'etr_stock_plus', 'etr_inventaires', 'etr_alerte_stock_jour', 'etr_facturation', 'etr_stripe', 'etr_acompte_defauts', 'etr_hors_service', 'etr_facture_compteur' ) as $etr_option ) {
+foreach ( array( 'etr_modules', 'etr_hors_service', 'etr_relances_jour', 'etr_cgv_url', 'etr_devis_validite', 'etr_estimation', 'etr_estimation_depart', 'etr_couleurs', 'etr_logistique', 'etr_traiteur_plus', 'etr_stock_plus', 'etr_inventaires', 'etr_alerte_stock_jour', 'etr_facturation', 'etr_stripe', 'etr_acompte_defauts', 'etr_hors_service', 'etr_facture_compteur', 'etr_contrat' ) as $etr_option ) {
 	delete_option( $etr_option ); // Fonctions activables (2.7.0).
 }
 // Compteurs d'essais Face ID par adresse IP (3.0.3).

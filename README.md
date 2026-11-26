@@ -123,6 +123,22 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Contrat de location signé en ligne, avis Google (3.2.0)
+
+Deux fonctions activables (Espace traiteur › Fonctions), désactivées par défaut.
+
+- **Contrat de location signé en ligne** (« contrat ») :
+  - après la validation (et l'acceptation du devis si les devis sont actifs), le traiteur voit « Signer le contrat de location » en tête de sa fiche ; il lit le contrat (matériel et valeur de remplacement, dates, lieu, montant, acompte, caution, conditions de location), indique son nom, signe au doigt et accepte ;
+  - le contrat signé est figé : contenu, nom, date et heure, adresse IP, navigateur, empreinte SHA-256 ; le PDF (signature comprise) est envoyé au traiteur et au bureau, téléchargeable par les deux ;
+  - si le matériel, les dates, le lieu ou les montants changent, le contrat est « à signer de nouveau » (les versions précédentes sont gardées) ; si la demande change pendant la lecture, la signature est refusée ;
+  - réglages : texte des conditions de location (un texte complet est proposé), « contrat à signer avant le paiement en ligne de l'acompte et de la caution » ;
+  - bureau : panneau « Contrat de location » et étape « Contrat » dans l'onglet Argent, tâche « Contrat pas encore signé » dans « À faire », notification à la signature.
+- **Avis Google après une bonne note** (« avis_google », avec « Avis après l'événement ») :
+  - après une note égale ou supérieure au seuil réglé (5, 4 ou 3), le traiteur est invité à laisser aussi un avis sur votre fiche Google ;
+  - le lien passe par le site (clic noté, puis redirection vers Google) ; le bureau voit sur la fiche si le traiteur l'a suivi, et les statistiques comptent les traiteurs envoyés vers Google ;
+  - réglages : lien « Laisser un avis » de la fiche Google (https), note minimale.
+- Extensions : filtre `etr_stripe_peut_payer` (paiement en ligne ouvert ou non), crochet `etr_traiteur_paiement` déjà utilisé par le contrat.
+
 ### Dates de livraison et de reprise : seulement les dates possibles (3.1.2)
 
 - **Formulaire du traiteur** : la livraison et la reprise se choisissent dans une liste des seules dates cohérentes avec l'événement (« Samedi 5 décembre · la veille », « … · le jour de l'événement », « … · le lendemain »). Le calendrier de l'iPhone ignorait les limites et laissait choisir une livraison après l'événement. Sans date d'événement, la liste est désactivée ; si l'événement change, une date devenue impossible est retirée.
