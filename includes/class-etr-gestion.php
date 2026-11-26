@@ -912,15 +912,26 @@ class ETR_Gestion {
 			'equipe'       => array( __( 'Équipe', 'espace-traiteur' ), 'equipe' ),
 			'tournee'      => array( __( 'Tournée', 'espace-traiteur' ), 'camion' ),
 			'scanner'      => array( __( 'Scanner', 'espace-traiteur' ), 'scan' ),
+			'preparations' => array( __( 'À préparer', 'espace-traiteur' ), 'coche' ),
 		);
 		if ( ETR_Equipe::bureau() ) {
-			$ordre = array( 'tableau', 'demandes', 'planning', 'traiteurs', 'tournee', 'scanner', 'catalogue', 'statistiques', 'equipe' );
+			$ordre = array( 'tableau', 'demandes', 'planning', 'traiteurs', 'tournee', 'preparations', 'scanner', 'catalogue', 'statistiques', 'equipe' );
 			/** Écrans ajoutés par les fonctions activables (inventaire, factures…), après les autres. */
 			return (array) apply_filters( 'etr_gestion_vues', array_merge( array_flip( $ordre ), $toutes ) );
 		}
 		// Livreur : la tournée d'abord ; préparateur : le planning. Sans prix ni gestion.
-		$cles = ETR_Equipe::livreur() ? array( 'tournee', 'planning', 'demandes', 'scanner' ) : array( 'planning', 'demandes', 'scanner' );
-		if ( ETR_Equipe::preparateur() ) {
+		// Chacun arrive sur son travail : le livreur sur sa tournée, le préparateur sur « À préparer ».
+		$livreur = user_can( get_current_user_id(), ETR_Equipe::CAP_LIVRER );
+		$prep    = user_can( get_current_user_id(), ETR_Equipe::CAP_PREPARER );
+		$cles    = array();
+		if ( $livreur ) {
+			$cles[] = 'tournee';
+		}
+		if ( $prep ) {
+			$cles[] = 'preparations';
+		}
+		$cles = array_merge( $cles, array( 'planning', 'demandes', 'scanner' ) );
+		if ( $prep ) {
 			$cles[] = 'catalogue';
 		}
 		$vues = array();
@@ -1030,6 +1041,9 @@ class ETR_Gestion {
 				break;
 			case 'tournee':
 				ETR_Terrain::vue_tournee();
+				break;
+			case 'preparations':
+				ETR_Parcours::vue_preparations();
 				break;
 			case 'scanner':
 				ETR_Terrain::vue_scanner();
@@ -1239,6 +1253,9 @@ class ETR_Gestion {
 		if ( ETR_Equipe::livreur() && ! ETR_Equipe::bureau() ) {
 			$tournee               = ETR_Operations::tournee_de( current_datetime()->format( 'Y-m-d' ), get_current_user_id() );
 			$pastilles['tournee'] = count( $tournee['livraisons'] ) + count( $tournee['reprises'] );
+		}
+		if ( ETR_Equipe::preparateur() && ! ETR_Equipe::bureau() ) {
+			$pastilles['preparations'] = ETR_Parcours::urgentes(); // Pour aujourd'hui et demain.
 		}
 		return array_filter( $pastilles );
 	}
@@ -1639,6 +1656,18 @@ class ETR_Gestion {
 		}
 		echo '</ul>';
 
+		// Où en sont les demandes : une case par étape, qui ouvre la liste filtrée.
+		ETR_Parcours::compteurs(
+			array_values(
+				array_filter(
+					self::demandes(),
+					function ( $id ) {
+						return in_array( etr_get_statut( $id ), array( 'en_attente', 'validee', 'livree' ), true );
+					}
+				)
+			)
+		);
+
 		// Ce que le bureau doit faire : devis, acomptes, factures, incidents, messages…
 		ETR_Fiche::a_faire(
 			array_values(
@@ -1864,6 +1893,18 @@ class ETR_Gestion {
 
 		// Filtres traiteur + recherche, puis comptes par statut.
 		list( $base, $liste ) = self::filtrer_demandes( $statut, $traiteur, $q );
+		// Étape du parcours (compteurs de l'accueil) : « À préparer », « Chez le traiteur »…
+		$etape   = isset( $_GET['etape'] ) ? sanitize_key( wp_unslash( $_GET['etape'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+		$etapes  = ETR_Parcours::filtres();
+		if ( isset( $etapes[ $etape ] ) ) {
+			$garder = function ( $id ) use ( $etape ) {
+				return ETR_Parcours::correspond( $id, $etape );
+			};
+			$base   = array_values( array_filter( $base, $garder ) );
+			$liste  = array_values( array_filter( $liste, $garder ) );
+		} else {
+			$etape = '';
+		}
 		$comptes              = array_fill_keys( array_keys( $statuts ), 0 );
 		foreach ( $base as $id ) {
 			$s = etr_get_statut( $id );
@@ -1895,9 +1936,14 @@ class ETR_Gestion {
 				'vue'      => 'demandes',
 				'traiteur' => $traiteur,
 				'q'        => $q,
+				'etape'    => $etape,
 			)
 		);
 
+		if ( $etape ) {
+			/* translators: %s : étape. */
+			echo '<p class="etr-filtre-etape">' . esc_html( sprintf( __( 'Étape : %s', 'espace-traiteur' ), $etapes[ $etape ] ) ) . ' · <a class="etr-lien" href="' . esc_url( self::url( array( 'vue' => 'demandes' ) ) ) . '">' . esc_html__( 'Voir toutes les demandes', 'espace-traiteur' ) . '</a></p>';
+		}
 		echo '<div class="etr-barre-outils">';
 		echo '<nav class="etr-filtres" aria-label="' . esc_attr__( 'Filtrer par statut', 'espace-traiteur' ) . '"><ul>';
 		echo '<li><a href="' . esc_url( self::url( $filtres ) ) . '" aria-current="' . ( '' === $statut ? 'true' : 'false' ) . '">' . esc_html__( 'Toutes', 'espace-traiteur' ) . ' <span>' . esc_html( number_format_i18n( count( $base ) ) ) . '</span></a></li>';
@@ -1983,8 +2029,9 @@ class ETR_Gestion {
 
 		ETR_Fiche::ouvrir( 'resume', $actif, 'etr-dossier' );
 		echo '<div class="etr-dossier__principal">';
-		ETR_Fiche::prochaine_etape( $id );
-		ETR_Terrain::panneau_suivi( $id ); // Les actions du terrain (préparer, livrer, reprendre).
+		// Parcours en sept étapes et ce que la personne doit faire maintenant (ou qui l'on attend).
+		ETR_Parcours::panneau( $id );
+		ETR_Fiche::prochaine_etape( $id ); // Le reste à faire du bureau (devis, acompte, incidents…).
 		self::panneaux_infos( $id );
 		do_action( 'etr_gestion_fiche', $id ); // Extensions (ancien emplacement).
 		echo '</div><aside class="etr-dossier__cote">';
@@ -2142,7 +2189,7 @@ class ETR_Gestion {
 			'annulee'    => __( 'Annulée, le matériel est libéré.', 'espace-traiteur' ),
 		);
 		// Sur téléphone, ce panneau s'ouvre en feuille depuis la barre d'action du bas (app.js).
-		echo '<form class="etr-panneau etr-decision" method="post" action="' . esc_url( self::url_demande( $id ) ) . '" data-feuille="' . esc_attr__( 'Changer le statut', 'espace-traiteur' ) . '" data-feuille-principale>';
+		echo '<form class="etr-panneau etr-decision" method="post" action="' . esc_url( self::url_demande( $id ) ) . '" data-feuille="' . esc_attr__( 'Changer le statut', 'espace-traiteur' ) . '">';
 		wp_nonce_field( 'etr_gestion_decision_' . $id, 'etr_nonce' );
 		echo '<input type="hidden" name="etr_gestion_action" value="decision"><input type="hidden" name="demande_id" value="' . (int) $id . '">';
 		echo '<fieldset><legend class="etr-panneau__titre">' . esc_html__( 'Statut', 'espace-traiteur' ) . '</legend>';

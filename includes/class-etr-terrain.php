@@ -221,6 +221,7 @@ class ETR_Terrain {
 		echo '<div class="etr-arret__tete"><a class="etr-arret__nom" data-hors-ligne href="' . esc_url( self::url( array( 'vue' => 'demande', 'id' => $id ) ) ) . '"><strong>' . esc_html( ETR_Operations::traiteur( $id ) ) . '</strong><span>' . esc_html( get_the_title( $id ) ) . '</span></a>';
 		echo self::badge_preparation( $id, $livraison ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé.
 		echo '</div>';
+		echo self::mini_suite( $id, $livraison ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé.
 		$etape   = $livraison ? 'livraison' : 'reprise';
 		$confiee = ETR_Operations::livreur_de( $id, $etape );
 		if ( $livreurs ) {
@@ -255,11 +256,56 @@ class ETR_Terrain {
 		}
 		do_action( 'etr_tournee_actions', $id, $etape ); // Fonctions activables : « En route ».
 		if ( ETR_Equipe::livreur() ) {
-			echo $livraison // phpcs:ignore WordPress.Security.EscapeOutput
-				? '<a class="etr-btn" data-hors-ligne data-action-etape href="' . esc_url( self::url( array( 'vue' => 'livrer', 'id' => $id ) ) ) . '">' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Livrer', 'espace-traiteur' ) . '</span></a>'
-				: '<a class="etr-btn" data-hors-ligne data-action-etape href="' . esc_url( self::url( array( 'vue' => 'reprendre', 'id' => $id ) ) ) . '">' . self::icone( 'reprise' ) . '<span>' . esc_html__( 'Reprendre', 'espace-traiteur' ) . '</span></a>';
+			if ( ! $livraison ) {
+				echo '<a class="etr-btn" data-hors-ligne data-action-etape href="' . esc_url( self::url( array( 'vue' => 'reprendre', 'id' => $id ) ) ) . '">' . self::icone( 'reprise' ) . '<span>' . esc_html__( 'Reprendre', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			} elseif ( ! $prepa['prete'] ) {
+				// Pas encore prête : on ne part pas avec une commande incomplète (le bureau peut forcer).
+				echo '<span class="etr-btn etr-btn--attente" data-action-etape aria-disabled="true">' . esc_html__( 'Pas encore prête', 'espace-traiteur' ) . '</span>';
+				if ( ETR_Equipe::bureau() ) {
+					echo '<a class="etr-btn etr-btn--discret" data-hors-ligne href="' . esc_url( self::url( array( 'vue' => 'livrer', 'id' => $id ) ) ) . '" data-confirmer="' . esc_attr__( 'La commande n’est pas marquée prête. Livrer quand même ?', 'espace-traiteur' ) . '">' . esc_html__( 'Livrer quand même', 'espace-traiteur' ) . '</a>';
+				}
+			} elseif ( $bilan['colis'] && $bilan['sortis'] < $bilan['colis'] ) {
+				// Prête : d'abord charger (scanner les colis), puis livrer.
+				echo '<a class="etr-btn" data-action-etape href="' . esc_url( self::url( array( 'vue' => 'scanner', 'mode' => 'sortie', 'd' => $id ) ) ) . '">' . self::icone( 'scan' ) . '<span>' . esc_html__( 'Charger les colis', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
+				echo '<a class="etr-btn etr-btn--discret" data-hors-ligne href="' . esc_url( self::url( array( 'vue' => 'livrer', 'id' => $id ) ) ) . '">' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Livrer', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			} else {
+				echo '<a class="etr-btn" data-hors-ligne data-action-etape href="' . esc_url( self::url( array( 'vue' => 'livrer', 'id' => $id ) ) ) . '">' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Livrer', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			}
 		}
 		echo '</div></li>';
+	}
+
+	/**
+	 * Titre d'une étape d'un écran du terrain (« 1 Compter le matériel »…).
+	 *
+	 * @param int    $n     Numéro.
+	 * @param string $titre Titre.
+	 * @param string $aide  Aide (facultative).
+	 * @return string HTML.
+	 */
+	private static function pas( $n, $titre, $aide = '' ) {
+		return '<h2 class="etr-pas-titre"><span class="etr-pas-titre__n" aria-hidden="true">' . (int) $n . '</span><span>' . esc_html( $titre ) . ( $aide ? '<small>' . esc_html( $aide ) . '</small>' : '' ) . '</span></h2>';
+	}
+
+	/**
+	 * Mini-suite d'une étape de tournée : Prête → Chargée → Livrée (ou Livrée → Reprise).
+	 *
+	 * @param int  $id        Demande.
+	 * @param bool $livraison Livraison (sinon reprise).
+	 * @return string HTML.
+	 */
+	private static function mini_suite( $id, $livraison ) {
+		$e      = ETR_Parcours::etapes( $id );
+		$cles   = $livraison ? array( 'preparee', 'chargee', 'livree' ) : array( 'livree', 'reprise' );
+		$html   = '<ol class="etr-mini-suite">';
+		$vu     = false;
+		foreach ( $cles as $cle ) {
+			$fait  = $e[ $cle ][1];
+			$etat  = $fait ? 'est-fait' : ( $vu ? 'est-a-venir' : 'est-courant' );
+			$vu    = $vu || ! $fait;
+			$html .= '<li class="' . $etat . '">' . ( $fait ? self::icone( 'coche' ) : '' ) . '<span>' . esc_html( $e[ $cle ][0] ) . '</span></li>';
+		}
+		return $html . '</ol>';
 	}
 
 	/**
@@ -308,6 +354,7 @@ class ETR_Terrain {
 		/* translators: 1 : préparés, 2 : total. */
 		echo '<p class="etr-prepa__compte"><strong data-prepa-fait>' . esc_html( number_format_i18n( $prepa['prepare'] ) ) . '</strong> / <span data-prepa-total>' . esc_html( number_format_i18n( $prepa['total'] ) ) . '</span> ' . esc_html__( 'articles prêts', 'espace-traiteur' ) . '</p></div>';
 
+		echo self::pas( 1, __( 'Préparer le matériel', 'espace-traiteur' ), __( 'Touchez le rond quand une ligne est complète, ou ajustez la quantité.', 'espace-traiteur' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<ul class="etr-prepa__lignes">';
 		foreach ( $lignes as $index => $ligne ) {
 			$demande = (int) $ligne['quantite'];
@@ -336,10 +383,12 @@ class ETR_Terrain {
 		}
 		echo '</ul>';
 
+		echo self::pas( 2, __( 'Compter les colis', 'espace-traiteur' ), __( 'Une étiquette par colis, à imprimer ensuite.', 'espace-traiteur' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<div class="etr-panneau etr-prepa__fin">';
 		echo '<label class="etr-prepa__colis"><span><strong>' . esc_html__( 'Nombre de colis', 'espace-traiteur' ) . '</strong><small>' . esc_html__( 'Caisses, chariots, piles de tables… une étiquette par colis.', 'espace-traiteur' ) . '</small></span>';
 		echo '<span class="etr-pas"><button type="button" data-action="colis-moins" aria-label="' . esc_attr__( 'Un colis de moins', 'espace-traiteur' ) . '">−</button><input type="number" inputmode="numeric" min="0" max="' . (int) ETR_Operations::MAX_COLIS . '" value="' . (int) $prepa['colis'] . '" data-colis><button type="button" data-action="colis-plus" aria-label="' . esc_attr__( 'Un colis de plus', 'espace-traiteur' ) . '">+</button></span></label>';
 		echo '</div>';
+		echo self::pas( 3, __( 'Valider : commande prête', 'espace-traiteur' ), __( 'Le livreur est prévenu ; collez les étiquettes sur les colis.', 'espace-traiteur' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<div class="etr-barre-action"><p class="etr-prepa__message" data-prepa-message role="status"></p>';
 		echo '<div class="etr-prepa__actions">';
 		echo '<button type="button" class="etr-btn" data-action="prete"' . ( $prepa['prete'] ? ' hidden' : '' ) . '>' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Commande prête', 'espace-traiteur' ) . '</span></button>'; // phpcs:ignore WordPress.Security.EscapeOutput
@@ -463,8 +512,17 @@ class ETR_Terrain {
 	 * Scanner d'étiquettes : chargement ou retour.
 	 */
 	public static function vue_scanner() {
-		ETR_Gestion::entete( __( 'Scanner', 'espace-traiteur' ), __( 'Visez l’étiquette d’un colis : il est compté aussitôt.', 'espace-traiteur' ) );
-		$mode = 'sortie';
+		// phpcs:disable WordPress.Security.NonceVerification -- simple affichage.
+		$mode    = isset( $_GET['mode'] ) && 'retour' === sanitize_key( wp_unslash( $_GET['mode'] ) ) ? 'retour' : 'sortie';
+		$demande = isset( $_GET['d'] ) ? absint( $_GET['d'] ) : 0;
+		// phpcs:enable
+		$retour  = $demande && ETR_Gestion::demande_visible( $demande ) ? self::retour_demande( $demande ) : '';
+		ETR_Gestion::entete( 'sortie' === $mode && $retour ? __( 'Charger les colis', 'espace-traiteur' ) : __( 'Scanner', 'espace-traiteur' ), __( 'Visez l’étiquette d’un colis : il est compté aussitôt.', 'espace-traiteur' ), '', $retour );
+		if ( $retour ) {
+			$bilan = ETR_Operations::bilan_colis( $demande );
+			/* translators: 1 : traiteur et événement, 2 : chargés ou revenus, 3 : colis. */
+			echo '<p class="etr-scanner__contexte">' . esc_html( sprintf( 'sortie' === $mode ? __( '%1$s : %2$s / %3$s colis chargés', 'espace-traiteur' ) : __( '%1$s : %2$s / %3$s colis revenus', 'espace-traiteur' ), ETR_Operations::traiteur( $demande ) . ' — ' . get_the_title( $demande ), number_format_i18n( 'sortie' === $mode ? $bilan['sortis'] : $bilan['revenus'] ), number_format_i18n( $bilan['colis'] ) ) ) . '</p>';
+		}
 		echo '<div class="etr-scanner" data-etr-scanner>';
 		echo '<div class="etr-segments" role="radiogroup" aria-label="' . esc_attr__( 'Type de scan', 'espace-traiteur' ) . '">';
 		echo '<label><input type="radio" name="etr-mode" value="sortie"' . checked( $mode, 'sortie', false ) . '><span>' . esc_html__( 'Chargement', 'espace-traiteur' ) . '</span></label>';
@@ -474,7 +532,7 @@ class ETR_Terrain {
 		echo '<button type="button" class="etr-btn etr-scanner__demarrer" data-action="camera">' . self::icone( 'scan' ) . '<span>' . esc_html__( 'Ouvrir la caméra', 'espace-traiteur' ) . '</span></button></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<div class="etr-scanner__resultat" data-resultat role="status" aria-live="polite" hidden></div>';
 		echo '<details class="etr-scanner__manuel"><summary>' . esc_html__( 'Étiquette abîmée ? Saisir les numéros', 'espace-traiteur' ) . '</summary>';
-		echo '<form data-manuel><label>' . esc_html__( 'Demande n°', 'espace-traiteur' ) . '<input type="number" inputmode="numeric" name="d" min="1" required></label>';
+		echo '<form data-manuel><label>' . esc_html__( 'Demande n°', 'espace-traiteur' ) . '<input type="number" inputmode="numeric" name="d" min="1" required' . ( $retour ? ' value="' . (int) $demande . '"' : '' ) . '></label>';
 		echo '<label>' . esc_html__( 'Colis n°', 'espace-traiteur' ) . '<input type="number" inputmode="numeric" name="c" min="1" required></label>';
 		echo '<button type="submit" class="etr-btn etr-btn--discret">' . esc_html__( 'Compter', 'espace-traiteur' ) . '</button></form></details>';
 		echo '<h2 class="etr-scanner__titre">' . esc_html__( 'Scans de cette session', 'espace-traiteur' ) . '</h2><ul class="etr-scanner__historique" data-historique><li class="etr-muted">' . esc_html__( 'Aucun pour l’instant.', 'espace-traiteur' ) . '</li></ul>';
@@ -527,17 +585,24 @@ class ETR_Terrain {
 		ETR_Gestion::entete( __( 'Livraison', 'espace-traiteur' ), ETR_Operations::traiteur( $id ) . ' — ' . get_the_title( $id ), '', self::retour_demande( $id ) );
 
 		echo '<form class="etr-terrain-form" data-etr-envoi="livraison" data-id="' . (int) $id . '" novalidate>';
+		if ( ! ETR_Operations::preparation( $id )['prete'] ) {
+			echo '<p class="etr-alerte">' . self::icone( 'alerte' ) . esc_html__( 'Cette commande n’est pas marquée prête : vérifiez le matériel avant de livrer.', 'espace-traiteur' ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		}
+		echo self::pas( 1, __( 'Vérifier le matériel', 'espace-traiteur' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
 		self::recap_materiel( $id );
 		if ( $bilan['colis'] && $bilan['sortis'] < $bilan['colis'] ) {
 			/* translators: 1 : colis chargés, 2 : total. */
 			echo '<p class="etr-alerte">' . self::icone( 'alerte' ) . esc_html( sprintf( __( 'Seulement %1$s colis sur %2$s ont été scannés au chargement.', 'espace-traiteur' ), number_format_i18n( $bilan['sortis'] ), number_format_i18n( $bilan['colis'] ) ) ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
-		echo '<section class="etr-panneau"><h2 class="etr-panneau__titre">' . esc_html__( 'Réception', 'espace-traiteur' ) . '</h2>';
+		echo self::pas( 2, __( 'Faire signer la réception', 'espace-traiteur' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '<section class="etr-panneau">';
 		echo '<p class="etr-champ"><label for="etr-signataire">' . esc_html__( 'Nom de la personne qui réceptionne', 'espace-traiteur' ) . '</label><input type="text" id="etr-signataire" name="signataire" autocomplete="name" required></p>';
 		self::zone_signature( __( 'Signature', 'espace-traiteur' ), true );
 		echo '</section>';
-		self::zone_photos( __( 'Photos du matériel livré (facultatif)', 'espace-traiteur' ) );
+		echo self::pas( 3, __( 'Photos et remarque', 'espace-traiteur' ), __( 'Facultatif : l’état du matériel à la livraison.', 'espace-traiteur' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
+		self::zone_photos( __( 'Photos du matériel livré', 'espace-traiteur' ) );
 		self::zone_note();
+		echo self::pas( 4, __( 'Valider la livraison', 'espace-traiteur' ), __( 'Le traiteur reçoit le bon de livraison signé.', 'espace-traiteur' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<div class="etr-barre-action"><p class="etr-prepa__message" data-envoi-message role="status"></p>';
 		echo '<button type="submit" class="etr-btn etr-btn--plein">' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Valider la livraison', 'espace-traiteur' ) . '</span></button></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '</form>';
@@ -556,7 +621,8 @@ class ETR_Terrain {
 		ETR_Gestion::entete( __( 'Reprise', 'espace-traiteur' ), ETR_Operations::traiteur( $id ) . ' — ' . get_the_title( $id ), '', self::retour_demande( $id ) );
 
 		echo '<form class="etr-terrain-form" data-etr-envoi="reprise" data-id="' . (int) $id . '" novalidate>';
-		echo '<section class="etr-panneau"><h2 class="etr-panneau__titre">' . esc_html__( 'Matériel rendu', 'espace-traiteur' ) . '</h2>';
+		echo self::pas( 1, __( 'Compter le matériel rendu', 'espace-traiteur' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '<section class="etr-panneau">';
 		echo '<p class="etr-muted">' . esc_html__( 'Comptez ce qui revient. Tout est prérempli : corrigez seulement ce qui manque ou est cassé.', 'espace-traiteur' ) . '</p>';
 		echo '<ul class="etr-reprise__lignes">';
 		foreach ( etr_get_lignes( $id ) as $index => $ligne ) {
@@ -571,15 +637,18 @@ class ETR_Terrain {
 		echo '</ul>';
 		if ( $bilan['colis'] ) {
 			/* translators: 1 : colis revenus, 2 : total. */
-			echo '<p class="etr-muted">' . esc_html( sprintf( __( 'Colis scannés au retour : %1$s / %2$s (depuis l’onglet Scanner, mode « Retour »).', 'espace-traiteur' ), number_format_i18n( $bilan['revenus'] ), number_format_i18n( $bilan['colis'] ) ) ) . '</p>';
+			echo '<p class="etr-muted">' . esc_html( sprintf( __( 'Colis scannés au retour : %1$s / %2$s.', 'espace-traiteur' ), number_format_i18n( $bilan['revenus'] ), number_format_i18n( $bilan['colis'] ) ) ) . ' <a class="etr-lien" href="' . esc_url( self::url( array( 'vue' => 'scanner', 'mode' => 'retour', 'd' => $id ) ) ) . '">' . esc_html__( 'Scanner les colis revenus', 'espace-traiteur' ) . '</a></p>';
 		}
 		echo '</section>';
+		echo self::pas( 2, __( 'Photos et remarque', 'espace-traiteur' ), __( 'Photographiez la casse : elle sert à la facturer.', 'espace-traiteur' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
 		self::zone_photos( __( 'Photos (casse, état du matériel)', 'espace-traiteur' ) );
 		self::zone_note();
+		echo self::pas( 3, __( 'Signature du client', 'espace-traiteur' ), __( 'Facultatif.', 'espace-traiteur' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<details class="etr-panneau etr-reprise__signature"><summary>' . esc_html__( 'Faire signer le client (facultatif)', 'espace-traiteur' ) . '</summary>';
 		echo '<p class="etr-champ"><label for="etr-signataire">' . esc_html__( 'Nom', 'espace-traiteur' ) . '</label><input type="text" id="etr-signataire" name="signataire" autocomplete="name"></p>';
 		self::zone_signature( __( 'Signature', 'espace-traiteur' ), false );
 		echo '</details>';
+		echo self::pas( 4, __( 'Valider la reprise', 'espace-traiteur' ), __( 'Sans écart, la demande est clôturée ; sinon le bureau est prévenu.', 'espace-traiteur' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<div class="etr-barre-action"><p class="etr-prepa__message" data-envoi-message role="status"></p>';
 		echo '<button type="submit" class="etr-btn etr-btn--plein">' . self::icone( 'coche' ) . '<span>' . esc_html__( 'Valider la reprise', 'espace-traiteur' ) . '</span></button></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '</form>';

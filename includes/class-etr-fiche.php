@@ -199,28 +199,24 @@ class ETR_Fiche {
 		if ( ! ETR_Equipe::bureau() ) {
 			return;
 		}
-		$taches = self::taches( $id );
+		// Valider et régler les écarts : dans le parcours ; ici, le reste (devis, acompte, incidents…).
+		$taches = array_values(
+			array_filter(
+				self::taches( $id ),
+				function ( $t ) {
+					return ! in_array( $t['cle'], array( 'etudier', 'ecarts' ), true );
+				}
+			)
+		);
 		if ( ! $taches ) {
 			return;
 		}
-		$premiere = $taches[0];
-		$url      = 'resume' === $premiere['onglet'] ? '' : ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id, 'onglet' => $premiere['onglet'] ) );
-		echo '<section class="etr-prochaine' . ( $premiere['urgent'] ? ' etr-prochaine--urgent' : '' ) . '" aria-label="' . esc_attr__( 'Prochaine étape', 'espace-traiteur' ) . '">';
-		echo '<p class="etr-prochaine__sur">' . esc_html__( 'Prochaine étape', 'espace-traiteur' ) . '</p>';
-		echo '<p class="etr-prochaine__texte">' . esc_html( $premiere['texte'] ) . '</p>';
-		if ( 'etudier' === $premiere['cle'] ) {
-			echo '<button type="button" class="etr-btn" data-ouvrir-statut>' . esc_html__( 'Valider ou refuser', 'espace-traiteur' ) . '</button>';
-		} elseif ( $url ) {
-			echo '<a class="etr-btn" href="' . esc_url( $url ) . '" data-onglet="' . esc_attr( $premiere['onglet'] ) . '">' . esc_html__( 'Y aller', 'espace-traiteur' ) . ETR_Gestion::icone( 'suite' ) . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique.
+		echo '<section class="etr-aussi" aria-labelledby="etr-aussi-' . (int) $id . '"><h2 class="etr-aussi__titre" id="etr-aussi-' . (int) $id . '">' . esc_html__( 'Aussi à faire', 'espace-traiteur' ) . '</h2><ul>';
+		foreach ( $taches as $t ) {
+			$url = ETR_Gestion::url( array_merge( array( 'vue' => 'demande', 'id' => $id ), 'resume' === $t['onglet'] ? array() : array( 'onglet' => $t['onglet'] ) ) );
+			echo '<li' . ( $t['urgent'] ? ' class="est-urgent"' : '' ) . '><a href="' . esc_url( $url ) . '" data-onglet="' . esc_attr( $t['onglet'] ) . '"><span>' . esc_html( $t['texte'] ) . '</span>' . ETR_Gestion::icone( 'suite' ) . '</a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique.
 		}
-		if ( count( $taches ) > 1 ) {
-			echo '<ul class="etr-prochaine__autres">';
-			foreach ( array_slice( $taches, 1 ) as $t ) {
-				echo '<li><a href="' . esc_url( ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id, 'onglet' => $t['onglet'] ) ) ) . '" data-onglet="' . esc_attr( $t['onglet'] ) . '">' . esc_html( $t['texte'] ) . '</a></li>';
-			}
-			echo '</ul>';
-		}
-		echo '</section>';
+		echo '</ul></section>';
 	}
 
 	/* ------------------------------------------------------------------ */
