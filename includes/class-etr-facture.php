@@ -106,6 +106,10 @@ class ETR_Facture {
 					if ( isset( $s['prochain'] ) && absint( $s['prochain'] ) > (int) $p['prochain'] ) {
 						$p['prochain'] = absint( $s['prochain'] );
 					}
+					// Année du compteur : écrite par la numérotation (pas par le formulaire), à garder.
+					if ( isset( $s['annee'] ) && preg_match( '/^\d{4}$/', (string) $s['annee'] ) ) {
+						$p['annee'] = (int) $s['annee'];
+					}
 					return $p;
 				},
 			)
@@ -285,6 +289,36 @@ class ETR_Facture {
 	}
 
 	/**
+	 * Ce qui est déjà réglé sur une facture, calculé à chaque fois (un acompte reçu ou une caution
+	 * débitée après l'émission comptent aussi) : rien n'est payé deux fois.
+	 *
+	 * @param int        $id Demande.
+	 * @param array|null $f  Facture (par défaut celle de la demande).
+	 * @return array { acompte, caution, reste }
+	 */
+	public static function reglements( $id, $f = null ) {
+		$f       = null === $f ? self::facture( $id ) : $f;
+		$ttc     = $f ? (float) $f['ttc'] : 0.0;
+		$acompte = 0.0;
+		$a       = class_exists( 'ETR_Devis' ) ? ETR_Devis::acompte( $id ) : array();
+		if ( ! empty( $a['acompte'] ) && ! empty( $a['acompte_recu'] ) ) {
+			$acompte = (float) $a['acompte'];
+		}
+		$caution = 0.0;
+		$s       = class_exists( 'ETR_Stripe' ) ? ETR_Stripe::paiements( $id ) : array();
+		if ( isset( $s['caution']['statut'], $s['caution']['debite'] ) && 'debitee' === $s['caution']['statut'] ) {
+			$caution = (float) $s['caution']['debite']; // Casse et manquants déjà prélevés sur la caution.
+		}
+		$acompte = min( $ttc, $acompte );
+		$caution = min( $ttc - $acompte, $caution );
+		return array(
+			'acompte' => round( $acompte, 2 ),
+			'caution' => round( $caution, 2 ),
+			'reste'   => round( max( 0, $ttc - $acompte - $caution ), 2 ),
+		);
+	}
+
+	/**
 	 * Établit la facture (une seule fois) : numéro, contenu figé, émetteur et client.
 	 *
 	 * @param int $id Demande.
@@ -346,10 +380,14 @@ class ETR_Facture {
 		/* translators: 1 : numéro, 2 : événement. */
 		$corps .= sprintf( __( 'Veuillez trouver ci-joint la facture %1$s pour « %2$s ».', 'espace-traiteur' ), $f['numero'], get_the_title( $id ) ) . "\n\n";
 		$corps .= __( 'Total TTC', 'espace-traiteur' ) . ' : ' . ETR_Devis::prix( $f['ttc'] ) . "\n";
-		if ( $f['acompte'] > 0 ) {
-			$corps .= __( 'Acompte déjà réglé', 'espace-traiteur' ) . ' : ' . ETR_Devis::prix( $f['acompte'] ) . "\n";
+		$r = self::reglements( $id, $f );
+		if ( $r['acompte'] > 0 ) {
+			$corps .= __( 'Acompte déjà réglé', 'espace-traiteur' ) . ' : ' . ETR_Devis::prix( $r['acompte'] ) . "\n";
 		}
-		$corps .= __( 'Reste à payer', 'espace-traiteur' ) . ' : ' . ETR_Devis::prix( $f['reste'] ) . "\n";
+		if ( $r['caution'] > 0 ) {
+			$corps .= __( 'Déjà prélevé sur la caution', 'espace-traiteur' ) . ' : ' . ETR_Devis::prix( $r['caution'] ) . "\n";
+		}
+		$corps .= __( 'Reste à payer', 'espace-traiteur' ) . ' : ' . ETR_Devis::prix( $r['reste'] ) . "\n";
 		$corps .= __( 'Échéance', 'espace-traiteur' ) . ' : ' . etr_format_date( $f['echeance'] ) . "\n\n";
 		$corps .= __( 'Voir la demande :', 'espace-traiteur' ) . ' ' . etr_url( array( 'etr_vue' => 'demande', 'id' => $id ) ) . "\n";
 		$envoye = etr_envoyer_mail( $user->user_email, $objet, $corps, array(), array( $fichier ) );
@@ -430,7 +468,7 @@ class ETR_Facture {
 		}
 		/* translators: 1 : numéro, 2 : date, 3 : TTC. */
 		echo '<p><strong>' . esc_html( $f['numero'] ) . '</strong> · ' . esc_html( sprintf( __( 'du %1$s · %2$s TTC', 'espace-traiteur' ), wp_date( 'j F Y', (int) $f['le'] ), ETR_Devis::prix( $f['ttc'] ) ) ) . '</p>';
-		echo $f['payee'] ? '<p class="etr-pastille-etat etr-pastille-etat--ok">' . esc_html( sprintf( /* translators: %s : date. */ __( 'Payée le %s', 'espace-traiteur' ), etr_format_date( $f['payee'] ) ) ) . '</p>' : '<p class="etr-pastille-etat etr-pastille-etat--cours">' . esc_html( sprintf( /* translators: 1 : montant, 2 : date. */ __( 'Reste %1$s à payer avant le %2$s', 'espace-traiteur' ), ETR_Devis::prix( $f['reste'] ), etr_format_date( $f['echeance'] ) ) ) . '</p>';
+		echo $f['payee'] ? '<p class="etr-pastille-etat etr-pastille-etat--ok">' . esc_html( sprintf( /* translators: %s : date. */ __( 'Payée le %s', 'espace-traiteur' ), etr_format_date( $f['payee'] ) ) ) . '</p>' : '<p class="etr-pastille-etat etr-pastille-etat--cours">' . esc_html( sprintf( /* translators: 1 : montant, 2 : date. */ __( 'Reste %1$s à payer avant le %2$s', 'espace-traiteur' ), ETR_Devis::prix( self::reglements( $id, $f )['reste'] ), etr_format_date( $f['echeance'] ) ) ) . '</p>';
 		echo '<p><a class="etr-lien" target="_blank" href="' . esc_url( self::url_pdf( $id ) ) . '">' . esc_html__( 'Voir la facture (PDF)', 'espace-traiteur' ) . '</a></p>';
 		echo '<form method="post" class="etr-facture__payee" action="' . esc_url( $url ) . '">' . wp_nonce_field( 'etr_facture_' . $id, 'etr_nonce', true, false ) . '<input type="hidden" name="etr_gestion_action" value="facture"><input type="hidden" name="quoi" value="payee"><input type="hidden" name="demande_id" value="' . (int) $id . '"><label>' . esc_html__( 'Payée le', 'espace-traiteur' ) . ' <input type="date" name="payee" value="' . esc_attr( $f['payee'] ) . '"></label> <button type="submit" class="etr-btn etr-btn--discret">' . esc_html__( 'Enregistrer', 'espace-traiteur' ) . '</button></form>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<form method="post" action="' . esc_url( $url ) . '">' . wp_nonce_field( 'etr_facture_' . $id, 'etr_nonce', true, false ) . '<input type="hidden" name="etr_gestion_action" value="facture"><input type="hidden" name="quoi" value="envoyer"><input type="hidden" name="demande_id" value="' . (int) $id . '"><button type="submit" class="etr-btn etr-btn--discret">' . esc_html__( 'Renvoyer au traiteur', 'espace-traiteur' ) . '</button></form></section>'; // phpcs:ignore WordPress.Security.EscapeOutput
@@ -481,7 +519,7 @@ class ETR_Facture {
 		echo '<section class="etr-panneau etr-encart-traiteur"><h2 class="etr-panneau__titre">' . esc_html__( 'Facture', 'espace-traiteur' ) . '</h2>';
 		/* translators: 1 : numéro, 2 : montant. */
 		echo '<p>' . esc_html( sprintf( __( 'Facture %1$s · %2$s TTC', 'espace-traiteur' ), $f['numero'], ETR_Devis::prix( $f['ttc'] ) ) ) . ' — <a class="etr-lien" href="' . esc_url( self::url_pdf( $id ) ) . '">' . esc_html__( 'Télécharger (PDF)', 'espace-traiteur' ) . '</a></p>';
-		echo $f['payee'] ? '<p class="etr-notice etr-notice--succes">' . esc_html( sprintf( /* translators: %s : date. */ __( 'Réglée le %s. Merci !', 'espace-traiteur' ), etr_format_date( $f['payee'] ) ) ) . '</p>' : '<p>' . esc_html( sprintf( /* translators: 1 : montant, 2 : date. */ __( 'Reste à payer : %1$s avant le %2$s.', 'espace-traiteur' ), ETR_Devis::prix( $f['reste'] ), etr_format_date( $f['echeance'] ) ) ) . '</p>';
+		echo $f['payee'] ? '<p class="etr-notice etr-notice--succes">' . esc_html( sprintf( /* translators: %s : date. */ __( 'Réglée le %s. Merci !', 'espace-traiteur' ), etr_format_date( $f['payee'] ) ) ) . '</p>' : '<p>' . esc_html( sprintf( /* translators: 1 : montant, 2 : date. */ __( 'Reste à payer : %1$s avant le %2$s.', 'espace-traiteur' ), ETR_Devis::prix( self::reglements( $id, $f )['reste'] ), etr_format_date( $f['echeance'] ) ) ) . '</p>';
 		do_action( 'etr_facture_encart_traiteur', $id, $f ); // Paiement en ligne du solde (Stripe).
 		echo '</section>';
 	}
@@ -614,9 +652,15 @@ class ETR_Facture {
 			array( sprintf( __( 'TVA %s %%', 'espace-traiteur' ), number_format_i18n( $f['taux'], fmod( $f['taux'], 1 ) ? 1 : 0 ) ), $f['tva'], false ),
 			array( __( 'Total TTC', 'espace-traiteur' ), $f['ttc'], true ),
 		);
-		if ( $f['acompte'] > 0 ) {
-			$totaux[] = array( __( 'Acompte réglé', 'espace-traiteur' ), - $f['acompte'], false );
-			$totaux[] = array( __( 'Reste à payer', 'espace-traiteur' ), $f['reste'], true );
+		$r = self::reglements( $id, $f );
+		if ( $r['acompte'] > 0 ) {
+			$totaux[] = array( __( 'Acompte réglé', 'espace-traiteur' ), - $r['acompte'], false );
+		}
+		if ( $r['caution'] > 0 ) {
+			$totaux[] = array( __( 'Prélevé sur la caution', 'espace-traiteur' ), - $r['caution'], false );
+		}
+		if ( $r['acompte'] > 0 || $r['caution'] > 0 ) {
+			$totaux[] = array( __( 'Reste à payer', 'espace-traiteur' ), $r['reste'], true );
 		}
 		foreach ( $totaux as $t ) {
 			$y += 16;
@@ -703,7 +747,7 @@ class ETR_Facture {
 			return;
 		}
 		$ttc = array_sum( array_map( function ( $l ) { return $l['facture']['ttc']; }, $liste ) );
-		$du  = array_sum( array_map( function ( $l ) { return $l['facture']['payee'] ? 0 : $l['facture']['reste']; }, $liste ) );
+		$du  = array_sum( array_map( function ( $l ) { return $l['facture']['payee'] ? 0 : self::reglements( $l['id'], $l['facture'] )['reste']; }, $liste ) );
 		/* translators: 1 : total, 2 : reste dû. */
 		echo '<p class="etr-factures__total">' . esc_html( sprintf( __( 'Total : %1$s TTC · reste dû : %2$s', 'espace-traiteur' ), ETR_Devis::prix( $ttc ), ETR_Devis::prix( $du ) ) ) . '</p>';
 		echo '<div class="etr-table-cadre"><table class="etr-table"><thead><tr><th>' . esc_html__( 'Numéro', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'Client', 'espace-traiteur' ) . '</th><th class="etr-table__nombre">' . esc_html__( 'TTC', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'État', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
@@ -736,12 +780,13 @@ class ETR_Facture {
 		header( 'Content-Disposition: attachment; filename="factures' . ( $mois ? '-' . $mois : '' ) . '.csv"' );
 		$sortie = fopen( 'php://output', 'w' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
 		fwrite( $sortie, "\xEF\xBB\xBF" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
-		$entetes = array( 'Numéro', 'Date', 'Échéance', 'Client', 'Demande', 'Total HT', 'TVA', 'Taux TVA', 'Total TTC', 'Acompte réglé', 'Reste à payer', 'Payée le', 'Paiement Stripe' );
+		$entetes = array( 'Numéro', 'Date', 'Échéance', 'Client', 'Demande', 'Total HT', 'TVA', 'Taux TVA', 'Total TTC', 'Acompte réglé', 'Prélevé sur la caution', 'Reste à payer', 'Payée le', 'Paiement Stripe' );
 		fwrite( $sortie, implode( ';', array_map( $cellule, $entetes ) ) . "\r\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
 		foreach ( array_reverse( self::factures( $mois ) ) as $l ) {
 			$f      = $l['facture'];
 			$stripe = class_exists( 'ETR_Stripe' ) ? ETR_Stripe::resume_paiements( $l['id'] ) : '';
-			$ligne  = array( $f['numero'], wp_date( 'd/m/Y', (int) $f['le'] ), gmdate( 'd/m/Y', strtotime( $f['echeance'] ) ), $f['client']['nom'], '#' . $l['id'] . ' ' . get_the_title( $l['id'] ), $nombre( $f['ht'] ), $nombre( $f['tva'] ), $nombre( $f['taux'] ), $nombre( $f['ttc'] ), $nombre( $f['acompte'] ), $nombre( $f['reste'] ), $f['payee'] ? gmdate( 'd/m/Y', strtotime( $f['payee'] ) ) : '', $stripe );
+			$r      = self::reglements( $l['id'], $f );
+			$ligne  = array( $f['numero'], wp_date( 'd/m/Y', (int) $f['le'] ), gmdate( 'd/m/Y', strtotime( $f['echeance'] ) ), $f['client']['nom'], '#' . $l['id'] . ' ' . get_the_title( $l['id'] ), $nombre( $f['ht'] ), $nombre( $f['tva'] ), $nombre( $f['taux'] ), $nombre( $f['ttc'] ), $nombre( $r['acompte'] ), $nombre( $r['caution'] ), $nombre( $r['reste'] ), $f['payee'] ? gmdate( 'd/m/Y', strtotime( $f['payee'] ) ) : '', $stripe );
 			fwrite( $sortie, implode( ';', array_map( $cellule, $ligne ) ) . "\r\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
 		}
 		fclose( $sortie ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose

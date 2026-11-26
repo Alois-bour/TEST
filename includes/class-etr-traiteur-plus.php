@@ -609,6 +609,12 @@ class ETR_Traiteur_Plus {
 			if ( ! self::peut_gerer_societe() || ! wp_verify_nonce( $nonce, 'etr_retirer_collaborateur_' . $membre ) || (int) get_user_meta( $membre, 'etr_societe', true ) !== get_current_user_id() ) {
 				wp_die( esc_html__( 'Action non autorisée.', 'espace-traiteur' ), '', array( 'response' => 403 ) );
 			}
+			// Ses demandes restent à la société : elles passent au compte principal avant de couper le lien.
+			$siennes = get_posts( array( 'post_type' => 'etr_demande', 'post_status' => 'any', 'author' => $membre, 'numberposts' => -1, 'fields' => 'ids' ) );
+			foreach ( $siennes as $demande ) {
+				wp_update_post( array( 'ID' => $demande, 'post_author' => get_current_user_id() ) );
+				ETR_Historique::ajouter( $demande, 'modification', sprintf( /* translators: %s : collaborateur. */ __( 'Demande rattachée au compte principal (accès de %s retiré)', 'espace-traiteur' ), etr_nom( get_userdata( $membre ) ) ) );
+			}
 			delete_user_meta( $membre, 'etr_societe' );
 			if ( ! ETR_Comptes::est_desactive( $membre ) ) {
 				ETR_Traiteurs::basculer_acces( $membre ); // Désactivé et déconnecté ; ses demandes restent à la société.
