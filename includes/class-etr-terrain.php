@@ -864,7 +864,7 @@ class ETR_Terrain {
 			$ecarts = ETR_Operations::texte_ecarts( (int) $reprise['manquants'], (int) $reprise['casses'] );
 			echo '<section class="etr-panneau etr-cr"><h2 class="etr-panneau__titre">' . esc_html__( 'Reprise', 'espace-traiteur' ) . '</h2>';
 			/* translators: 1 : date, 2 : livreur. */
-			echo '<p>' . esc_html( sprintf( __( 'Reprise le %1$s par %2$s.', 'espace-traiteur' ), wp_date( 'j F Y, H:i', $reprise['le'] ), etr_nom( get_userdata( $reprise['par'] ) ) ) ) . ' <strong class="' . ( $ecarts ? 'etr-manque' : 'etr-ok' ) . '">' . esc_html( $ecarts ? $ecarts : __( 'Complète, en bon état.', 'espace-traiteur' ) ) . '</strong></p>';
+			echo '<p>' . esc_html( sprintf( __( 'Reprise le %1$s par %2$s.', 'espace-traiteur' ), wp_date( 'j F Y, H:i', $reprise['le'] ), etr_nom( get_userdata( (int) ( $reprise['par'] ?? 0 ) ) ) ) ) . ' <strong class="' . ( $ecarts ? 'etr-manque' : 'etr-ok' ) . '">' . esc_html( $ecarts ? $ecarts : __( 'Complète, en bon état.', 'espace-traiteur' ) ) . '</strong></p>';
 			if ( $ecarts ) {
 				echo '<div class="etr-table-cadre etr-cr__ecarts" tabindex="0" role="region" aria-label="' . esc_attr__( 'Écarts à la reprise', 'espace-traiteur' ) . '"><table class="etr-table"><thead><tr><th>' . esc_html__( 'Article', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'Livrés', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'Rendus', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'Manquants', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'Cassés', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
 				foreach ( etr_get_lignes( $id ) as $index => $ligne ) {

@@ -338,4 +338,69 @@ class ETR_Fiche {
 		}
 		echo '</ul></section>';
 	}
+
+	/* ------------------------------------------------------------------ */
+	/* Espace traiteur                                                    */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Ce que le traiteur a à faire sur sa demande (liens vers le bon bloc de la page).
+	 *
+	 * @param int $id Demande.
+	 * @return array[] { texte, ancre }
+	 */
+	public static function taches_traiteur( $id ) {
+		$t = array();
+		if ( ! etr_peut_voir_demande( $id ) ) {
+			return $t;
+		}
+		if ( ETR_Modules::actif( 'devis' ) && ETR_Devis::devis( $id ) && ETR_Devis::acceptable( $id ) ) {
+			$t[] = array( __( 'Accepter le devis', 'espace-traiteur' ), '#etr-devis-accepter' );
+		}
+		if ( class_exists( 'ETR_Stripe' ) && ETR_Stripe::pret() ) {
+			$acompte = ETR_Stripe::a_payer( $id, 'acompte' );
+			if ( $acompte > 0 ) {
+				/* translators: %s : montant. */
+				$t[] = array( sprintf( __( 'Payer l’acompte de %s', 'espace-traiteur' ), ETR_Devis::prix( $acompte ) ), '#etr-paiement' );
+			}
+			$caution = ETR_Stripe::a_payer( $id, 'caution' );
+			$mode    = ETR_Stripe::parametres()['caution'];
+			if ( $caution > 0 && ! ( 'empreinte' === $mode && ETR_Stripe::empreinte_a_partir_du( $id ) ) ) {
+				/* translators: %s : montant. */
+				$t[] = array( sprintf( 'empreinte' === $mode ? __( 'Déposer l’empreinte bancaire de %s (caution)', 'espace-traiteur' ) : __( 'Enregistrer votre carte pour la caution de %s', 'espace-traiteur' ), ETR_Devis::prix( $caution ) ), '#etr-paiement' );
+			}
+			$solde = ETR_Stripe::a_payer( $id, 'solde' );
+			if ( $solde > 0 ) {
+				/* translators: %s : montant. */
+				$t[] = array( sprintf( __( 'Régler la facture : %s', 'espace-traiteur' ), ETR_Devis::prix( $solde ) ), '#etr-facture-traiteur' );
+			}
+		}
+		if ( ETR_Modules::actif( 'avis' ) && 'cloturee' === etr_get_statut( $id ) && class_exists( 'ETR_Traiteur_Plus' ) && ! is_array( get_post_meta( $id, ETR_Traiteur_Plus::META_AVIS, true ) ) ) {
+			$t[] = array( __( 'Donner votre avis sur la prestation', 'espace-traiteur' ), '#etr-avis' );
+		}
+		/**
+		 * Tâches du traiteur sur une demande.
+		 *
+		 * @param array[] $t  { texte, ancre }.
+		 * @param int     $id Demande.
+		 */
+		return (array) apply_filters( 'etr_traiteur_taches', $t, $id );
+	}
+
+	/**
+	 * Carte « À faire » en haut de la fiche du traiteur.
+	 *
+	 * @param int $id Demande.
+	 */
+	public static function actions_traiteur( $id ) {
+		$t = self::taches_traiteur( $id );
+		if ( ! $t ) {
+			return;
+		}
+		echo '<section class="etr-a-faire-traiteur" aria-labelledby="etr-a-faire-traiteur-titre"><h2 id="etr-a-faire-traiteur-titre" class="etr-a-faire-traiteur__titre">' . esc_html( _n( 'Une action de votre part', 'Actions de votre part', count( $t ), 'espace-traiteur' ) ) . '</h2><ul>';
+		foreach ( $t as $i => $tache ) {
+			echo '<li><a class="etr-btn' . ( $i ? ' etr-btn--secondaire' : '' ) . '" href="' . esc_attr( $tache[1] ) . '">' . esc_html( $tache[0] ) . '</a></li>';
+		}
+		echo '</ul></section>';
+	}
 }

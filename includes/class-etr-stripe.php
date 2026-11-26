@@ -35,7 +35,7 @@ class ETR_Stripe {
 		add_action( 'admin_init', array( __CLASS__, 'reglages' ) );
 		add_action( 'etr_fonctions_reglages', array( __CLASS__, 'champs_reglages' ) );
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
-		add_action( 'etr_traiteur_demande_fin', array( __CLASS__, 'encart_traiteur' ), 5 );
+		add_action( 'etr_traiteur_paiement', array( __CLASS__, 'encart_traiteur' ), 7 );
 		add_action( 'etr_facture_encart_traiteur', array( __CLASS__, 'bouton_solde' ) );
 		add_action( 'etr_traiteur_action', array( __CLASS__, 'action_payer' ) );
 		add_action( 'template_redirect', array( __CLASS__, 'retour' ), 4 );

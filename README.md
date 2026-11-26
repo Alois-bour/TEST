@@ -130,6 +130,9 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Argent en un coup d'œil** : montant indicatif et frise devis → acompte → caution → facture. « Acompte et caution » s'affiche en lecture, le formulaire s'ouvre avec « Modifier ».
 - **Historique** : les 12 derniers événements, les plus anciens repliés.
 - **Accueil du bureau** : liste « À faire » de toutes les demandes en cours, l'urgent d'abord, chaque ligne ouvre la fiche sur le bon onglet.
+- **Espace traiteur sur téléphone** : onglets en bas de l'écran (Demandes, Nouvelle, Dispos, Équipe), comme l'application de l'équipe ; l'en-tête garde sa hauteur sur les pages courtes.
+- **Fiche du traiteur** : « Actions de votre part » tout en haut (accepter le devis, payer l'acompte, déposer l'empreinte ou enregistrer la carte, régler la facture, donner son avis), chaque bouton mène au bon endroit ; devis, acompte et caution, casse, paiement en ligne et facture réunis dans un seul bloc « Paiement ».
+- **Mes demandes** : l'action attendue s'affiche sur la demande dans la liste.
 - Extensions : panneaux à placer avec `etr_gestion_fiche_resume`, `etr_gestion_fiche_materiel`, `etr_gestion_fiche_echanges`, `etr_gestion_fiche_argent` ; filtres `etr_gestion_fiche_onglets` et `etr_gestion_taches`. `etr_gestion_fiche` et `etr_gestion_fiche_cote` restent appelés dans le résumé.
 
 ### Corrections de la quatrième revue (3.0.5)
