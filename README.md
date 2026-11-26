@@ -123,6 +123,15 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Application : fiche en onglets et « À faire » (3.1.0)
+
+- **Fiche d'une demande en onglets** : Résumé · Matériel · Échanges · Argent (bureau) · Historique. Pastilles sur les onglets (point d'argent à traiter, incident ouvert, message du traiteur sans réponse). Les onglets sont de vrais liens (`?onglet=argent`), changent sans rechargement, restent en haut de l'écran, et le même onglet revient après un enregistrement.
+- **Prochaine étape** en tête du résumé (bureau) : demande à étudier (« Valider ou refuser » ouvre le statut), devis à envoyer, acompte ou caution à recevoir, écarts de reprise, facture à établir ou à encaisser, paiement en double, débit à relancer, caution à libérer, incident, message sans réponse ; les autres points sont listés dessous.
+- **Argent en un coup d'œil** : montant indicatif et frise devis → acompte → caution → facture. « Acompte et caution » s'affiche en lecture, le formulaire s'ouvre avec « Modifier ».
+- **Historique** : les 12 derniers événements, les plus anciens repliés.
+- **Accueil du bureau** : liste « À faire » de toutes les demandes en cours, l'urgent d'abord, chaque ligne ouvre la fiche sur le bon onglet.
+- Extensions : panneaux à placer avec `etr_gestion_fiche_resume`, `etr_gestion_fiche_materiel`, `etr_gestion_fiche_echanges`, `etr_gestion_fiche_argent` ; filtres `etr_gestion_fiche_onglets` et `etr_gestion_taches`. `etr_gestion_fiche` et `etr_gestion_fiche_cote` restent appelés dans le résumé.
+
 ### Corrections de la quatrième revue (3.0.5)
 
 - **Stripe** : si le retour du traiteur enregistre déjà la session, le webhook demande à Stripe de renvoyer l'événement (rien n'est perdu si ce retour échoue) ; un paiement en ligne après un règlement noté à la main (facture payée, acompte reçu) est signalé en double, la date n'est pas changée ; la caution ne peut pas être libérée tant qu'un débit attend la réponse de Stripe.

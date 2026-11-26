@@ -51,7 +51,7 @@ class ETR_Traiteur_Plus {
 		add_action( 'etr_statut_change', array( __CLASS__, 'noter_cloture' ), 10, 3 );
 		add_action( 'etr_rappels_horaires', array( __CLASS__, 'demander_avis' ), 30 );
 		add_action( 'etr_traiteur_demande_fin', array( __CLASS__, 'formulaire_avis' ), 2 );
-		add_action( 'etr_gestion_fiche', array( __CLASS__, 'panneau_avis' ), 1 );
+		add_action( 'etr_gestion_fiche_echanges', array( __CLASS__, 'panneau_avis' ), 50 );
 		add_action( 'etr_gestion_statistiques', array( __CLASS__, 'statistiques_avis' ), 20 );
 	}
 

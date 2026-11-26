@@ -28,9 +28,9 @@ class ETR_Devis {
 	 * Hooks.
 	 */
 	public static function init() {
-		add_action( 'etr_gestion_fiche_cote', array( __CLASS__, 'panneau_devis' ), 20 );
-		add_action( 'etr_gestion_fiche_cote', array( __CLASS__, 'panneau_acompte' ), 30 );
-		add_action( 'etr_gestion_fiche', array( __CLASS__, 'panneau_casse' ), 5 );
+		add_action( 'etr_gestion_fiche_argent', array( __CLASS__, 'panneau_devis' ), 20 );
+		add_action( 'etr_gestion_fiche_argent', array( __CLASS__, 'panneau_acompte' ), 30 );
+		add_action( 'etr_gestion_fiche_argent', array( __CLASS__, 'panneau_casse' ), 45 );
 		add_action( 'etr_gestion_action', array( __CLASS__, 'actions_bureau' ) );
 		add_action( 'etr_traiteur_demande_fin', array( __CLASS__, 'encart_traiteur' ), 5 );
 		add_action( 'etr_traiteur_action', array( __CLASS__, 'action_traiteur' ) );
@@ -297,7 +297,18 @@ class ETR_Devis {
 			'caution_recue'  => array( __( 'Caution reçue le', 'espace-traiteur' ), 'date' ),
 			'caution_rendue' => array( __( 'Caution rendue le', 'espace-traiteur' ), 'date' ),
 		);
-		echo '<form class="etr-panneau etr-acompte" method="post" action="' . esc_url( ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id ) ) ) . '"><h2 class="etr-panneau__titre">' . esc_html__( 'Acompte et caution', 'espace-traiteur' ) . '</h2>';
+		// Lecture d'abord ; le formulaire s'ouvre avec « Modifier » (ouvert d'emblée si rien n'est saisi).
+		$textes = self::textes_acompte( $id );
+		echo '<section class="etr-panneau etr-acompte"><h2 class="etr-panneau__titre">' . esc_html__( 'Acompte et caution', 'espace-traiteur' ) . '</h2>';
+		if ( $textes ) {
+			echo '<ul class="etr-liste-simple">';
+			foreach ( $textes as $texte ) {
+				echo '<li>' . esc_html( $texte ) . '</li>';
+			}
+			echo '</ul>';
+		}
+		echo '<details class="etr-replie"' . ( $textes ? '' : ' open' ) . '><summary class="etr-btn etr-btn--discret">' . esc_html( $textes ? __( 'Modifier', 'espace-traiteur' ) : __( 'Renseigner', 'espace-traiteur' ) ) . '</summary>';
+		echo '<form method="post" action="' . esc_url( ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id, 'onglet' => 'argent' ) ) ) . '">';
 		wp_nonce_field( 'etr_acompte_' . $id, 'etr_nonce' );
 		echo '<input type="hidden" name="etr_gestion_action" value="acompte"><input type="hidden" name="demande_id" value="' . (int) $id . '">';
 		foreach ( $champs as $cle => $champ ) {
@@ -312,7 +323,7 @@ class ETR_Devis {
 				echo '<input type="hidden" name="etr_acompte_vu[' . esc_attr( $cle ) . ']" value="' . esc_attr( (string) $valeur ) . '">';
 			}
 		}
-		echo '<button type="submit" class="etr-btn etr-btn--discret">' . esc_html__( 'Enregistrer', 'espace-traiteur' ) . '</button></form>';
+		echo '<button type="submit" class="etr-btn etr-btn--discret">' . esc_html__( 'Enregistrer', 'espace-traiteur' ) . '</button></form></details></section>';
 	}
 
 	/* ------------------------------------------------------------------ */

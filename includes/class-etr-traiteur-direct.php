@@ -37,7 +37,7 @@ class ETR_Traiteur_Direct {
 		add_action( 'etr_traiteur_demande_apres_suivi', array( __CLASS__, 'suivi_en_route' ), 4 );
 
 		// Messages.
-		add_action( 'etr_gestion_fiche', array( __CLASS__, 'panneau_messages_equipe' ) );
+		add_action( 'etr_gestion_fiche_echanges', array( __CLASS__, 'panneau_messages_equipe' ) );
 		add_action( 'etr_gestion_action', array( __CLASS__, 'action_equipe' ) );
 		add_action( 'etr_traiteur_demande_fin', array( __CLASS__, 'panneau_messages_traiteur' ), 20 );
 		add_action( 'etr_traiteur_action', array( __CLASS__, 'action_traiteur' ) );

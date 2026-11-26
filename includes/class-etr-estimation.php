@@ -33,7 +33,7 @@ class ETR_Estimation {
 		add_action( 'admin_init', array( __CLASS__, 'reglages' ) );
 		add_action( 'etr_fonctions_reglages', array( __CLASS__, 'champs_reglages' ) );
 		add_action( 'etr_gestion_tarif_estimation', array( __CLASS__, 'encart_gestion' ) );
-		add_action( 'etr_gestion_fiche_cote', array( __CLASS__, 'formulaire_recalculer' ), 1 );
+		add_action( 'etr_gestion_fiche_argent', array( __CLASS__, 'formulaire_recalculer' ), 1 );
 		add_action( 'etr_gestion_action', array( __CLASS__, 'action_recalculer' ) );
 		add_action( 'add_meta_boxes_etr_demande', array( __CLASS__, 'metabox' ) );
 		// Calcul à l'avance (la fiche s'ouvre sans attendre les services).

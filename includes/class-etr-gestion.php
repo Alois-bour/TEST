@@ -1216,7 +1216,7 @@ class ETR_Gestion {
 	 * @param string $nom Nom.
 	 * @return string
 	 */
-	private static function icone( $nom ) {
+	public static function icone( $nom ) {
 		return ETR_Frontend::icone( $nom );
 	}
 
@@ -1427,7 +1427,7 @@ class ETR_Gestion {
 	 * @param int $id Demande.
 	 * @return string
 	 */
-	private static function url_demande( $id ) {
+	public static function url_demande( $id ) {
 		return self::url(
 			array(
 				'vue' => 'demande',
@@ -1626,6 +1626,18 @@ class ETR_Gestion {
 			echo '<li' . ( $c[3] ? ' class="etr-chiffres--accent"' : '' ) . '><a href="' . esc_url( $c[2] ) . '"><strong>' . esc_html( number_format_i18n( $c[0] ) ) . '</strong><span>' . esc_html( $c[1] ) . '</span></a></li>';
 		}
 		echo '</ul>';
+
+		// Ce que le bureau doit faire : devis, acomptes, factures, incidents, messages…
+		ETR_Fiche::a_faire(
+			array_values(
+				array_filter(
+					self::demandes(),
+					function ( $id ) {
+						return in_array( etr_get_statut( $id ), array( 'en_attente', 'validee', 'livree', 'cloturee' ), true );
+					}
+				)
+			)
+		);
 
 		// Semaine logistique.
 		echo '<section class="etr-semaine" aria-labelledby="etr-semaine-titre">';
@@ -1951,30 +1963,58 @@ class ETR_Gestion {
 		$sous = sprintf( __( 'Demande n° %1$d de %2$s, reçue le %3$s', 'espace-traiteur' ), $id, etr_nom( $auteur ), get_the_date( '', $demande ) );
 		self::entete( get_the_title( $demande ), $sous, '<div class="etr-page-entete__statut">' . etr_statut_badge( $statut ) . '</div>', $retour );
 
-		echo '<div class="etr-dossier">';
-		echo '<div class="etr-dossier__principal">';
-		ETR_Terrain::panneau_suivi( $id ); // En tête : les actions du terrain (préparer, livrer, reprendre).
-		self::panneau_materiel( $id );
-		ETR_Terrain::panneaux_comptes_rendus( $id );
-		ETR_Terrain::panneau_incidents( $id );
-		ETR_Terrain::panneau_notes( $id );
-		do_action( 'etr_gestion_fiche', $id ); // Fonctions activables : messages, casse facturée…
-		self::panneaux_infos( $id );
-		echo '<section class="etr-panneau"><h2 class="etr-panneau__titre">' . esc_html__( 'Historique', 'espace-traiteur' ) . '</h2>' . ETR_Historique::html( $id ) . '</section>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans ETR_Historique::html().
-		echo '</div>';
+		// Fiche en onglets : Résumé, Matériel, Échanges, Argent (bureau), Historique.
+		$onglets = ETR_Fiche::onglets( $id );
+		$actif   = ETR_Fiche::onglet_actif( $onglets );
+		ETR_Fiche::barre( $id, $onglets, $actif );
 
-		echo '<aside class="etr-dossier__cote">';
+		ETR_Fiche::ouvrir( 'resume', $actif, 'etr-dossier' );
+		echo '<div class="etr-dossier__principal">';
+		ETR_Fiche::prochaine_etape( $id );
+		ETR_Terrain::panneau_suivi( $id ); // Les actions du terrain (préparer, livrer, reprendre).
+		self::panneaux_infos( $id );
+		do_action( 'etr_gestion_fiche', $id ); // Extensions (ancien emplacement).
+		echo '</div><aside class="etr-dossier__cote">';
 		if ( ETR_Equipe::bureau() ) {
 			self::panneau_decision( $id, $statut );
-			self::panneau_tarif( $id );
-			do_action( 'etr_gestion_fiche_cote', $id ); // Fonctions activables : devis, acompte…
 		}
-		self::panneau_documents( $id );
+		/** Panneaux du résumé (dates de livraison et de reprise…). */
+		do_action( 'etr_gestion_fiche_resume', $id );
+		if ( ETR_Equipe::bureau() ) {
+			do_action( 'etr_gestion_fiche_cote', $id ); // Extensions (ancien emplacement).
+		}
 		self::panneau_traiteur( $auteur );
 		if ( current_user_can( 'edit_post', $id ) ) {
 			echo '<p class="etr-dossier__wp"><a class="etr-lien" href="' . esc_url( get_edit_post_link( $id, 'url' ) ) . '">' . esc_html__( 'Ouvrir dans l’administration WordPress', 'espace-traiteur' ) . '</a></p>';
 		}
-		echo '</aside>';
+		echo '</aside></div>';
+
+		ETR_Fiche::ouvrir( 'materiel', $actif );
+		self::panneau_materiel( $id );
+		ETR_Terrain::panneaux_comptes_rendus( $id );
+		/** Panneaux du matériel (volume…). */
+		do_action( 'etr_gestion_fiche_materiel', $id );
+		self::panneau_documents( $id );
+		echo '</div>';
+
+		ETR_Fiche::ouvrir( 'echanges', $actif );
+		/** Échanges (messages avec le traiteur, avis…). */
+		do_action( 'etr_gestion_fiche_echanges', $id );
+		ETR_Terrain::panneau_incidents( $id );
+		ETR_Terrain::panneau_notes( $id );
+		echo '</div>';
+
+		if ( isset( $onglets['argent'] ) ) {
+			ETR_Fiche::ouvrir( 'argent', $actif );
+			ETR_Fiche::resume_argent( $id );
+			self::panneau_tarif( $id );
+			/** Argent (devis, acompte, paiements en ligne, facture…). */
+			do_action( 'etr_gestion_fiche_argent', $id );
+			echo '</div>';
+		}
+
+		ETR_Fiche::ouvrir( 'historique', $actif );
+		echo '<section class="etr-panneau"><h2 class="etr-panneau__titre">' . esc_html__( 'Historique', 'espace-traiteur' ) . '</h2>' . ETR_Historique::html( $id, 12 ) . '</section>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans ETR_Historique::html().
 		echo '</div>';
 	}
 

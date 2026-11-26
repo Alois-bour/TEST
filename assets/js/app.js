@@ -570,4 +570,129 @@
 			}
 		}, { passive: true } );
 	}() );
+	/* ------------------------------------------------------------------ */
+	/* Fiche d'une demande : onglets                                      */
+	/* ------------------------------------------------------------------ */
+
+	( function () {
+		var barreOnglets = document.querySelector( '.etr-fiche-onglets' );
+		if ( ! barreOnglets ) {
+			return;
+		}
+		var fiche  = barreOnglets.getAttribute( 'data-fiche' );
+		var RETOUR = 'etr-fiche-onglet';
+		var liste  = barreOnglets.querySelector( 'ul' );
+
+		// Onglets plus larges que l'écran : fondu du côté où il en reste.
+		function bords() {
+			barreOnglets.classList.toggle( 'a-gauche', liste.scrollLeft > 4 );
+			barreOnglets.classList.toggle( 'a-droite', liste.scrollLeft + liste.clientWidth < liste.scrollWidth - 4 );
+		}
+		liste.addEventListener( 'scroll', bords, { passive: true } );
+		window.addEventListener( 'resize', bords );
+		var actifDepart = barreOnglets.querySelector( '[aria-selected="true"]' );
+		if ( actifDepart && actifDepart.offsetLeft - liste.offsetLeft + actifDepart.offsetWidth > liste.clientWidth ) {
+			liste.scrollLeft = actifDepart.offsetLeft - liste.offsetLeft - 24;
+		}
+		bords();
+
+		function afficher( cle, garderAdresse ) {
+			var partie = document.querySelector( '[data-partie="' + cle + '"]' );
+			if ( ! partie ) {
+				return;
+			}
+			document.querySelectorAll( '[data-partie]' ).forEach( function ( p ) {
+				p.hidden = p !== partie;
+			} );
+			barreOnglets.querySelectorAll( '[role="tab"]' ).forEach( function ( a ) {
+				a.setAttribute( 'aria-selected', a.getAttribute( 'data-onglet' ) === cle ? 'true' : 'false' );
+			} );
+			var actif = barreOnglets.querySelector( '[aria-selected="true"]' );
+			if ( actif ) {
+				// Onglet choisi bien en vue dans la barre (sans faire défiler la page).
+				var debut = actif.offsetLeft - liste.offsetLeft;
+				if ( debut < liste.scrollLeft || debut + actif.offsetWidth > liste.scrollLeft + liste.clientWidth ) {
+					liste.scrollTo( { left: Math.max( 0, debut - 24 ), behavior: 'smooth' } );
+				}
+			}
+			if ( ! garderAdresse ) {
+				var url = new URL( window.location.href );
+				if ( 'resume' === cle ) {
+					url.searchParams.delete( 'onglet' );
+				} else {
+					url.searchParams.set( 'onglet', cle );
+				}
+				url.searchParams.delete( 'etr_msg' );
+				window.history.replaceState( window.history.state, '', url.href );
+			}
+			// La barre d'onglets reste en vue ; le haut de la partie aussi.
+			var haut = barreOnglets.getBoundingClientRect().top;
+			if ( haut < 0 || haut > window.innerHeight / 2 ) {
+				barreOnglets.scrollIntoView( { block: 'start' } );
+			}
+		}
+
+		// Onglets et liens « Y aller » (prochaine étape) : sans rechargement.
+		document.addEventListener( 'click', function ( e ) {
+			var lien = e.target.closest( 'a[data-onglet]' );
+			if ( ! lien || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0 ) {
+				return;
+			}
+			e.preventDefault();
+			afficher( lien.getAttribute( 'data-onglet' ) );
+		} );
+		barreOnglets.addEventListener( 'keydown', function ( e ) {
+			if ( 'ArrowRight' !== e.key && 'ArrowLeft' !== e.key ) {
+				return;
+			}
+			var tabs = Array.prototype.slice.call( barreOnglets.querySelectorAll( '[role="tab"]' ) );
+			var i    = tabs.indexOf( document.activeElement );
+			if ( i < 0 ) {
+				return;
+			}
+			var suivant = tabs[ ( i + ( 'ArrowRight' === e.key ? 1 : tabs.length - 1 ) ) % tabs.length ];
+			suivant.focus();
+			afficher( suivant.getAttribute( 'data-onglet' ) );
+		} );
+
+		// Après un enregistrement (la page revient sur la fiche), le même onglet est rouvert.
+		document.addEventListener( 'submit', function ( e ) {
+			var partie = e.target.closest( '[data-partie]' );
+			var cle    = partie ? partie.getAttribute( 'data-partie' ) : '';
+			if ( ! cle && e.target.closest( 'dialog' ) ) {
+				var visible = document.querySelector( '[data-partie]:not([hidden])' );
+				cle         = visible ? visible.getAttribute( 'data-partie' ) : '';
+			}
+			try {
+				window.sessionStorage.setItem( RETOUR, JSON.stringify( { fiche: fiche, onglet: cle, le: Date.now() } ) );
+			} catch ( err ) {}
+		}, true );
+		try {
+			var retour = JSON.parse( window.sessionStorage.getItem( RETOUR ) || 'null' );
+			window.sessionStorage.removeItem( RETOUR );
+			if ( retour && retour.fiche === fiche && retour.onglet && Date.now() - retour.le < 120000 && ! new URL( window.location.href ).searchParams.get( 'onglet' ) ) {
+				afficher( retour.onglet, true );
+			}
+		} catch ( err ) {}
+
+		// « Valider ou refuser » (prochaine étape) : le panneau du statut.
+		document.addEventListener( 'click', function ( e ) {
+			if ( ! e.target.closest( '[data-ouvrir-statut]' ) ) {
+				return;
+			}
+			var bouton = document.querySelector( '.etr-barre-action--feuilles .etr-btn:not(.etr-btn--discret)' );
+			if ( telephone.matches && bouton ) {
+				bouton.click();
+				return;
+			}
+			var panneau = document.querySelector( '.etr-decision' );
+			if ( panneau ) {
+				panneau.scrollIntoView( { behavior: 'smooth', block: 'start' } );
+				var choix = panneau.querySelector( 'input[type="radio"]:checked, input[type="radio"]' );
+				if ( choix ) {
+					choix.focus( { preventScroll: true } );
+				}
+			}
+		} );
+	}() );
 }() );

@@ -29,7 +29,7 @@ class ETR_Facture {
 	public static function init() {
 		add_action( 'admin_init', array( __CLASS__, 'reglages' ) );
 		add_action( 'etr_fonctions_reglages', array( __CLASS__, 'champs_reglages' ) );
-		add_action( 'etr_gestion_fiche_cote', array( __CLASS__, 'panneau' ), 40 );
+		add_action( 'etr_gestion_fiche_argent', array( __CLASS__, 'panneau' ), 40 );
 		add_action( 'etr_gestion_action', array( __CLASS__, 'actions' ) );
 		add_action( 'etr_traiteur_demande_fin', array( __CLASS__, 'encart_traiteur' ), 6 );
 		add_action( 'template_redirect', array( __CLASS__, 'telechargement' ), 5 );

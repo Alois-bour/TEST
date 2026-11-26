@@ -29,7 +29,7 @@ class ETR_Logistique {
 		// Volume.
 		add_action( 'woocommerce_product_options_inventory_product_data', array( __CLASS__, 'champ_produit' ), 25 );
 		add_action( 'woocommerce_admin_process_product_object', array( __CLASS__, 'enregistrer_produit' ) );
-		add_action( 'etr_gestion_fiche_cote', array( __CLASS__, 'panneau_volume' ), 8 );
+		add_action( 'etr_gestion_fiche_materiel', array( __CLASS__, 'panneau_volume' ), 8 );
 		add_filter( 'etr_estimation_camions', array( __CLASS__, 'camions_estimation' ), 10, 2 );
 
 		// Créneaux.

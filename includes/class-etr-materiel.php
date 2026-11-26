@@ -23,7 +23,7 @@ class ETR_Materiel {
 	public static function init() {
 		add_filter( 'etr_planning_mouvement_attributs', array( __CLASS__, 'attributs_mouvement' ), 10, 2 );
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
-		add_action( 'etr_gestion_fiche_cote', array( __CLASS__, 'panneau_dates' ), 5 );
+		add_action( 'etr_gestion_fiche_resume', array( __CLASS__, 'panneau_dates' ), 5 );
 		add_action( 'etr_gestion_action', array( __CLASS__, 'actions' ) );
 
 		add_filter( 'etr_stock_total', array( __CLASS__, 'stock_disponible' ), 10, 2 );
@@ -196,7 +196,7 @@ class ETR_Materiel {
 	 * @param int $id Demande.
 	 */
 	public static function panneau_dates( $id ) {
-		if ( ! ETR_Modules::actif( 'deplacer_dates' ) ) {
+		if ( ! ETR_Modules::actif( 'deplacer_dates' ) || ! ETR_Equipe::bureau() ) {
 			return;
 		}
 		$etapes = array_filter(
