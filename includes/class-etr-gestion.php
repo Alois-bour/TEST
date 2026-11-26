@@ -521,7 +521,7 @@ class ETR_Gestion {
 			self::url(
 				array(
 					'vue'     => 'equipe',
-					'etr_msg' => ! empty( $resultat['existant'] ) ? 'membre_traiteur' : 'membre_' . ETR_Traiteurs::code_creation( $resultat ),
+					'etr_msg' => 'membre_' . ETR_Traiteurs::code_creation( $resultat ),
 				)
 			)
 		);
@@ -1394,7 +1394,6 @@ class ETR_Gestion {
 			'invite'     => __( 'Invitation envoyée.', 'espace-traiteur' ),
 			'role'       => __( 'Rôles enregistrés.', 'espace-traiteur' ),
 			'membre_cree' => __( 'Personne ajoutée. Elle a reçu un e-mail pour choisir son mot de passe et installer l’application.', 'espace-traiteur' ),
-			'membre_traiteur' => __( 'Ce compte traiteur fait maintenant partie de l’équipe : il se connecte à l’application avec son mot de passe habituel, et garde son espace traiteur.', 'espace-traiteur' ),
 			'membre_cree_sans_invitation' => __( 'Personne ajoutée, sans invitation. Cliquez sur « Envoyer l’invitation » dans la liste quand vous êtes prêt.', 'espace-traiteur' ),
 			'retire'     => __( 'Accès retiré : la personne est déconnectée et ne peut plus entrer dans l’application.', 'espace-traiteur' ),
 			'rendu'      => __( 'Accès rendu.', 'espace-traiteur' ),
@@ -2554,7 +2553,8 @@ class ETR_Gestion {
 		$erreurs = array(
 			'nom'          => array( 'nom', __( 'Indiquez le nom.', 'espace-traiteur' ) ),
 			'email'        => array( 'email', __( 'Cette adresse e-mail n’est pas valide.', 'espace-traiteur' ) ),
-			'email_existe' => array( 'email', __( 'Cette adresse est déjà celle d’un membre de l’équipe ou d’un administrateur.', 'espace-traiteur' ) ),
+			'email_existe'   => array( 'email', __( 'Un compte existe déjà avec cette adresse e-mail.', 'espace-traiteur' ) ),
+			'email_traiteur' => array( 'email', __( 'Cette adresse est celle d’un compte traiteur. Un traiteur garde uniquement son espace traiteur : utilisez une autre adresse pour le compte d’équipe.', 'espace-traiteur' ) ),
 			'role'         => array( 'roles', __( 'Choisissez au moins un rôle.', 'espace-traiteur' ) ),
 			'creation'     => array( '', __( 'Le compte n’a pas pu être créé. Réessayez.', 'espace-traiteur' ) ),
 		);

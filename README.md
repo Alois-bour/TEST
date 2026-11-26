@@ -130,11 +130,11 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - Le serveur refuse toujours une date incohérente envoyée autrement.
 - **Fiches** (traiteur, équipe, administration) : la livraison et la reprise sont dites par rapport à l'événement (« 26 novembre 2026 · la veille de l'événement ») ; sans date choisie, « Le jour de l'événement (27 novembre 2026) » au lieu d'un tiret.
 
-### Comptes traiteurs dans l'équipe (3.1.1)
+### Comptes traiteurs : uniquement l'espace traiteur (3.1.1)
 
-- **Application de l'équipe** : un compte traiteur qui essaie de s'y connecter voit pourquoi c'est refusé, un lien vers l'espace traiteur, et comment obtenir l'accès.
-- **Équipe › Ajouter** : l'adresse d'un compte traiteur existant est acceptée ; le compte reçoit les rôles d'équipe choisis, garde son mot de passe et son espace traiteur. L'adresse d'un membre de l'équipe ou d'un administrateur reste refusée.
-- Un traiteur qui a un rôle d'équipe (préparateur, livreur, et plus seulement bureau) peut se connecter à l'application.
+- Un compte traiteur n'a accès qu'à son espace traiteur, jamais à l'application de l'équipe, même si un rôle d'équipe lui était ajouté (par exemple depuis wp-admin).
+- **Connexion à l'application** avec un compte traiteur : message clair, lien vers l'espace traiteur ; un membre de l'équipe utilise son compte d'équipe, avec sa propre adresse.
+- **Équipe › Ajouter** : l'adresse d'un compte traiteur est refusée avec un message dédié (« utilisez une autre adresse pour le compte d'équipe »).
 
 ### Application : fiche en onglets et « À faire » (3.1.0)
 

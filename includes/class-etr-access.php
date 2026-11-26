@@ -87,11 +87,9 @@ class ETR_Access {
 	 * @return bool
 	 */
 	public static function traiteur_seulement( $user_id ) {
-		// Un traiteur qui fait aussi partie de l'équipe (préparateur, livreur…) garde l'accès à l'application.
 		return etr_est_traiteur( $user_id )
 			&& ! etr_est_gestionnaire( $user_id )
-			&& ! user_can( $user_id, 'edit_posts' )
-			&& ! ( class_exists( 'ETR_Equipe' ) && ETR_Equipe::acces( $user_id ) );
+			&& ! user_can( $user_id, 'edit_posts' );
 	}
 
 	/**

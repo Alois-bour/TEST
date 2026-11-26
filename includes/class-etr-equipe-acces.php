@@ -369,9 +369,9 @@ class ETR_Equipe_Acces {
 		if ( self::$erreur ) {
 			echo '<div class="etr-auth__message etr-auth__message--erreur" role="alert"><p>' . esc_html( self::$erreur ) . '</p>';
 			if ( self::$hors_espace ) {
-				// Compte traiteur : où aller, et comment obtenir l'accès s'il fait aussi partie de l'équipe.
+				// Compte traiteur : où aller (il n'a jamais accès à l'application de l'équipe).
 				echo '<p><a href="' . esc_url( etr_url() ) . '">' . esc_html__( 'Ouvrir l’espace traiteur', 'espace-traiteur' ) . '</a></p>';
-				echo '<p>' . esc_html__( 'Vous faites partie de l’équipe ? Connectez-vous avec votre compte d’équipe, ou demandez à un administrateur de donner un rôle à ce compte (Bureau, Préparateur ou Livreur) dans Espace traiteur › Équipe.', 'espace-traiteur' ) . '</p>';
+				echo '<p>' . esc_html__( 'Vous faites partie de l’équipe ? Connectez-vous avec votre compte d’équipe, qui a sa propre adresse e-mail.', 'espace-traiteur' ) . '</p>';
 			}
 			echo '</div>';
 		}
