@@ -251,7 +251,7 @@ class ETR_Terrain {
 		echo '<div class="etr-arret__actions">';
 		echo '<a class="etr-btn etr-btn--discret etr-btn--icone" href="' . esc_url( self::url( array( 'vue' => 'incident', 'id' => $id ) ) ) . '" data-hors-ligne aria-label="' . esc_attr__( 'Signaler un incident', 'espace-traiteur' ) . '" title="' . esc_attr__( 'Signaler un incident', 'espace-traiteur' ) . '">' . self::icone( 'alerte' ) . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		if ( $lieu ) {
-			echo '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_itineraire( $lieu ) ) . '" target="_blank" rel="noopener">' . self::icone( 'lieu' ) . '<span>' . esc_html__( 'Itinéraire', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			echo '<a class="etr-btn etr-btn--discret etr-arret__itineraire" href="' . esc_url( self::url_itineraire( $lieu ) ) . '" target="_blank" rel="noopener" title="' . esc_attr__( 'Itinéraire', 'espace-traiteur' ) . '">' . self::icone( 'lieu' ) . '<span>' . esc_html__( 'Itinéraire', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
 		do_action( 'etr_tournee_actions', $id, $etape ); // Fonctions activables : « En route ».
 		if ( ETR_Equipe::livreur() ) {
@@ -320,8 +320,14 @@ class ETR_Terrain {
 				echo wp_kses_post( $article['image'] );
 			}
 			echo '<span><strong>' . esc_html( $ligne['titre'] ) . '</strong>';
-			/* translators: 1 : quantité, 2 : unité. */
-			echo '<small>' . esc_html( trim( sprintf( __( '%1$s demandé(s) %2$s', 'espace-traiteur' ), number_format_i18n( $demande ), isset( $ligne['unite'] ) ? $ligne['unite'] : '' ) ) ) . '</small></span></span>';
+			$unite = isset( $ligne['unite'] ) ? trim( (string) $ligne['unite'] ) : '';
+			echo '<small>' . esc_html(
+				'' !== $unite
+					/* translators: 1 : quantité, 2 : unité (pièce(s), lot(s)…). */
+					? sprintf( __( 'À préparer : %1$s %2$s', 'espace-traiteur' ), number_format_i18n( $demande ), $unite )
+					/* translators: %s : quantité. */
+					: sprintf( __( 'À préparer : %s', 'espace-traiteur' ), number_format_i18n( $demande ) )
+			) . '</small></span></span>';
 			echo '<span class="etr-pas" role="group" aria-label="' . esc_attr__( 'Quantité prête', 'espace-traiteur' ) . '">';
 			echo '<button type="button" data-action="moins" aria-label="' . esc_attr__( 'Un de moins', 'espace-traiteur' ) . '">−</button>';
 			echo '<input type="number" inputmode="numeric" min="0" max="' . (int) $demande . '" value="' . (int) $fait . '" aria-label="' . esc_attr__( 'Quantité prête', 'espace-traiteur' ) . '">';
@@ -864,7 +870,7 @@ class ETR_Terrain {
 			$ecarts = ETR_Operations::texte_ecarts( (int) $reprise['manquants'], (int) $reprise['casses'] );
 			echo '<section class="etr-panneau etr-cr"><h2 class="etr-panneau__titre">' . esc_html__( 'Reprise', 'espace-traiteur' ) . '</h2>';
 			/* translators: 1 : date, 2 : livreur. */
-			echo '<p>' . esc_html( sprintf( __( 'Reprise le %1$s par %2$s.', 'espace-traiteur' ), wp_date( 'j F Y, H:i', $reprise['le'] ), etr_nom( get_userdata( $reprise['par'] ) ) ) ) . ' <strong class="' . ( $ecarts ? 'etr-manque' : 'etr-ok' ) . '">' . esc_html( $ecarts ? $ecarts : __( 'Complète, en bon état.', 'espace-traiteur' ) ) . '</strong></p>';
+			echo '<p>' . esc_html( sprintf( __( 'Reprise le %1$s par %2$s.', 'espace-traiteur' ), wp_date( 'j F Y, H:i', $reprise['le'] ), etr_nom( get_userdata( (int) ( $reprise['par'] ?? 0 ) ) ) ) ) . ' <strong class="' . ( $ecarts ? 'etr-manque' : 'etr-ok' ) . '">' . esc_html( $ecarts ? $ecarts : __( 'Complète, en bon état.', 'espace-traiteur' ) ) . '</strong></p>';
 			if ( $ecarts ) {
 				echo '<div class="etr-table-cadre etr-cr__ecarts" tabindex="0" role="region" aria-label="' . esc_attr__( 'Écarts à la reprise', 'espace-traiteur' ) . '"><table class="etr-table"><thead><tr><th>' . esc_html__( 'Article', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'Livrés', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'Rendus', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'Manquants', 'espace-traiteur' ) . '</th><th>' . esc_html__( 'Cassés', 'espace-traiteur' ) . '</th></tr></thead><tbody>';
 				foreach ( etr_get_lignes( $id ) as $index => $ligne ) {

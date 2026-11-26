@@ -1332,3 +1332,102 @@ body.etr-plein-ecran { margin: 0; padding: 0; background: var(--etr-fond-carte, 
 .etr-societe__ajout .etr-champ input { display: block; width: 100%; }
 .etr-stripe__form { margin: 0 0 10px; }
 .etr-stripe__secure { font-size: 12.5px; }
+
+/* ------------------------------------------------------------------ */
+/* Espace traiteur sur téléphone : onglets en bas, « À faire », Paiement (3.1.0) */
+/* ------------------------------------------------------------------ */
+
+.etr-app__nav-court { display: none; }
+
+@media (max-width: 900px) {
+	.etr-espace.etr-app:not(.etr-app--integre) .etr-app__nav {
+		position: fixed;
+		z-index: 30;
+		right: 0;
+		bottom: 0;
+		left: 0;
+		order: 0;
+		width: auto;
+		max-width: none;
+		margin: 0;
+		padding: 6px max(8px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+		background: var(--etr-fond-carte, #fff);
+		border-top: 1px solid var(--etr-trait);
+		box-shadow: 0 -6px 20px rgba(29, 29, 27, .05);
+	}
+	.etr-espace.etr-app:not(.etr-app--integre) .etr-app__nav ul { display: flex; gap: 2px; overflow: visible; }
+	.etr-espace.etr-app:not(.etr-app--integre) .etr-app__nav li { flex: 1 1 0; min-width: 0; }
+	.etr-espace.etr-app:not(.etr-app--integre) .etr-app__nav a {
+		flex-direction: column;
+		justify-content: center;
+		gap: 3px;
+		min-height: 52px;
+		padding: 6px 2px;
+		border-radius: 10px;
+		font-size: 11px;
+		line-height: 1.1;
+		text-align: center;
+		box-shadow: none;
+	}
+	.etr-espace.etr-app:not(.etr-app--integre) .etr-app__nav a .etr-icone { width: 22px; height: 22px; }
+	.etr-espace.etr-app:not(.etr-app--integre) .etr-app__nav a[aria-current="page"] { background: var(--etr-olive-clair); color: var(--etr-olive-fonce); box-shadow: none; }
+	.etr-espace.etr-app:not(.etr-app--integre) .etr-app__nav-libelle { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+	.etr-espace.etr-app:not(.etr-app--integre) .etr-app__nav-court { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+	.etr-espace.etr-app:not(.etr-app--integre) .etr-app__principal { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+	/* Page courte : l'en-tête garde sa hauteur (la grille n'étire que le contenu). */
+	.etr-espace.etr-app:not(.etr-app--integre) { grid-template-rows: auto 1fr; }
+	.etr-espace.etr-app:not(.etr-app--integre) .etr-app__barre { align-self: start; }
+}
+
+/* « À faire » en haut de la fiche */
+.etr-a-faire-traiteur {
+	margin: 0 0 24px;
+	padding: 20px 22px;
+	border: 1px solid var(--etr-trait);
+	border-radius: 16px;
+	background: var(--etr-olive-clair);
+}
+.etr-app .etr-a-faire-traiteur__titre { margin: 0 0 12px; font: 400 22px/1.25 var(--etr-serif); color: var(--etr-encre); }
+.etr-a-faire-traiteur ul { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; list-style: none; }
+
+/* Paiement : devis, acompte, paiement en ligne, facture dans un seul bloc */
+.etr-paiement-traiteur { margin-bottom: 24px; scroll-margin-top: 80px; }
+.etr-app .etr-paiement-traiteur .etr-panneau {
+	margin: 0;
+	padding: 16px 0 0;
+	border: 0;
+	border-top: 1px solid var(--etr-trait-doux);
+	border-radius: 0;
+	background: none;
+	box-shadow: none;
+}
+.etr-app .etr-paiement-traiteur .etr-panneau + .etr-panneau,
+.etr-app .etr-paiement-traiteur > .etr-panneau__titre + .etr-panneau { margin-top: 16px; }
+.etr-app .etr-paiement-traiteur .etr-panneau .etr-panneau__titre { font-size: 15px; }
+#etr-devis-accepter,
+#etr-paiement,
+#etr-facture-traiteur,
+#etr-avis { scroll-margin-top: 90px; }
+
+@media (max-width: 640px) {
+	.etr-a-faire-traiteur { padding: 18px; }
+	.etr-a-faire-traiteur ul { flex-direction: column; }
+	.etr-a-faire-traiteur .etr-btn { width: 100%; justify-content: center; text-align: center; }
+}
+.etr-app .etr-a-faire-traiteur .etr-btn--secondaire { background: var(--etr-fond-carte, #fff); border-color: var(--etr-trait); color: var(--etr-encre); }
+.etr-app .etr-a-faire-traiteur .etr-btn--secondaire:hover,
+.etr-app .etr-a-faire-traiteur .etr-btn--secondaire:focus { border-color: #c9c0b2; }
+
+/* Liste « Mes demandes » : action attendue du traiteur */
+.etr-agenda__action {
+	display: inline-flex;
+	align-self: flex-start;
+	margin: 4px 0 2px;
+	padding: 3px 10px;
+	border-radius: 999px;
+	background: #f8eedb;
+	color: #7a5310;
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 1.35;
+}

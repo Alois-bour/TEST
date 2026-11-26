@@ -456,7 +456,7 @@ class ETR_Operations {
 		$manque = $prepa['total'] - $prepa['prepare'];
 		$texte  = $manque
 			/* translators: 1 : colis, 2 : articles manquants. */
-			? sprintf( __( 'Commande prête (%1$s colis), incomplète : %2$s article(s) manquant(s)', 'espace-traiteur' ), number_format_i18n( $prepa['colis'] ), number_format_i18n( $manque ) )
+			? sprintf( _n( 'Commande prête (%1$s colis), incomplète : %2$s article manquant', 'Commande prête (%1$s colis), incomplète : %2$s articles manquants', $manque, 'espace-traiteur' ), number_format_i18n( $prepa['colis'] ), number_format_i18n( $manque ) )
 			/* translators: %s : colis. */
 			: sprintf( __( 'Commande prête (%s colis)', 'espace-traiteur' ), number_format_i18n( $prepa['colis'] ) );
 		ETR_Historique::ajouter( $id, 'preparation', $texte );

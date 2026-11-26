@@ -1184,3 +1184,216 @@ html:active-view-transition-type(onglet)::view-transition-new(etr-contenu) { ani
 .etr-stripe__debit { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
 .etr-factures__filtre { margin: 0 0 14px; }
 .etr-factures__total { font-weight: 600; }
+
+/* ------------------------------------------------------------------ */
+/* Fiche d'une demande : onglets, prochaine étape, argent (3.1.0)     */
+/* ------------------------------------------------------------------ */
+
+.etr-fiche-onglets {
+	position: sticky;
+	top: 0;
+	z-index: 8;
+	margin: 0 0 20px;
+	padding: 8px 0;
+	background: var(--etr-voile);
+	border-bottom: 1px solid var(--etr-trait);
+}
+.etr-fiche-onglets ul { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; overflow-x: auto; scrollbar-width: none; }
+.etr-fiche-onglets ul::-webkit-scrollbar { display: none; }
+.etr-fiche-onglets li { flex: none; }
+.etr-app .etr-fiche-onglets a {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 40px;
+	padding: 0 14px;
+	border-radius: 999px;
+	color: var(--etr-gris);
+	font: 500 15px/1 var(--etr-sans);
+	text-decoration: none;
+	white-space: nowrap;
+}
+.etr-app .etr-fiche-onglets a:hover { color: var(--etr-encre); background: var(--etr-lin); }
+.etr-app .etr-fiche-onglets a[aria-selected="true"] { background: var(--etr-encre); color: var(--etr-voile); }
+.etr-fiche-onglets__pastille {
+	display: inline-grid;
+	place-items: center;
+	min-width: 20px;
+	height: 20px;
+	padding: 0 6px;
+	border-radius: 10px;
+	background: var(--etr-ambre);
+	color: #fff;
+	font: 600 12px/1 var(--etr-sans);
+	font-variant-numeric: tabular-nums;
+}
+.etr-fiche-partie[hidden] { display: none !important; }
+.etr-fiche-partie:not(.etr-dossier) { display: flex; flex-direction: column; gap: 24px; max-width: 880px; }
+
+/* Prochaine étape */
+.etr-prochaine {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 20px 22px;
+	border-radius: 16px;
+	background: var(--etr-olive-clair);
+	border: 1px solid var(--etr-trait);
+}
+.etr-prochaine--urgent { background: var(--etr-ambre-clair); }
+.etr-app .etr-prochaine__sur { margin: 0; font: 600 12px/1.2 var(--etr-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--etr-gris); }
+.etr-app .etr-prochaine__texte { margin: 0; font: 400 22px/1.25 var(--etr-serif); color: var(--etr-encre); }
+.etr-prochaine .etr-btn .etr-icone { width: 18px; height: 18px; }
+.etr-prochaine__autres { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.etr-prochaine__autres li::before { content: "•"; margin-right: 8px; color: var(--etr-gris); }
+.etr-app .etr-prochaine__autres a { color: var(--etr-texte); }
+
+/* Argent en un coup d'œil */
+.etr-argent__tete { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+.etr-app .etr-argent__total { display: flex; align-items: baseline; gap: 10px; margin: 0; }
+.etr-argent__total span { font-size: 14px; color: var(--etr-gris); }
+.etr-argent__total strong { font: 400 28px/1 var(--etr-serif); color: var(--etr-encre); font-variant-numeric: lining-nums tabular-nums; }
+.etr-argent__frise { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
+.etr-argent__etape {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 12px 14px 12px 42px;
+	border: 1px solid var(--etr-trait);
+	border-radius: 12px;
+	background: var(--etr-voile);
+}
+.etr-argent__puce {
+	position: absolute;
+	top: 13px;
+	left: 14px;
+	display: grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border: 2px solid var(--etr-trait);
+	border-radius: 50%;
+}
+.etr-argent__puce .etr-icone { width: 12px; height: 12px; stroke-width: 3; }
+.etr-argent__etape--fait .etr-argent__puce { border-color: var(--etr-olive); background: var(--etr-olive); color: #fff; }
+.etr-argent__etape--en-cours .etr-argent__puce { border-color: var(--etr-olive); }
+.etr-argent__etape--a-faire .etr-argent__puce { border-color: var(--etr-ambre); }
+.etr-argent__etape--a-faire .etr-argent__etat { color: var(--etr-ambre); font-weight: 600; }
+.etr-argent__etape--plus-tard { opacity: .7; }
+.etr-argent__nom { font-weight: 600; color: var(--etr-encre); }
+.etr-argent__etat { font-size: 14px; color: var(--etr-gris); }
+.etr-argent__montant { font-size: 14px; color: var(--etr-texte); font-variant-numeric: tabular-nums; }
+
+/* Formulaire replié (« Modifier ») */
+.etr-replie > summary { list-style: none; display: inline-flex; margin-top: 4px; cursor: pointer; }
+.etr-replie > summary::-webkit-details-marker { display: none; }
+.etr-replie[open] > summary { margin-bottom: 14px; }
+.etr-historique__suite { margin-top: 12px; }
+.etr-historique__suite > summary { cursor: pointer; }
+.etr-historique__suite[open] > summary { margin-bottom: 12px; }
+
+/* Accueil : À faire */
+.etr-a-faire { margin: 0 0 40px; }
+.etr-a-faire__liste { margin: 0; padding: 0; list-style: none; border: 1px solid var(--etr-trait); border-radius: 16px; background: var(--etr-fond-carte, #fff); overflow: hidden; }
+.etr-a-faire__ligne + .etr-a-faire__ligne,
+.etr-a-faire__plus { border-top: 1px solid var(--etr-trait-doux); }
+.etr-app .etr-a-faire__ligne a { display: flex; align-items: center; gap: 12px; padding: 14px 18px; color: var(--etr-encre); text-decoration: none; }
+.etr-app .etr-a-faire__ligne a:hover { background: var(--etr-voile); }
+.etr-a-faire__ligne--urgent a { box-shadow: inset 3px 0 0 var(--etr-ambre); }
+.etr-a-faire__texte { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; font-weight: 500; }
+.etr-a-faire__texte small { font-weight: 400; font-size: 13px; color: var(--etr-gris); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.etr-a-faire__ligne .etr-icone { flex: none; width: 18px; height: 18px; color: var(--etr-gris); }
+.etr-a-faire__plus { padding: 10px 18px; font-size: 13px; color: var(--etr-gris); }
+
+@media (max-width: 900px) {
+	.etr-fiche-onglets { margin: 0 -20px 16px; padding: 8px 20px; }
+	.etr-installee .etr-fiche-onglets { top: calc(50px + env(safe-area-inset-top)); }
+	.etr-fiche-onglets ul { gap: 0; }
+	/* Plus d'onglets à droite ou à gauche : fondu sur le bord (classes posées par app.js). */
+	.etr-fiche-onglets.a-droite ul { -webkit-mask-image: linear-gradient(to right, #000 82%, transparent); mask-image: linear-gradient(to right, #000 82%, transparent); }
+	.etr-fiche-onglets.a-gauche ul { -webkit-mask-image: linear-gradient(to left, #000 82%, transparent); mask-image: linear-gradient(to left, #000 82%, transparent); }
+	.etr-fiche-onglets.a-gauche.a-droite ul { -webkit-mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent); }
+	.etr-app .etr-fiche-onglets a { gap: 4px; min-height: 36px; padding: 0 9px; font-size: 14px; letter-spacing: -.01em; }
+	.etr-fiche-onglets__pastille { min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px; }
+	.etr-app .etr-prochaine__texte { font-size: 20px; }
+	.etr-argent__frise { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+/* ------------------------------------------------------------------ */
+/* Planning sur téléphone : liste jour par jour (3.1.0)               */
+/* ------------------------------------------------------------------ */
+
+.etr-calendrier__jsem,
+.etr-calendrier__rien,
+.etr-calendrier__rien-jour { display: none; }
+
+@media (max-width: 640px) {
+	.etr-calendrier { overflow: visible; border: 0; border-radius: 0; background: none; }
+	.etr-calendrier__semaine { display: block; min-width: 0; }
+	.etr-calendrier__semaine.etr-calendrier__entete { display: none; }
+	.etr-calendrier__semaine + .etr-calendrier__semaine { border-top: 0; }
+	.etr-calendrier__jour {
+		display: grid;
+		grid-template-columns: 52px minmax(0, 1fr);
+		align-items: start;
+		gap: 12px;
+		min-height: 0;
+		padding: 12px 0;
+		border-top: 1px solid var(--etr-trait-doux);
+		background: none;
+	}
+	.etr-calendrier__jour + .etr-calendrier__jour { border-left: 0; }
+	.etr-calendrier__jour--hors,
+	.etr-calendrier__jour--vide:not(.etr-calendrier__jour--aujourdhui) { display: none; }
+	.etr-calendrier__jour--aujourdhui { margin: 0 -12px; padding: 12px; border-radius: 12px; background: var(--etr-lin); }
+	.etr-calendrier__jour time { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0; font-size: 26px; }
+	.etr-calendrier__jsem { display: block; font: 500 12px/1 var(--etr-sans); text-transform: uppercase; letter-spacing: .04em; color: var(--etr-gris); }
+	.etr-app .etr-calendrier__rien-jour { display: block; align-self: center; margin: 0; font-size: 14px; color: var(--etr-gris); }
+	.etr-calendrier .etr-mvt { padding: 8px 10px 8px 12px; font-size: 14px; }
+	.etr-calendrier .etr-mvt__sous { display: block; }
+	.etr-calendrier .etr-mvt__type { font-size: 12px; }
+	.etr-calendrier__rien { display: block; padding: 24px 0; color: var(--etr-gris); }
+}
+
+/* Carte de tournée : « Livrer » / « Reprendre » en grand, le reste en petit au-dessus. */
+@media (max-width: 640px) {
+	.etr-arret__actions { gap: 8px; }
+	.etr-arret__actions > .etr-btn--discret:not(.etr-btn--icone) { flex: 1 1 0; justify-content: center; min-width: 0; padding-left: 10px; padding-right: 10px; }
+	.etr-arret__actions [data-action-etape] { flex: 1 0 100%; order: 10; justify-content: center; min-height: 48px; font-size: 16px; }
+	/* Itinéraire en icône seule : « En route · arrivée » tient sur une ligne. */
+	.etr-arret__actions > .etr-btn--discret.etr-arret__itineraire { flex: none; padding-left: 12px; padding-right: 12px; }
+	.etr-arret__actions [data-en-route] span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.etr-arret__actions .etr-arret__itineraire span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+
+/* Feuille « Plus » : groupes Terrain, Gestion, Compte */
+.etr-app .etr-feuille__groupe { margin: 18px 4px 8px; font: 600 12px/1.2 var(--etr-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--etr-gris); }
+.etr-app .etr-feuille__tete + .etr-feuille__groupe { margin-top: 4px; }
+
+/* Menu « Exporter » (liste des demandes) */
+.etr-menu-export { position: relative; }
+.etr-menu-export > summary { list-style: none; cursor: pointer; }
+.etr-menu-export > summary::-webkit-details-marker { display: none; }
+.etr-menu-export ul {
+	position: absolute;
+	z-index: 15;
+	top: calc(100% + 6px);
+	right: 0;
+	width: max-content;
+	max-width: min(320px, calc(100vw - 40px));
+	margin: 0;
+	padding: 6px;
+	list-style: none;
+	border: 1px solid var(--etr-trait);
+	border-radius: 12px;
+	background: var(--etr-fond-carte, #fff);
+	box-shadow: 0 12px 32px rgba(29, 29, 27, .12);
+}
+.etr-app .etr-menu-export a { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 8px; color: var(--etr-encre); font-weight: 500; text-decoration: none; }
+.etr-app .etr-menu-export a:hover { background: var(--etr-voile); }
+.etr-menu-export small { font-weight: 400; font-size: 13px; color: var(--etr-gris); }
+@media (max-width: 640px) {
+	.etr-menu-export ul { right: auto; left: 0; }
+}

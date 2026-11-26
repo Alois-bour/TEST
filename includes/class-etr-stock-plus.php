@@ -187,7 +187,7 @@ class ETR_Stock_Plus {
 	 */
 	public static function vues( $vues ) {
 		if ( ETR_Modules::actif( 'inventaire' ) ) {
-			$vues['inventaire'] = array( __( 'Inventaire', 'espace-traiteur' ), 'catalogue' );
+			$vues['inventaire'] = array( __( 'Inventaire', 'espace-traiteur' ), 'inventaire' );
 		}
 		return $vues;
 	}
@@ -395,7 +395,7 @@ class ETR_Stock_Plus {
 		echo '<section class="etr-panneau etr-stock-bas"><h2 class="etr-panneau__titre">' . esc_html__( 'Stock bas à venir', 'espace-traiteur' ) . ' <span class="etr-compteur">' . esc_html( number_format_i18n( count( $bas ) ) ) . '</span></h2><ul class="etr-liste-simple">';
 		foreach ( $bas as $b ) {
 			/* translators: 1 : article, 2 : libre, 3 : stock, 4 : date. */
-			echo '<li>' . esc_html( sprintf( __( '%1$s : %2$s libre(s) sur %3$s le %4$s', 'espace-traiteur' ), $b['titre'], number_format_i18n( $b['libre'] ), number_format_i18n( $b['stock'] ), etr_format_date( $b['jour'] ) ) ) . '</li>';
+			echo '<li>' . esc_html( sprintf( _n( '%1$s : %2$s libre sur %3$s le %4$s', '%1$s : %2$s libres sur %3$s le %4$s', $b['libre'], 'espace-traiteur' ), $b['titre'], number_format_i18n( $b['libre'] ), number_format_i18n( $b['stock'] ), etr_format_date( $b['jour'] ) ) ) . '</li>';
 		}
 		echo '</ul></section>';
 	}

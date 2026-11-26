@@ -597,6 +597,9 @@ class ETR_Frontend {
 			'plus-onglet'  => '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
 			'visage'       => '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9v4h-1M9.5 15.5c1.5 1 3.5 1 5 0"/>',
 			'cloche'       => '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+			'facture'      => '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 8h3M9 12h7M9 16h7"/>',
+			'inventaire'   => '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 11l2 2 4-4M8.5 17h7"/>',
+			'equipe'       => '<circle cx="12" cy="7.5" r="3.5"/><path d="M5 21a7 7 0 0 1 14 0"/><path d="M12 14.5v6.5"/>',
 		);
 		if ( ! isset( $traces[ $nom ] ) ) {
 			return '';
@@ -687,13 +690,19 @@ class ETR_Frontend {
 
 		echo '<nav class="etr-app__nav" aria-label="' . esc_attr__( 'Espace traiteur', 'espace-traiteur' ) . '"><ul>';
 		$liens = array(
-			'demandes' => array( etr_url(), __( 'Mes demandes', 'espace-traiteur' ), 'demandes' ),
-			'nouvelle' => array( etr_url( array( 'etr_vue' => 'nouvelle' ) ), __( 'Nouvelle demande', 'espace-traiteur' ), 'plus' ),
+			'demandes' => array( etr_url(), __( 'Mes demandes', 'espace-traiteur' ), 'demandes', __( 'Demandes', 'espace-traiteur' ) ),
+			'nouvelle' => array( etr_url( array( 'etr_vue' => 'nouvelle' ) ), __( 'Nouvelle demande', 'espace-traiteur' ), 'plus', __( 'Nouvelle', 'espace-traiteur' ) ),
 		);
 		/** Écrans ajoutés par les fonctions activables (disponibilités, équipe de la société). */
-		$liens = (array) apply_filters( 'etr_traiteur_menu', $liens );
+		$liens  = (array) apply_filters( 'etr_traiteur_menu', $liens );
+		$courts = array(
+			'disponibilites' => __( 'Dispos', 'espace-traiteur' ),
+			'societe'        => __( 'Équipe', 'espace-traiteur' ),
+		);
 		foreach ( $liens as $cle => $lien ) {
-			echo '<li><a href="' . esc_url( $lien[0] ) . '"' . ( $cle === $actif ? ' aria-current="page"' : '' ) . '>' . self::icone( $lien[2] ) . '<span>' . esc_html( $lien[1] ) . '</span></a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique.
+			// Libellé court (4e valeur) : barre d'onglets en bas sur téléphone.
+			$court = isset( $lien[3] ) ? $lien[3] : ( isset( $courts[ $cle ] ) ? $courts[ $cle ] : $lien[1] );
+			echo '<li><a href="' . esc_url( $lien[0] ) . '"' . ( $cle === $actif ? ' aria-current="page"' : '' ) . '>' . self::icone( $lien[2] ) . '<span class="etr-app__nav-libelle">' . esc_html( $lien[1] ) . '</span><span class="etr-app__nav-court" aria-hidden="true">' . esc_html( $court ) . '</span></a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique.
 		}
 		echo '</ul></nav>';
 
@@ -984,6 +993,11 @@ class ETR_Frontend {
 			echo self::bloc_date( $date ); // phpcs:ignore WordPress.Security.EscapeOutput
 			echo '<span class="etr-agenda__corps">';
 			echo '<span class="etr-agenda__titre">' . esc_html( get_the_title( $demande ) ) . '</span>';
+			$a_faire = ETR_Fiche::taches_traiteur( $demande->ID );
+			if ( $a_faire ) {
+				// Action attendue du traiteur (devis à accepter, acompte à payer…) : visible dès la liste.
+				echo '<span class="etr-agenda__action">' . esc_html( $a_faire[0][0] ) . ( count( $a_faire ) > 1 ? ' · ' . esc_html( sprintf( /* translators: %s : nombre. */ _n( '+%s autre', '+%s autres', count( $a_faire ) - 1, 'espace-traiteur' ), number_format_i18n( count( $a_faire ) - 1 ) ) ) : '' ) . '</span>';
+			}
 			echo '<span class="etr-agenda__meta">';
 			if ( $lieu ) {
 				echo '<span>' . esc_html( $lieu ) . '</span>';
@@ -1127,12 +1141,23 @@ class ETR_Frontend {
 		$sous = sprintf( __( 'Demande n° %1$d, envoyée le %2$s', 'espace-traiteur' ), $demande_id, get_the_date( '', $demande ) );
 		self::entete_page( get_the_title( $demande ), $sous, '<div class="etr-page-entete__statut">' . etr_statut_badge( $statut ) . '</div>', $retour );
 
+		// Ce que le traiteur a à faire (accepter le devis, payer…), tout en haut.
+		ETR_Fiche::actions_traiteur( $demande_id );
 		self::suivi( $statut );
 		do_action( 'etr_traiteur_demande_apres_suivi', $demande_id ); // Bon de livraison signé, suivi détaillé.
 
 		$reponse = get_post_meta( $demande_id, '_etr_reponse', true );
 		if ( $reponse ) {
 			echo '<section class="etr-reponse">' . self::icone( 'message' ) . '<div><h2>' . esc_html__( 'Message de notre équipe', 'espace-traiteur' ) . '</h2><p>' . nl2br( esc_html( $reponse ) ) . '</p></div></section>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		}
+
+		// Puis tout l'argent en un bloc.
+		ob_start();
+		/** Devis, acompte et caution, paiement en ligne, facture : un seul bloc « Paiement ». */
+		do_action( 'etr_traiteur_paiement', $demande_id );
+		$paiement = trim( (string) ob_get_clean() );
+		if ( '' !== $paiement ) {
+			echo '<section class="etr-panneau etr-paiement-traiteur" id="etr-paiement-traiteur"><h2 class="etr-panneau__titre">' . esc_html__( 'Paiement', 'espace-traiteur' ) . '</h2>' . $paiement . '</section>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé par chaque encart.
 		}
 
 		$champs     = etr_champs_demande();

@@ -907,8 +907,8 @@ class ETR_Gestion {
 			'planning'     => array( __( 'Planning', 'espace-traiteur' ), 'calendrier' ),
 			'traiteurs'    => array( __( 'Traiteurs', 'espace-traiteur' ), 'invites' ),
 			'catalogue'    => array( __( 'Catalogue', 'espace-traiteur' ), 'catalogue' ),
-			'statistiques' => array( __( 'Statistiques', 'espace-traiteur' ), 'demandes' ),
-			'equipe'       => array( __( 'Équipe', 'espace-traiteur' ), 'invites' ),
+			'statistiques' => array( __( 'Statistiques', 'espace-traiteur' ), 'statistiques' ),
+			'equipe'       => array( __( 'Équipe', 'espace-traiteur' ), 'equipe' ),
 			'tournee'      => array( __( 'Tournée', 'espace-traiteur' ), 'camion' ),
 			'scanner'      => array( __( 'Scanner', 'espace-traiteur' ), 'scan' ),
 		);
@@ -1216,7 +1216,7 @@ class ETR_Gestion {
 	 * @param string $nom Nom.
 	 * @return string
 	 */
-	private static function icone( $nom ) {
+	public static function icone( $nom ) {
 		return ETR_Frontend::icone( $nom );
 	}
 
@@ -1331,15 +1331,24 @@ class ETR_Gestion {
 		echo '<dialog class="etr-feuille" id="etr-plus" aria-labelledby="etr-plus-titre"><div class="etr-feuille__poignee" aria-hidden="true"></div>';
 		echo '<div class="etr-feuille__tete"><p class="etr-feuille__titre" id="etr-plus-titre">' . esc_html( etr_nom( $user ) ) . '<small>' . esc_html( $role ? $role : $user->user_email ) . '</small></p><button type="button" class="etr-feuille__fermer" data-fermer-feuille aria-label="' . esc_attr__( 'Fermer', 'espace-traiteur' ) . '">×</button></div>';
 		$secondaires = array_slice( $cles, self::ONGLETS_TELEPHONE );
-		if ( $secondaires ) {
-			echo '<ul class="etr-feuille__liste">';
-			foreach ( $secondaires as $cle ) {
+		// Écrans classés : le terrain, puis la gestion (les écrans ajoutés vont en gestion), puis le compte.
+		$terrain = array( 'tournee', 'scanner', 'planning', 'demandes' );
+		$groupes = array(
+			__( 'Terrain', 'espace-traiteur' ) => array_values( array_intersect( $secondaires, $terrain ) ),
+			__( 'Gestion', 'espace-traiteur' ) => array_values( array_diff( $secondaires, $terrain ) ),
+		);
+		foreach ( $groupes as $titre => $liste ) {
+			if ( ! $liste ) {
+				continue;
+			}
+			echo '<p class="etr-feuille__groupe">' . esc_html( $titre ) . '</p><ul class="etr-feuille__liste">';
+			foreach ( $liste as $cle ) {
 				$badge = isset( $pastilles[ $cle ] ) ? '<span class="etr-gestion__pastille">' . esc_html( number_format_i18n( $pastilles[ $cle ] ) ) . '</span>' : '';
 				echo '<li><a href="' . esc_url( self::url( array( 'vue' => $cle ) ) ) . '"' . ( $cle === $actif ? ' aria-current="page"' : '' ) . '>' . self::icone( $vues[ $cle ][1] ) . '<span>' . esc_html( $vues[ $cle ][0] ) . '</span>' . $badge . self::icone( 'suite' ) . '</a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
 			}
 			echo '</ul>';
 		}
-		echo '<ul class="etr-feuille__liste">';
+		echo '<p class="etr-feuille__groupe">' . esc_html__( 'Compte', 'espace-traiteur' ) . '</p><ul class="etr-feuille__liste">';
 		foreach ( self::liens_compte() as $lien ) {
 			echo '<li><a href="' . esc_url( $lien[0] ) . '"' . ( 'sortie' === $lien[2] ? ' class="est-danger"' : '' ) . '>' . self::icone( $lien[2] ) . '<span>' . esc_html( $lien[1] ) . '</span>' . ( 'sortie' === $lien[2] ? '' : self::icone( 'suite' ) ) . '</a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
@@ -1427,7 +1436,7 @@ class ETR_Gestion {
 	 * @param int $id Demande.
 	 * @return string
 	 */
-	private static function url_demande( $id ) {
+	public static function url_demande( $id ) {
 		return self::url(
 			array(
 				'vue' => 'demande',
@@ -1626,6 +1635,18 @@ class ETR_Gestion {
 			echo '<li' . ( $c[3] ? ' class="etr-chiffres--accent"' : '' ) . '><a href="' . esc_url( $c[2] ) . '"><strong>' . esc_html( number_format_i18n( $c[0] ) ) . '</strong><span>' . esc_html( $c[1] ) . '</span></a></li>';
 		}
 		echo '</ul>';
+
+		// Ce que le bureau doit faire : devis, acomptes, factures, incidents, messages…
+		ETR_Fiche::a_faire(
+			array_values(
+				array_filter(
+					self::demandes(),
+					function ( $id ) {
+						return in_array( etr_get_statut( $id ), array( 'en_attente', 'validee', 'livree', 'cloturee' ), true );
+					}
+				)
+			)
+		);
 
 		// Semaine logistique.
 		echo '<section class="etr-semaine" aria-labelledby="etr-semaine-titre">';
@@ -1858,10 +1879,11 @@ class ETR_Gestion {
 				'q'        => $q,
 			)
 		);
-		$action = ! ETR_Equipe::bureau() ? '' : '<div class="etr-export">'
-			. '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_export( 'demandes', $export ) ) . '">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Exporter les demandes', 'espace-traiteur' ) . '</span></a>'
-			. '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_export( 'articles', $export ) ) . '">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Détail des articles', 'espace-traiteur' ) . '</span></a>'
-			. '</div>';
+		// Exports regroupés dans un petit menu : la liste des demandes remonte sur téléphone.
+		$action = ! ETR_Equipe::bureau() ? '' : '<details class="etr-menu-export"><summary class="etr-btn etr-btn--discret">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Exporter', 'espace-traiteur' ) . '</span></summary><ul>'
+			. '<li><a href="' . esc_url( self::url_export( 'demandes', $export ) ) . '">' . esc_html__( 'Les demandes (CSV)', 'espace-traiteur' ) . '<small>' . esc_html__( 'une ligne par demande, filtres appliqués', 'espace-traiteur' ) . '</small></a></li>'
+			. '<li><a href="' . esc_url( self::url_export( 'articles', $export ) ) . '">' . esc_html__( 'Le détail des articles (CSV)', 'espace-traiteur' ) . '<small>' . esc_html__( 'une ligne par article demandé', 'espace-traiteur' ) . '</small></a></li>'
+			. '</ul></details>';
 		/* translators: %s : nombre de demandes. */
 		self::entete( __( 'Demandes', 'espace-traiteur' ), sprintf( _n( '%s demande', '%s demandes', count( self::demandes() ), 'espace-traiteur' ), number_format_i18n( count( self::demandes() ) ) ), $action );
 
@@ -1951,30 +1973,58 @@ class ETR_Gestion {
 		$sous = sprintf( __( 'Demande n° %1$d de %2$s, reçue le %3$s', 'espace-traiteur' ), $id, etr_nom( $auteur ), get_the_date( '', $demande ) );
 		self::entete( get_the_title( $demande ), $sous, '<div class="etr-page-entete__statut">' . etr_statut_badge( $statut ) . '</div>', $retour );
 
-		echo '<div class="etr-dossier">';
-		echo '<div class="etr-dossier__principal">';
-		ETR_Terrain::panneau_suivi( $id ); // En tête : les actions du terrain (préparer, livrer, reprendre).
-		self::panneau_materiel( $id );
-		ETR_Terrain::panneaux_comptes_rendus( $id );
-		ETR_Terrain::panneau_incidents( $id );
-		ETR_Terrain::panneau_notes( $id );
-		do_action( 'etr_gestion_fiche', $id ); // Fonctions activables : messages, casse facturée…
-		self::panneaux_infos( $id );
-		echo '<section class="etr-panneau"><h2 class="etr-panneau__titre">' . esc_html__( 'Historique', 'espace-traiteur' ) . '</h2>' . ETR_Historique::html( $id ) . '</section>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans ETR_Historique::html().
-		echo '</div>';
+		// Fiche en onglets : Résumé, Matériel, Échanges, Argent (bureau), Historique.
+		$onglets = ETR_Fiche::onglets( $id );
+		$actif   = ETR_Fiche::onglet_actif( $onglets );
+		ETR_Fiche::barre( $id, $onglets, $actif );
 
-		echo '<aside class="etr-dossier__cote">';
+		ETR_Fiche::ouvrir( 'resume', $actif, 'etr-dossier' );
+		echo '<div class="etr-dossier__principal">';
+		ETR_Fiche::prochaine_etape( $id );
+		ETR_Terrain::panneau_suivi( $id ); // Les actions du terrain (préparer, livrer, reprendre).
+		self::panneaux_infos( $id );
+		do_action( 'etr_gestion_fiche', $id ); // Extensions (ancien emplacement).
+		echo '</div><aside class="etr-dossier__cote">';
 		if ( ETR_Equipe::bureau() ) {
 			self::panneau_decision( $id, $statut );
-			self::panneau_tarif( $id );
-			do_action( 'etr_gestion_fiche_cote', $id ); // Fonctions activables : devis, acompte…
 		}
-		self::panneau_documents( $id );
+		/** Panneaux du résumé (dates de livraison et de reprise…). */
+		do_action( 'etr_gestion_fiche_resume', $id );
+		if ( ETR_Equipe::bureau() ) {
+			do_action( 'etr_gestion_fiche_cote', $id ); // Extensions (ancien emplacement).
+		}
 		self::panneau_traiteur( $auteur );
 		if ( current_user_can( 'edit_post', $id ) ) {
 			echo '<p class="etr-dossier__wp"><a class="etr-lien" href="' . esc_url( get_edit_post_link( $id, 'url' ) ) . '">' . esc_html__( 'Ouvrir dans l’administration WordPress', 'espace-traiteur' ) . '</a></p>';
 		}
-		echo '</aside>';
+		echo '</aside></div>';
+
+		ETR_Fiche::ouvrir( 'materiel', $actif );
+		self::panneau_materiel( $id );
+		ETR_Terrain::panneaux_comptes_rendus( $id );
+		/** Panneaux du matériel (volume…). */
+		do_action( 'etr_gestion_fiche_materiel', $id );
+		self::panneau_documents( $id );
+		echo '</div>';
+
+		ETR_Fiche::ouvrir( 'echanges', $actif );
+		/** Échanges (messages avec le traiteur, avis…). */
+		do_action( 'etr_gestion_fiche_echanges', $id );
+		ETR_Terrain::panneau_incidents( $id );
+		ETR_Terrain::panneau_notes( $id );
+		echo '</div>';
+
+		if ( isset( $onglets['argent'] ) ) {
+			ETR_Fiche::ouvrir( 'argent', $actif );
+			ETR_Fiche::resume_argent( $id );
+			self::panneau_tarif( $id );
+			/** Argent (devis, acompte, paiements en ligne, facture…). */
+			do_action( 'etr_gestion_fiche_argent', $id );
+			echo '</div>';
+		}
+
+		ETR_Fiche::ouvrir( 'historique', $actif );
+		echo '<section class="etr-panneau"><h2 class="etr-panneau__titre">' . esc_html__( 'Historique', 'espace-traiteur' ) . '</h2>' . ETR_Historique::html( $id, 12 ) . '</section>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans ETR_Historique::html().
 		echo '</div>';
 	}
 
@@ -2237,20 +2287,36 @@ class ETR_Gestion {
 				if ( $date === $jour ) {
 					$classes[] = 'etr-calendrier__jour--aujourdhui';
 				}
+				if ( empty( $jours[ $date ] ) ) {
+					$classes[] = 'etr-calendrier__jour--vide'; // Masqué dans la liste du téléphone.
+				}
 				echo '<div class="' . esc_attr( implode( ' ', $classes ) ) . '" role="cell" data-jour="' . esc_attr( $date ) . '">';
-				echo '<time datetime="' . esc_attr( $date ) . '">' . esc_html( date_i18n( 'j', strtotime( $date ) ) ) . '</time>';
+				// Jour de la semaine : affiché seulement dans la liste du téléphone.
+				echo '<time datetime="' . esc_attr( $date ) . '"><span class="etr-calendrier__jsem">' . esc_html( date_i18n( 'D', strtotime( $date ) ) ) . '</span>' . esc_html( date_i18n( 'j', strtotime( $date ) ) ) . '</time>';
 				if ( ! empty( $jours[ $date ] ) ) {
 					echo '<ul>';
 					foreach ( $jours[ $date ] as $mvt ) {
 						echo '<li>' . self::mouvement_html( $mvt ) . '</li>'; // phpcs:ignore WordPress.Security.EscapeOutput
 					}
 					echo '</ul>';
+				} elseif ( $date === $jour ) {
+					echo '<p class="etr-calendrier__rien-jour">' . esc_html__( 'Rien de prévu aujourd’hui', 'espace-traiteur' ) . '</p>';
 				}
 				echo '</div>';
 			}
 			echo '</div>';
 		}
 		echo '</div>';
+		$dans_le_mois = array_filter(
+			$jours,
+			function ( $liste, $d ) use ( $mois ) {
+				return $liste && substr( (string) $d, 0, 7 ) === $mois;
+			},
+			ARRAY_FILTER_USE_BOTH
+		);
+		if ( ! $dans_le_mois ) {
+			echo '<p class="etr-calendrier__rien">' . esc_html__( 'Rien de prévu ce mois-ci.', 'espace-traiteur' ) . '</p>';
+		}
 	}
 
 	/* ------------------------------------------------------------------ */

@@ -35,11 +35,11 @@ class ETR_Stripe {
 		add_action( 'admin_init', array( __CLASS__, 'reglages' ) );
 		add_action( 'etr_fonctions_reglages', array( __CLASS__, 'champs_reglages' ) );
 		add_action( 'rest_api_init', array( __CLASS__, 'routes' ) );
-		add_action( 'etr_traiteur_demande_fin', array( __CLASS__, 'encart_traiteur' ), 5 );
+		add_action( 'etr_traiteur_paiement', array( __CLASS__, 'encart_traiteur' ), 7 );
 		add_action( 'etr_facture_encart_traiteur', array( __CLASS__, 'bouton_solde' ) );
 		add_action( 'etr_traiteur_action', array( __CLASS__, 'action_payer' ) );
 		add_action( 'template_redirect', array( __CLASS__, 'retour' ), 4 );
-		add_action( 'etr_gestion_fiche_cote', array( __CLASS__, 'panneau' ), 35 );
+		add_action( 'etr_gestion_fiche_argent', array( __CLASS__, 'panneau' ), 35 );
 		add_action( 'etr_gestion_action', array( __CLASS__, 'action_bureau' ) );
 		add_action( 'etr_reprise_enregistree', array( __CLASS__, 'reprise_complete' ), 20, 2 );
 		add_action( 'etr_statut_change', array( __CLASS__, 'montants_par_defaut' ), 5, 3 );

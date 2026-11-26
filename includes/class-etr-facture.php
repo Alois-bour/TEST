@@ -29,9 +29,9 @@ class ETR_Facture {
 	public static function init() {
 		add_action( 'admin_init', array( __CLASS__, 'reglages' ) );
 		add_action( 'etr_fonctions_reglages', array( __CLASS__, 'champs_reglages' ) );
-		add_action( 'etr_gestion_fiche_cote', array( __CLASS__, 'panneau' ), 40 );
+		add_action( 'etr_gestion_fiche_argent', array( __CLASS__, 'panneau' ), 40 );
 		add_action( 'etr_gestion_action', array( __CLASS__, 'actions' ) );
-		add_action( 'etr_traiteur_demande_fin', array( __CLASS__, 'encart_traiteur' ), 6 );
+		add_action( 'etr_traiteur_paiement', array( __CLASS__, 'encart_traiteur' ), 8 );
 		add_action( 'template_redirect', array( __CLASS__, 'telechargement' ), 5 );
 		add_action( 'etr_statut_change', array( __CLASS__, 'a_la_cloture' ), 30, 3 );
 		add_filter( 'etr_gestion_vues', array( __CLASS__, 'vues' ) );
@@ -625,7 +625,7 @@ class ETR_Facture {
 		if ( ! $f || ! etr_peut_voir_demande( $id ) ) {
 			return;
 		}
-		echo '<section class="etr-panneau etr-encart-traiteur"><h2 class="etr-panneau__titre">' . esc_html__( 'Facture', 'espace-traiteur' ) . '</h2>';
+		echo '<section class="etr-panneau etr-encart-traiteur" id="etr-facture-traiteur"><h2 class="etr-panneau__titre">' . esc_html__( 'Facture', 'espace-traiteur' ) . '</h2>';
 		/* translators: 1 : numéro, 2 : montant. */
 		echo '<p>' . esc_html( sprintf( __( 'Facture %1$s · %2$s TTC', 'espace-traiteur' ), $f['numero'], ETR_Devis::prix( $f['ttc'] ) ) ) . ' — <a class="etr-lien" href="' . esc_url( self::url_pdf( $id ) ) . '">' . esc_html__( 'Télécharger (PDF)', 'espace-traiteur' ) . '</a></p>';
 		echo $f['payee'] ? '<p class="etr-notice etr-notice--succes">' . esc_html( sprintf( /* translators: %s : date. */ __( 'Réglée le %s. Merci !', 'espace-traiteur' ), etr_format_date( $f['payee'] ) ) ) . '</p>' : '<p>' . esc_html( sprintf( /* translators: 1 : montant, 2 : date. */ __( 'Reste à payer : %1$s avant le %2$s.', 'espace-traiteur' ), ETR_Devis::prix( self::reglements( $id, $f )['reste'] ), etr_format_date( $f['echeance'] ) ) ) . '</p>';
@@ -802,7 +802,7 @@ class ETR_Facture {
 	 */
 	public static function vues( $vues ) {
 		if ( ETR_Modules::actif( 'facture' ) ) {
-			$vues['factures'] = array( __( 'Factures', 'espace-traiteur' ), 'demandes' );
+			$vues['factures'] = array( __( 'Factures', 'espace-traiteur' ), 'facture' );
 		}
 		return $vues;
 	}

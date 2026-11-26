@@ -37,7 +37,7 @@ class ETR_Traiteur_Direct {
 		add_action( 'etr_traiteur_demande_apres_suivi', array( __CLASS__, 'suivi_en_route' ), 4 );
 
 		// Messages.
-		add_action( 'etr_gestion_fiche', array( __CLASS__, 'panneau_messages_equipe' ) );
+		add_action( 'etr_gestion_fiche_echanges', array( __CLASS__, 'panneau_messages_equipe' ) );
 		add_action( 'etr_gestion_action', array( __CLASS__, 'action_equipe' ) );
 		add_action( 'etr_traiteur_demande_fin', array( __CLASS__, 'panneau_messages_traiteur' ), 20 );
 		add_action( 'etr_traiteur_action', array( __CLASS__, 'action_traiteur' ) );
@@ -285,8 +285,8 @@ class ETR_Traiteur_Direct {
 		}
 		$deja = self::en_route( $id, $etape );
 		/* translators: %s : heure. */
-		$texte = $deja ? sprintf( __( 'Arrivée vers %s', 'espace-traiteur' ), wp_date( 'H:i', (int) $deja['arrivee'] ) ) : __( 'En route', 'espace-traiteur' );
-		echo '<button type="button" class="etr-btn etr-btn--discret" data-en-route="' . (int) $id . '" data-etape="' . esc_attr( $etape ) . '">' . ETR_Frontend::icone( 'lieu' ) . '<span>' . esc_html( $texte ) . '</span></button>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique.
+		$texte = $deja ? sprintf( __( 'En route · arrivée %s', 'espace-traiteur' ), wp_date( 'H:i', (int) $deja['arrivee'] ) ) : __( 'En route', 'espace-traiteur' );
+		echo '<button type="button" class="etr-btn etr-btn--discret" data-en-route="' . (int) $id . '" data-etape="' . esc_attr( $etape ) . '">' . ETR_Frontend::icone( 'camion' ) . '<span>' . esc_html( $texte ) . '</span></button>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique.
 	}
 
 	/**

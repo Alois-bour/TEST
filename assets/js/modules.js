@@ -63,7 +63,7 @@
 					x.disabled = true;
 				} );
 				api( bouton.getAttribute( 'data-en-route' ) + '/en-route', { etape: bouton.getAttribute( 'data-etape' ), minutes: minutes } ).then( function ( r ) {
-					bouton.querySelector( 'span' ).textContent = 'Arrivée vers ' + r.arrivee;
+					bouton.querySelector( 'span' ).textContent = 'En route · arrivée ' + r.arrivee;
 					feuille.close();
 					toast( r.message );
 				} ).catch( function ( erreur ) {

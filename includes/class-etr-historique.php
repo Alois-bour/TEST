@@ -122,13 +122,30 @@ class ETR_Historique {
 	 * Liste HTML (la plus récente en premier).
 	 *
 	 * @param int $demande_id Demande.
+	 * @param int $max        Entrées affichées d'emblée (0 : toutes) ; les plus anciennes sont repliées.
 	 * @return string
 	 */
-	public static function html( $demande_id ) {
+	public static function html( $demande_id, $max = 0 ) {
 		$entrees = array_reverse( self::entrees( $demande_id ) );
 		if ( ! $entrees ) {
 			return '<p class="etr-muted">' . esc_html__( 'Aucun événement enregistré (demande antérieure à l’historique).', 'espace-traiteur' ) . '</p>';
 		}
+		if ( $max > 0 && count( $entrees ) > $max ) {
+			$anciennes = count( $entrees ) - $max;
+			/* translators: %s : nombre. */
+			$suite = '<details class="etr-historique__suite"><summary class="etr-lien">' . esc_html( sprintf( _n( 'Voir l’événement plus ancien', 'Voir les %s événements plus anciens', $anciennes, 'espace-traiteur' ), number_format_i18n( $anciennes ) ) ) . '</summary>' . self::liste( array_slice( $entrees, $max ) ) . '</details>';
+			return self::liste( array_slice( $entrees, 0, $max ) ) . $suite;
+		}
+		return self::liste( $entrees );
+	}
+
+	/**
+	 * Entrées en liste HTML.
+	 *
+	 * @param array[] $entrees Entrées (plus récentes d'abord).
+	 * @return string
+	 */
+	private static function liste( $entrees ) {
 		$html = '<ol class="etr-historique">';
 		foreach ( $entrees as $entree ) {
 			$user  = ! empty( $entree['user'] ) ? get_userdata( (int) $entree['user'] ) : false;
