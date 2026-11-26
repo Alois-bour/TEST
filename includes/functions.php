@@ -111,6 +111,18 @@ function etr_champs_demande() {
  */
 function etr_valeur_affichee( $demande_id, $cle, $type ) {
 	$valeur = (string) get_post_meta( $demande_id, '_etr_' . $cle, true );
+	// Livraison et reprise : toujours dites par rapport à l'événement (« la veille »…), et
+	// sans date choisie, le jour de l'événement plutôt qu'un tiret.
+	if ( in_array( $cle, array( 'date_livraison', 'date_reprise' ), true ) ) {
+		$evenement = (string) get_post_meta( $demande_id, '_etr_date_evenement', true );
+		if ( '' === $valeur && etr_date_valide( $evenement ) ) {
+			/* translators: %s : date de l'événement. */
+			return esc_html( sprintf( __( 'Le jour de l’événement (%s)', 'espace-traiteur' ), etr_format_date( $evenement ) ) );
+		}
+		if ( etr_date_valide( $valeur ) && etr_date_valide( $evenement ) ) {
+			return esc_html( etr_format_date( $valeur ) ) . ' <span class="etr-date-relative">· ' . esc_html( etr_date_relative( $valeur, $evenement ) ) . '</span>';
+		}
+	}
 	if ( '' === $valeur ) {
 		return '—';
 	}
@@ -121,6 +133,31 @@ function etr_valeur_affichee( $demande_id, $cle, $type ) {
 		return nl2br( esc_html( $valeur ) );
 	}
 	return esc_html( $valeur );
+}
+
+/**
+ * Position d'une date par rapport à l'événement : « la veille de l'événement », « 3 jours après »…
+ *
+ * @param string $date      Date (AAAA-MM-JJ).
+ * @param string $evenement Date de l'événement (AAAA-MM-JJ).
+ * @return string
+ */
+function etr_date_relative( $date, $evenement ) {
+	$n = (int) round( ( strtotime( $date . ' 12:00:00 UTC' ) - strtotime( $evenement . ' 12:00:00 UTC' ) ) / DAY_IN_SECONDS );
+	if ( 0 === $n ) {
+		return __( 'le jour de l’événement', 'espace-traiteur' );
+	}
+	if ( -1 === $n ) {
+		return __( 'la veille de l’événement', 'espace-traiteur' );
+	}
+	if ( 1 === $n ) {
+		return __( 'le lendemain de l’événement', 'espace-traiteur' );
+	}
+	return $n < 0
+		/* translators: %s : nombre de jours. */
+		? sprintf( __( '%s jours avant l’événement', 'espace-traiteur' ), number_format_i18n( -$n ) )
+		/* translators: %s : nombre de jours. */
+		: sprintf( __( '%s jours après l’événement', 'espace-traiteur' ), number_format_i18n( $n ) );
 }
 
 /**

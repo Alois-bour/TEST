@@ -128,6 +128,7 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Formulaire du traiteur** : la livraison et la reprise se choisissent dans une liste des seules dates cohérentes avec l'événement (« Samedi 5 décembre · la veille », « … · le jour de l'événement », « … · le lendemain »). Le calendrier de l'iPhone ignorait les limites et laissait choisir une livraison après l'événement. Sans date d'événement, la liste est désactivée ; si l'événement change, une date devenue impossible est retirée.
 - **Fiche, « Changer les dates » (bureau)** : même liste, construite côté serveur ; la date actuelle reste proposée même hors limites.
 - Le serveur refuse toujours une date incohérente envoyée autrement.
+- **Fiches** (traiteur, équipe, administration) : la livraison et la reprise sont dites par rapport à l'événement (« 26 novembre 2026 · la veille de l'événement ») ; sans date choisie, « Le jour de l'événement (27 novembre 2026) » au lieu d'un tiret.
 
 ### Comptes traiteurs dans l'équipe (3.1.1)
 
