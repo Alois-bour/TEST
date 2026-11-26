@@ -597,6 +597,9 @@ class ETR_Frontend {
 			'plus-onglet'  => '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
 			'visage'       => '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9v4h-1M9.5 15.5c1.5 1 3.5 1 5 0"/>',
 			'cloche'       => '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+			'facture'      => '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 8h3M9 12h7M9 16h7"/>',
+			'inventaire'   => '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 11l2 2 4-4M8.5 17h7"/>',
+			'equipe'       => '<circle cx="12" cy="7.5" r="3.5"/><path d="M5 21a7 7 0 0 1 14 0"/><path d="M12 14.5v6.5"/>',
 		);
 		if ( ! isset( $traces[ $nom ] ) ) {
 			return '';

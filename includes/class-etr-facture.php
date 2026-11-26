@@ -802,7 +802,7 @@ class ETR_Facture {
 	 */
 	public static function vues( $vues ) {
 		if ( ETR_Modules::actif( 'facture' ) ) {
-			$vues['factures'] = array( __( 'Factures', 'espace-traiteur' ), 'demandes' );
+			$vues['factures'] = array( __( 'Factures', 'espace-traiteur' ), 'facture' );
 		}
 		return $vues;
 	}

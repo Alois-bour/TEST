@@ -907,8 +907,8 @@ class ETR_Gestion {
 			'planning'     => array( __( 'Planning', 'espace-traiteur' ), 'calendrier' ),
 			'traiteurs'    => array( __( 'Traiteurs', 'espace-traiteur' ), 'invites' ),
 			'catalogue'    => array( __( 'Catalogue', 'espace-traiteur' ), 'catalogue' ),
-			'statistiques' => array( __( 'Statistiques', 'espace-traiteur' ), 'demandes' ),
-			'equipe'       => array( __( 'Équipe', 'espace-traiteur' ), 'invites' ),
+			'statistiques' => array( __( 'Statistiques', 'espace-traiteur' ), 'statistiques' ),
+			'equipe'       => array( __( 'Équipe', 'espace-traiteur' ), 'equipe' ),
 			'tournee'      => array( __( 'Tournée', 'espace-traiteur' ), 'camion' ),
 			'scanner'      => array( __( 'Scanner', 'espace-traiteur' ), 'scan' ),
 		);
@@ -1331,15 +1331,24 @@ class ETR_Gestion {
 		echo '<dialog class="etr-feuille" id="etr-plus" aria-labelledby="etr-plus-titre"><div class="etr-feuille__poignee" aria-hidden="true"></div>';
 		echo '<div class="etr-feuille__tete"><p class="etr-feuille__titre" id="etr-plus-titre">' . esc_html( etr_nom( $user ) ) . '<small>' . esc_html( $role ? $role : $user->user_email ) . '</small></p><button type="button" class="etr-feuille__fermer" data-fermer-feuille aria-label="' . esc_attr__( 'Fermer', 'espace-traiteur' ) . '">×</button></div>';
 		$secondaires = array_slice( $cles, self::ONGLETS_TELEPHONE );
-		if ( $secondaires ) {
-			echo '<ul class="etr-feuille__liste">';
-			foreach ( $secondaires as $cle ) {
+		// Écrans classés : le terrain, puis la gestion (les écrans ajoutés vont en gestion), puis le compte.
+		$terrain = array( 'tournee', 'scanner', 'planning', 'demandes' );
+		$groupes = array(
+			__( 'Terrain', 'espace-traiteur' ) => array_values( array_intersect( $secondaires, $terrain ) ),
+			__( 'Gestion', 'espace-traiteur' ) => array_values( array_diff( $secondaires, $terrain ) ),
+		);
+		foreach ( $groupes as $titre => $liste ) {
+			if ( ! $liste ) {
+				continue;
+			}
+			echo '<p class="etr-feuille__groupe">' . esc_html( $titre ) . '</p><ul class="etr-feuille__liste">';
+			foreach ( $liste as $cle ) {
 				$badge = isset( $pastilles[ $cle ] ) ? '<span class="etr-gestion__pastille">' . esc_html( number_format_i18n( $pastilles[ $cle ] ) ) . '</span>' : '';
 				echo '<li><a href="' . esc_url( self::url( array( 'vue' => $cle ) ) ) . '"' . ( $cle === $actif ? ' aria-current="page"' : '' ) . '>' . self::icone( $vues[ $cle ][1] ) . '<span>' . esc_html( $vues[ $cle ][0] ) . '</span>' . $badge . self::icone( 'suite' ) . '</a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
 			}
 			echo '</ul>';
 		}
-		echo '<ul class="etr-feuille__liste">';
+		echo '<p class="etr-feuille__groupe">' . esc_html__( 'Compte', 'espace-traiteur' ) . '</p><ul class="etr-feuille__liste">';
 		foreach ( self::liens_compte() as $lien ) {
 			echo '<li><a href="' . esc_url( $lien[0] ) . '"' . ( 'sortie' === $lien[2] ? ' class="est-danger"' : '' ) . '>' . self::icone( $lien[2] ) . '<span>' . esc_html( $lien[1] ) . '</span>' . ( 'sortie' === $lien[2] ? '' : self::icone( 'suite' ) ) . '</a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
@@ -1870,10 +1879,11 @@ class ETR_Gestion {
 				'q'        => $q,
 			)
 		);
-		$action = ! ETR_Equipe::bureau() ? '' : '<div class="etr-export">'
-			. '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_export( 'demandes', $export ) ) . '">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Exporter les demandes', 'espace-traiteur' ) . '</span></a>'
-			. '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_export( 'articles', $export ) ) . '">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Détail des articles', 'espace-traiteur' ) . '</span></a>'
-			. '</div>';
+		// Exports regroupés dans un petit menu : la liste des demandes remonte sur téléphone.
+		$action = ! ETR_Equipe::bureau() ? '' : '<details class="etr-menu-export"><summary class="etr-btn etr-btn--discret">' . self::icone( 'telecharger' ) . '<span>' . esc_html__( 'Exporter', 'espace-traiteur' ) . '</span></summary><ul>'
+			. '<li><a href="' . esc_url( self::url_export( 'demandes', $export ) ) . '">' . esc_html__( 'Les demandes (CSV)', 'espace-traiteur' ) . '<small>' . esc_html__( 'une ligne par demande, filtres appliqués', 'espace-traiteur' ) . '</small></a></li>'
+			. '<li><a href="' . esc_url( self::url_export( 'articles', $export ) ) . '">' . esc_html__( 'Le détail des articles (CSV)', 'espace-traiteur' ) . '<small>' . esc_html__( 'une ligne par article demandé', 'espace-traiteur' ) . '</small></a></li>'
+			. '</ul></details>';
 		/* translators: %s : nombre de demandes. */
 		self::entete( __( 'Demandes', 'espace-traiteur' ), sprintf( _n( '%s demande', '%s demandes', count( self::demandes() ), 'espace-traiteur' ), number_format_i18n( count( self::demandes() ) ) ), $action );
 
@@ -2277,20 +2287,36 @@ class ETR_Gestion {
 				if ( $date === $jour ) {
 					$classes[] = 'etr-calendrier__jour--aujourdhui';
 				}
+				if ( empty( $jours[ $date ] ) ) {
+					$classes[] = 'etr-calendrier__jour--vide'; // Masqué dans la liste du téléphone.
+				}
 				echo '<div class="' . esc_attr( implode( ' ', $classes ) ) . '" role="cell" data-jour="' . esc_attr( $date ) . '">';
-				echo '<time datetime="' . esc_attr( $date ) . '">' . esc_html( date_i18n( 'j', strtotime( $date ) ) ) . '</time>';
+				// Jour de la semaine : affiché seulement dans la liste du téléphone.
+				echo '<time datetime="' . esc_attr( $date ) . '"><span class="etr-calendrier__jsem">' . esc_html( date_i18n( 'D', strtotime( $date ) ) ) . '</span>' . esc_html( date_i18n( 'j', strtotime( $date ) ) ) . '</time>';
 				if ( ! empty( $jours[ $date ] ) ) {
 					echo '<ul>';
 					foreach ( $jours[ $date ] as $mvt ) {
 						echo '<li>' . self::mouvement_html( $mvt ) . '</li>'; // phpcs:ignore WordPress.Security.EscapeOutput
 					}
 					echo '</ul>';
+				} elseif ( $date === $jour ) {
+					echo '<p class="etr-calendrier__rien-jour">' . esc_html__( 'Rien de prévu aujourd’hui', 'espace-traiteur' ) . '</p>';
 				}
 				echo '</div>';
 			}
 			echo '</div>';
 		}
 		echo '</div>';
+		$dans_le_mois = array_filter(
+			$jours,
+			function ( $liste, $d ) use ( $mois ) {
+				return $liste && substr( (string) $d, 0, 7 ) === $mois;
+			},
+			ARRAY_FILTER_USE_BOTH
+		);
+		if ( ! $dans_le_mois ) {
+			echo '<p class="etr-calendrier__rien">' . esc_html__( 'Rien de prévu ce mois-ci.', 'espace-traiteur' ) . '</p>';
+		}
 	}
 
 	/* ------------------------------------------------------------------ */

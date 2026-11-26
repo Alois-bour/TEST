@@ -251,7 +251,7 @@ class ETR_Terrain {
 		echo '<div class="etr-arret__actions">';
 		echo '<a class="etr-btn etr-btn--discret etr-btn--icone" href="' . esc_url( self::url( array( 'vue' => 'incident', 'id' => $id ) ) ) . '" data-hors-ligne aria-label="' . esc_attr__( 'Signaler un incident', 'espace-traiteur' ) . '" title="' . esc_attr__( 'Signaler un incident', 'espace-traiteur' ) . '">' . self::icone( 'alerte' ) . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		if ( $lieu ) {
-			echo '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url_itineraire( $lieu ) ) . '" target="_blank" rel="noopener">' . self::icone( 'lieu' ) . '<span>' . esc_html__( 'Itinéraire', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			echo '<a class="etr-btn etr-btn--discret etr-arret__itineraire" href="' . esc_url( self::url_itineraire( $lieu ) ) . '" target="_blank" rel="noopener" title="' . esc_attr__( 'Itinéraire', 'espace-traiteur' ) . '">' . self::icone( 'lieu' ) . '<span>' . esc_html__( 'Itinéraire', 'espace-traiteur' ) . '</span></a>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
 		do_action( 'etr_tournee_actions', $id, $etape ); // Fonctions activables : « En route ».
 		if ( ETR_Equipe::livreur() ) {
@@ -320,8 +320,14 @@ class ETR_Terrain {
 				echo wp_kses_post( $article['image'] );
 			}
 			echo '<span><strong>' . esc_html( $ligne['titre'] ) . '</strong>';
-			/* translators: 1 : quantité, 2 : unité. */
-			echo '<small>' . esc_html( trim( sprintf( __( '%1$s demandé(s) %2$s', 'espace-traiteur' ), number_format_i18n( $demande ), isset( $ligne['unite'] ) ? $ligne['unite'] : '' ) ) ) . '</small></span></span>';
+			$unite = isset( $ligne['unite'] ) ? trim( (string) $ligne['unite'] ) : '';
+			echo '<small>' . esc_html(
+				'' !== $unite
+					/* translators: 1 : quantité, 2 : unité (pièce(s), lot(s)…). */
+					? sprintf( __( 'À préparer : %1$s %2$s', 'espace-traiteur' ), number_format_i18n( $demande ), $unite )
+					/* translators: %s : quantité. */
+					: sprintf( __( 'À préparer : %s', 'espace-traiteur' ), number_format_i18n( $demande ) )
+			) . '</small></span></span>';
 			echo '<span class="etr-pas" role="group" aria-label="' . esc_attr__( 'Quantité prête', 'espace-traiteur' ) . '">';
 			echo '<button type="button" data-action="moins" aria-label="' . esc_attr__( 'Un de moins', 'espace-traiteur' ) . '">−</button>';
 			echo '<input type="number" inputmode="numeric" min="0" max="' . (int) $demande . '" value="' . (int) $fait . '" aria-label="' . esc_attr__( 'Quantité prête', 'espace-traiteur' ) . '">';
