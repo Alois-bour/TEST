@@ -575,7 +575,7 @@ class ETR_Contrat {
 	/* ------------------------------------------------------------------ */
 
 	/**
-	 * Panneau « Contrat de location » (onglet Argent de la fiche).
+	 * Panneau « Contrat de location » (onglet Finances de la fiche).
 	 *
 	 * @param int $id Demande.
 	 */

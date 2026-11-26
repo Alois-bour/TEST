@@ -1510,3 +1510,32 @@ html:active-view-transition-type(onglet)::view-transition-new(etr-contenu) { ani
 	.etr-pipeline span { font-size: 12px; }
 	.etr-a-preparer__liste { grid-template-columns: 1fr; }
 }
+
+/* ------------------------------------------------------------------ */
+/* Finances : compte de la demande, parties numérotées (3.3.1)        */
+/* ------------------------------------------------------------------ */
+.etr-compte__grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.etr-compte__bloc { padding: 16px; border: 1px solid var(--etr-trait-doux); border-radius: 12px; background: var(--etr-voile); }
+.etr-app .etr-compte__sous-titre { margin: 0 0 10px; font: 600 13px/1.3 var(--etr-sans); letter-spacing: .04em; text-transform: uppercase; color: var(--etr-gris); }
+.etr-compte > .etr-compte__sous-titre { margin-top: 22px; }
+.etr-app .etr-compte__lignes { margin: 0; }
+.etr-compte__lignes > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px dashed var(--etr-trait); }
+.etr-compte__lignes > div:last-child { border-bottom: 0; }
+.etr-app .etr-compte__lignes dt { margin: 0; font-weight: 400; color: var(--etr-texte, var(--etr-encre)); }
+.etr-compte__lignes dt small { display: block; font-size: 12px; color: var(--etr-gris); }
+.etr-app .etr-compte__lignes dd { margin: 0; white-space: nowrap; font-variant-numeric: lining-nums tabular-nums; color: var(--etr-encre); }
+.etr-compte__lignes > .est-total { margin-top: 4px; padding-top: 10px; border-top: 2px solid var(--etr-encre); border-bottom: 0; }
+.etr-app .etr-compte__lignes > .est-total dt { font-weight: 600; color: var(--etr-encre); }
+.etr-app .etr-compte__lignes > .est-total dd { font: 400 24px/1 var(--etr-serif); }
+.etr-app .etr-compte__lignes > .est-a-faire dt small,
+.etr-app .etr-compte__lignes > .est-a-faire dd { color: var(--etr-ambre); }
+.etr-app .etr-compte__lignes > .est-fait dt small { color: var(--etr-olive); }
+.etr-app .etr-compte__lignes > .est-du dd,
+.etr-app .etr-compte__lignes > .est-du dt { color: var(--etr-ambre); }
+.etr-compte__lignes > .est-du { border-top-color: var(--etr-ambre); }
+.etr-app .etr-compte__source { margin: 10px 0 0; font-size: 13px; color: var(--etr-gris); }
+.etr-app .etr-finances__titre { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--etr-trait); }
+@media (max-width: 640px) {
+	.etr-compte__grille { grid-template-columns: 1fr; gap: 12px; }
+	.etr-compte__bloc { padding: 12px 14px; }
+}

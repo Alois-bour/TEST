@@ -290,6 +290,7 @@ class ETR_Gestion {
 		$traiteur = isset( $_GET['traiteur'] ) ? absint( $_GET['traiteur'] ) : 0;
 		$q        = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
 		$mois     = isset( $_GET['mois'] ) ? sanitize_text_field( wp_unslash( $_GET['mois'] ) ) : '';
+		$etape    = isset( $_GET['etape'] ) ? sanitize_key( wp_unslash( $_GET['etape'] ) ) : '';
 		// phpcs:enable
 		if ( ! array_key_exists( $statut, etr_statuts() ) ) {
 			$statut = '';
@@ -298,15 +299,27 @@ class ETR_Gestion {
 			$mois = current_time( 'Y-m' );
 		}
 
+		// Mêmes filtres que la liste, étape du parcours comprise.
+		$ids = self::filtrer_demandes( $statut, $traiteur, $q )[1];
+		if ( isset( ETR_Parcours::filtres()[ $etape ] ) ) {
+			$ids = array_values(
+				array_filter(
+					$ids,
+					function ( $id ) use ( $etape ) {
+						return ETR_Parcours::correspond( $id, $etape );
+					}
+				)
+			);
+		}
 		if ( 'planning' === $type ) {
 			$nom    = 'planning-' . $mois;
 			$lignes = self::export_planning( $mois );
 		} elseif ( 'articles' === $type ) {
 			$nom    = 'demandes-articles-' . current_time( 'Y-m-d' );
-			$lignes = self::export_articles( self::filtrer_demandes( $statut, $traiteur, $q )[1] );
+			$lignes = self::export_articles( $ids );
 		} else {
 			$nom    = 'demandes-' . current_time( 'Y-m-d' );
-			$lignes = self::export_demandes( self::filtrer_demandes( $statut, $traiteur, $q )[1] );
+			$lignes = self::export_demandes( $ids );
 		}
 		$lignes = apply_filters( 'etr_export_csv', $lignes, $type );
 
@@ -989,7 +1002,7 @@ class ETR_Gestion {
 		$vue    = self::vue_courante();
 		$parent = array(
 			'demande'   => 'demandes',
-			'preparer'  => 'demandes',
+			'preparer'  => ETR_Equipe::bureau() ? 'demandes' : 'preparations', // Le préparateur vient de « À préparer ».
 			'livrer'    => 'tournee',
 			'reprendre' => 'tournee',
 			'colis'     => 'scanner',
@@ -1342,7 +1355,7 @@ class ETR_Gestion {
 		echo '<p class="etr-app__societe">' . esc_html( etr_nom( $user ) ) . '<span>' . esc_html( $role ? $role : $user->user_email ) . '</span></p>';
 		echo '<ul class="etr-app__liens">';
 		foreach ( self::liens_compte() as $lien ) {
-			echo '<li><a href="' . esc_url( $lien[0] ) . '">' . self::icone( $lien[2] ) . '<span>' . esc_html( $lien[1] ) . '</span></a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			echo '<li' . ( '#etr-cookies' === $lien[0] ? ' hidden' : '' ) . '><a href="' . esc_url( $lien[0] ) . '">' . self::icone( $lien[2] ) . '<span>' . esc_html( $lien[1] ) . '</span></a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
 		echo '</ul></div>';
 		echo '</header>';
@@ -1352,7 +1365,7 @@ class ETR_Gestion {
 		echo '<div class="etr-feuille__tete"><p class="etr-feuille__titre" id="etr-plus-titre">' . esc_html( etr_nom( $user ) ) . '<small>' . esc_html( $role ? $role : $user->user_email ) . '</small></p><button type="button" class="etr-feuille__fermer" data-fermer-feuille aria-label="' . esc_attr__( 'Fermer', 'espace-traiteur' ) . '">×</button></div>';
 		$secondaires = array_slice( $cles, self::ONGLETS_TELEPHONE );
 		// Écrans classés : le terrain, puis la gestion (les écrans ajoutés vont en gestion), puis le compte.
-		$terrain = array( 'tournee', 'scanner', 'planning', 'demandes' );
+		$terrain = array( 'tournee', 'preparations', 'scanner', 'planning', 'demandes' );
 		$groupes = array(
 			__( 'Terrain', 'espace-traiteur' ) => array_values( array_intersect( $secondaires, $terrain ) ),
 			__( 'Gestion', 'espace-traiteur' ) => array_values( array_diff( $secondaires, $terrain ) ),
@@ -1370,7 +1383,7 @@ class ETR_Gestion {
 		}
 		echo '<p class="etr-feuille__groupe">' . esc_html__( 'Compte', 'espace-traiteur' ) . '</p><ul class="etr-feuille__liste">';
 		foreach ( self::liens_compte() as $lien ) {
-			echo '<li><a href="' . esc_url( $lien[0] ) . '"' . ( 'sortie' === $lien[2] ? ' class="est-danger"' : '' ) . '>' . self::icone( $lien[2] ) . '<span>' . esc_html( $lien[1] ) . '</span>' . ( 'sortie' === $lien[2] ? '' : self::icone( 'suite' ) ) . '</a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			echo '<li' . ( '#etr-cookies' === $lien[0] ? ' hidden' : '' ) . '><a href="' . esc_url( $lien[0] ) . '"' . ( 'sortie' === $lien[2] ? ' class="est-danger"' : '' ) . '>' . self::icone( $lien[2] ) . '<span>' . esc_html( $lien[1] ) . '</span>' . ( 'sortie' === $lien[2] ? '' : self::icone( 'suite' ) ) . '</a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
 		echo '</ul></dialog>';
 	}
@@ -1921,6 +1934,7 @@ class ETR_Gestion {
 				'statut'   => $statut,
 				'traiteur' => $traiteur,
 				'q'        => $q,
+				'etape'    => $etape,
 			)
 		);
 		// Exports regroupés dans un petit menu : la liste des demandes remonte sur téléphone.
@@ -1963,6 +1977,9 @@ class ETR_Gestion {
 		if ( $statut ) {
 			echo '<input type="hidden" name="statut" value="' . esc_attr( $statut ) . '">';
 		}
+		if ( $etape ) {
+			echo '<input type="hidden" name="etape" value="' . esc_attr( $etape ) . '">';
+		}
 		echo '<label class="screen-reader-text" for="etr-filtre-traiteur">' . esc_html__( 'Traiteur', 'espace-traiteur' ) . '</label>';
 		echo '<select id="etr-filtre-traiteur" name="traiteur" onchange="this.form.submit()"><option value="">' . esc_html__( 'Tous les traiteurs', 'espace-traiteur' ) . '</option>';
 		foreach ( get_users( array( 'role' => 'traiteur', 'orderby' => 'display_name' ) ) as $user ) {
@@ -1978,7 +1995,7 @@ class ETR_Gestion {
 
 		if ( ! $liste ) {
 			echo '<div class="etr-vide etr-vide--compact"><p>' . esc_html__( 'Aucune demande ne correspond à ces filtres.', 'espace-traiteur' ) . '</p>';
-			if ( $statut || $traiteur || $q ) {
+			if ( $statut || $traiteur || $q || $etape ) {
 				echo '<a class="etr-lien" href="' . esc_url( self::url( array( 'vue' => 'demandes' ) ) ) . '">' . esc_html__( 'Effacer les filtres', 'espace-traiteur' ) . '</a>';
 			}
 			echo '</div>';
@@ -2022,7 +2039,7 @@ class ETR_Gestion {
 		$sous = sprintf( __( 'Demande n° %1$d de %2$s, reçue le %3$s', 'espace-traiteur' ), $id, etr_nom( $auteur ), get_the_date( '', $demande ) );
 		self::entete( get_the_title( $demande ), $sous, '<div class="etr-page-entete__statut">' . etr_statut_badge( $statut ) . '</div>', $retour );
 
-		// Fiche en onglets : Résumé, Matériel, Échanges, Argent (bureau), Historique.
+		// Fiche en onglets : Résumé, Matériel, Échanges, Finances (bureau), Historique.
 		$onglets = ETR_Fiche::onglets( $id );
 		$actif   = ETR_Fiche::onglet_actif( $onglets );
 		ETR_Fiche::barre( $id, $onglets, $actif );
@@ -2067,8 +2084,9 @@ class ETR_Gestion {
 		if ( isset( $onglets['argent'] ) ) {
 			ETR_Fiche::ouvrir( 'argent', $actif );
 			ETR_Fiche::resume_argent( $id );
+			ETR_Fiche::titre_finances( 1, __( 'Fixer le prix', 'espace-traiteur' ), __( 'Remise et frais de livraison (l’estimation aide à chiffrer la livraison).', 'espace-traiteur' ) );
 			self::panneau_tarif( $id );
-			/** Argent (devis, acompte, paiements en ligne, facture…). */
+			/** Finances (prix, devis, acompte, paiements en ligne, facture…). */
 			do_action( 'etr_gestion_fiche_argent', $id );
 			echo '</div>';
 		}

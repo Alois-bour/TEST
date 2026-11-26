@@ -688,25 +688,5 @@
 				afficher( retour.onglet, true );
 			}
 		} catch ( err ) {}
-
-		// « Valider ou refuser » (prochaine étape) : le panneau du statut.
-		document.addEventListener( 'click', function ( e ) {
-			if ( ! e.target.closest( '[data-ouvrir-statut]' ) ) {
-				return;
-			}
-			var bouton = document.querySelector( '.etr-barre-action--feuilles .etr-btn:not(.etr-btn--discret)' );
-			if ( telephone.matches && bouton ) {
-				bouton.click();
-				return;
-			}
-			var panneau = document.querySelector( '.etr-decision' );
-			if ( panneau ) {
-				panneau.scrollIntoView( { behavior: 'smooth', block: 'start' } );
-				var choix = panneau.querySelector( 'input[type="radio"]:checked, input[type="radio"]' );
-				if ( choix ) {
-					choix.focus( { preventScroll: true } );
-				}
-			}
-		} );
 	}() );
 }() );
