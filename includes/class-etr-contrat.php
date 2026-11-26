@@ -37,6 +37,9 @@ class ETR_Contrat {
 		add_filter( 'etr_traiteur_taches', array( __CLASS__, 'tache_traiteur' ), 5, 2 );
 		add_filter( 'etr_gestion_taches', array( __CLASS__, 'tache_bureau' ), 10, 2 );
 		add_filter( 'etr_stripe_peut_payer', array( __CLASS__, 'peut_payer' ), 10, 3 );
+		foreach ( array( 'added_post_meta', 'updated_post_meta', 'deleted_post_meta' ) as $hook ) {
+			add_action( $hook, array( __CLASS__, 'oublier_etat' ), 10, 2 );
+		}
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -146,6 +149,7 @@ class ETR_Contrat {
 		$lignes = array();
 		foreach ( etr_get_lignes( $id ) as $ligne ) {
 			$lignes[] = array(
+				'article'  => (int) $ligne['article_id'],
 				'titre'    => (string) $ligne['titre'],
 				'quantite' => (int) $ligne['quantite'],
 				'unite'    => isset( $ligne['unite'] ) ? (string) $ligne['unite'] : '',
@@ -189,8 +193,46 @@ class ETR_Contrat {
 	 * @return string
 	 */
 	public static function empreinte( $contenu ) {
+		$essentiel           = array_intersect_key( $contenu, array_flip( array( 'date', 'lieu', 'livraison', 'reprise', 'total', 'acompte', 'caution' ) ) );
+		$essentiel['lignes'] = array_map(
+			function ( $l ) {
+				// Le catalogue peut changer (nom, valeur de remplacement) sans que la commande change.
+				return array( isset( $l['article'] ) ? (int) $l['article'] : (string) $l['titre'], (int) $l['quantite'] );
+			},
+			(array) ( $contenu['lignes'] ?? array() )
+		);
+		return 'v2:' . hash( 'sha256', (string) wp_json_encode( $essentiel ) );
+	}
+
+	/**
+	 * Empreinte des contrats signés en 3.2.0 (avec les noms et valeurs du catalogue).
+	 *
+	 * @param array $contenu Contenu.
+	 * @return string
+	 */
+	private static function empreinte_v1( $contenu ) {
 		$essentiel = array_intersect_key( $contenu, array_flip( array( 'lignes', 'date', 'lieu', 'livraison', 'reprise', 'total', 'acompte', 'caution' ) ) );
+		$essentiel['lignes'] = array_map(
+			function ( $l ) {
+				unset( $l['article'] );
+				return $l;
+			},
+			(array) ( $essentiel['lignes'] ?? array() )
+		);
 		return hash( 'sha256', (string) wp_json_encode( $essentiel ) );
+	}
+
+	/**
+	 * Le contrat signé correspond-il encore à la demande ?
+	 *
+	 * @param int   $id    Demande.
+	 * @param array $signe Contrat signé.
+	 * @return bool
+	 */
+	private static function a_jour( $id, $signe ) {
+		$contenu = self::contenu( $id );
+		$attendu = (string) $signe['empreinte'];
+		return 0 === strpos( $attendu, 'v2:' ) ? hash_equals( $attendu, self::empreinte( $contenu ) ) : hash_equals( $attendu, self::empreinte_v1( $contenu ) );
 	}
 
 	/**
@@ -201,30 +243,60 @@ class ETR_Contrat {
 	 * @return string
 	 */
 	public static function etat( $id ) {
+		$id = (int) $id;
+		if ( ! isset( self::$etats[ $id ] ) ) {
+			self::$etats[ $id ] = self::calculer_etat( $id );
+		}
+		return self::$etats[ $id ];
+	}
+
+	/**
+	 * États déjà calculés pendant cette requête (la liste « À faire » en demande beaucoup).
+	 *
+	 * @var string[]
+	 */
+	private static $etats = array();
+
+	/**
+	 * Une demande change (métadonnée, statut) : son état est recalculé.
+	 *
+	 * @param int $meta_id Métadonnée.
+	 * @param int $post_id Contenu.
+	 */
+	public static function oublier_etat( $meta_id, $post_id = 0 ) {
+		unset( self::$etats[ (int) $post_id ] );
+	}
+
+	/**
+	 * Calcul de l'état.
+	 *
+	 * @param int $id Demande.
+	 * @return string
+	 */
+	private static function calculer_etat( $id ) {
 		if ( ! ETR_Modules::actif( 'contrat' ) ) {
 			return 'aucun';
 		}
 		$statut = etr_get_statut( $id );
 		$signe  = self::signe( $id );
-		if ( in_array( $statut, array( 'refusee', 'annulee' ), true ) ) {
-			return $signe ? 'signe' : 'aucun';
-		}
-		if ( in_array( $statut, array( 'livree', 'cloturee' ), true ) ) {
-			return $signe ? 'signe' : 'aucun'; // Après la livraison, on ne fait plus signer.
-		}
-		if ( 'validee' !== $statut ) {
-			return $signe ? 'signe' : 'attente';
+		if ( in_array( $statut, array( 'refusee', 'annulee', 'livree', 'cloturee' ), true ) ) {
+			return $signe ? 'signe' : 'aucun'; // Après la livraison (ou sans suite), on ne fait plus signer.
 		}
 		if ( ETR_Modules::actif( 'devis' ) ) {
 			$devis = ETR_Devis::devis( $id );
 			if ( ! $devis || empty( $devis['accepte'] ) ) {
-				return $signe ? 'a_resigner' : 'attente'; // Nouveau devis à accepter d'abord.
+				// Devis (nouveau) à accepter d'abord : on ne fait jamais signer des montants non acceptés.
+				return 'attente';
 			}
+		}
+		if ( 'validee' !== $statut ) {
+			// Demande pas (ou plus) validée : un contrat encore conforme reste valable, sinon on attend.
+			return $signe && self::a_jour( $id, $signe ) ? 'signe' : 'attente';
 		}
 		if ( ! $signe ) {
 			return 'a_signer';
 		}
-		return self::empreinte( self::contenu( $id ) ) === $signe['empreinte'] ? 'signe' : 'a_resigner';
+		return self::a_jour( $id, $signe ) ? 'signe' : 'a_resigner';
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -279,7 +351,7 @@ class ETR_Contrat {
 		if ( ! $peut || 'solde' === $type || ! self::parametres()['avant_paiement'] ) {
 			return $peut;
 		}
-		return ! in_array( self::etat( $id ), array( 'a_signer', 'a_resigner' ), true );
+		return in_array( self::etat( $id ), array( 'signe', 'aucun' ), true );
 	}
 
 	/**
@@ -290,6 +362,14 @@ class ETR_Contrat {
 			return;
 		}
 		wp_enqueue_script( 'espace-traiteur-contrat', ETR_URL . 'assets/js/contrat.js', array(), ETR_VERSION, true );
+		wp_localize_script(
+			'espace-traiteur-contrat',
+			'etrContrat',
+			array(
+				'vide'  => __( 'Signez dans le cadre avant d’envoyer.', 'espace-traiteur' ),
+				'envoi' => __( 'Signature en cours…', 'espace-traiteur' ),
+			)
+		);
 	}
 
 	/**
@@ -424,7 +504,7 @@ class ETR_Contrat {
 			$erreur( __( 'Indiquez votre nom et cochez l’acceptation des conditions.', 'espace-traiteur' ) );
 		}
 		$contenu = self::contenu( $id );
-		$attendu = isset( $_POST['empreinte'] ) ? sanitize_key( wp_unslash( $_POST['empreinte'] ) ) : '';
+		$attendu = isset( $_POST['empreinte'] ) ? preg_replace( '/[^a-z0-9:]/', '', strtolower( (string) wp_unslash( $_POST['empreinte'] ) ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- caractères limités.
 		if ( ! hash_equals( self::empreinte( $contenu ), $attendu ) ) {
 			// La demande a changé pendant la lecture : on ne fait pas signer un texte que la personne n'a pas vu.
 			$erreur( __( 'Le contrat a changé pendant votre lecture (matériel, dates ou montants). Relisez-le, puis signez de nouveau.', 'espace-traiteur' ) );
@@ -557,7 +637,7 @@ class ETR_Contrat {
 		}
 		$id     = absint( $_GET['id'] ); // phpcs:ignore WordPress.Security.NonceVerification
 		$equipe = ETR_Equipe::acces() && ETR_Equipe::bureau() && ETR_Gestion::demande_visible( $id );
-		$permis = is_user_logged_in() && 'etr_demande' === get_post_type( $id ) && ( etr_peut_voir_demande( $id ) || $equipe ) && self::signe( $id );
+		$permis = ETR_Modules::actif( 'contrat' ) && is_user_logged_in() && 'etr_demande' === get_post_type( $id ) && 'publish' === get_post_status( $id ) && ( etr_peut_voir_demande( $id ) || $equipe ) && self::signe( $id );
 		if ( ! $permis ) {
 			wp_die( esc_html__( 'Document introuvable.', 'espace-traiteur' ), '', array( 'response' => 404 ) );
 		}

@@ -765,7 +765,7 @@ class ETR_Traiteur_Plus {
 		echo '<section class="etr-panneau etr-avis"><h2 class="etr-panneau__titre">' . esc_html__( 'Avis du traiteur', 'espace-traiteur' ) . '</h2><p class="etr-avis__etoiles">' . esc_html( str_repeat( '★', (int) $avis['note'] ) . str_repeat( '☆', 5 - (int) $avis['note'] ) ) . '</p>';
 		echo $avis['texte'] ? '<p>' . nl2br( esc_html( $avis['texte'] ) ) . '</p>' : '';
 		echo '<p class="etr-muted">' . esc_html( wp_date( 'j F Y', (int) $avis['le'] ) ) . '</p>';
-		if ( ETR_Modules::actif( 'avis_google' ) && (int) $avis['note'] >= (int) self::parametres()['google_note'] ) {
+		if ( self::proposer_google( $id ) ) {
 			$clic = (int) get_post_meta( $id, self::META_GOOGLE, true );
 			/* translators: %s : date. */
 			echo '<p class="etr-muted">' . esc_html( $clic ? sprintf( __( 'Avis Google : le traiteur a suivi le lien le %s.', 'espace-traiteur' ), wp_date( 'j F Y', $clic ) ) : __( 'Avis Google : proposé, lien pas encore suivi.', 'espace-traiteur' ) ) . '</p>';

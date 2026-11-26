@@ -16,6 +16,8 @@
 	var vide   = true;
 	var trace  = false;
 	var texteAide = aide.textContent;
+	var textes    = window.etrContrat || { vide: 'Signez dans le cadre avant d’envoyer.', envoi: 'Signature en cours…' };
+	var taille    = { l: 0, h: 0 }; // Taille de la toile au dernier calage.
 
 	function preparer() {
 		var cadre = toile.getBoundingClientRect();
@@ -23,6 +25,7 @@
 			return;
 		}
 		var ratio    = window.devicePixelRatio || 1;
+		taille       = { l: cadre.width, h: cadre.height };
 		toile.width  = Math.round( cadre.width * ratio );
 		toile.height = Math.round( cadre.height * ratio );
 		ctx          = toile.getContext( '2d' );
@@ -41,10 +44,38 @@
 		return { x: e.clientX - cadre.left, y: e.clientY - cadre.top };
 	}
 
+	// La toile change de taille (barre de défilement qui apparaît, texte du contrat ouvert,
+	// téléphone tourné) : on recale, en gardant le tracé à l'échelle ; sinon le trait
+	// s'écarterait du doigt et la signature serait déformée.
+	function recaler() {
+		var cadre = toile.getBoundingClientRect();
+		if ( ! cadre.width || ( Math.abs( cadre.width - taille.l ) < 1 && Math.abs( cadre.height - taille.h ) < 1 ) ) {
+			return;
+		}
+		if ( vide ) {
+			preparer();
+			return;
+		}
+		var copie    = document.createElement( 'canvas' );
+		copie.width  = toile.width;
+		copie.height = toile.height;
+		copie.getContext( '2d' ).drawImage( toile, 0, 0 );
+		var garder   = champ.value;
+		preparer();
+		ctx.drawImage( copie, 0, 0, cadre.width, cadre.height );
+		vide        = false;
+		champ.value = garder;
+		zone.classList.add( 'est-signee' );
+	}
+	if ( window.ResizeObserver ) {
+		new window.ResizeObserver( recaler ).observe( toile );
+	}
+
 	toile.addEventListener( 'pointerdown', function ( e ) {
 		if ( ! ctx ) {
 			preparer();
 		}
+		recaler(); // Au cas où la taille a changé sans être signalée.
 		e.preventDefault();
 		toile.setPointerCapture( e.pointerId );
 		trace = true;
@@ -72,19 +103,14 @@
 	} );
 	zone.querySelector( '[data-contrat-effacer]' ).addEventListener( 'click', preparer );
 
-	// Le texte du contrat s'ouvre : la toile a maintenant sa vraie taille.
-	window.addEventListener( 'resize', function () {
-		if ( vide ) {
-			preparer();
-		}
-	} );
+	window.addEventListener( 'resize', recaler );
 	preparer();
 
 	form.addEventListener( 'submit', function ( e ) {
 		if ( vide ) {
 			e.preventDefault();
 			zone.classList.add( 'est-erreur' );
-			aide.textContent = 'Signez dans le cadre avant d’envoyer.';
+			aide.textContent = textes.vide;
 			zone.scrollIntoView( { behavior: 'smooth', block: 'center' } );
 			return;
 		}
@@ -100,7 +126,7 @@
 		var bouton = form.querySelector( 'button[type="submit"]' );
 		if ( bouton ) {
 			bouton.disabled    = true;
-			bouton.textContent = 'Signature en cours…';
+			bouton.textContent = textes.envoi;
 		}
 	} );
 }() );
