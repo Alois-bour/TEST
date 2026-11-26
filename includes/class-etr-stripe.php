@@ -318,8 +318,11 @@ class ETR_Stripe {
 	/**
 	 * Montant à payer pour un type, ou 0.
 	 *
-	 * @param int    $id   Demande.
-	 * @param string $type acompte | solde | caution.
+	 * @param int    $id     Demande.
+	 * @param string $type   acompte | solde | caution.
+	 * @param bool   $filtre Appliquer les conditions des autres fonctions (filtre etr_stripe_peut_payer,
+	 *                       ex. contrat à signer d'abord). false : montant dû, pour l'affichage
+	 *                       seulement ; ne jamais s'en servir pour ouvrir un paiement.
 	 * @return float
 	 */
 	public static function a_payer( $id, $type, $filtre = true ) {

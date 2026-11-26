@@ -123,6 +123,17 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Contrat et avis Google : corrections de la revue (3.2.1)
+
+- **Nouveau devis pas encore accepté** : le contrat attend l'acceptation (plus de « Signer de nouveau » au-dessus de « Accepter le devis », signature refusée par le serveur) ; on ne signe jamais des montants non acceptés.
+- **Paiement en ligne** (réglage « avant le paiement ») : ouvert seulement avec un contrat signé et à jour, quel que soit le statut (une demande en attente avec un acompte renseigné ne peut plus être payée sans contrat).
+- **Catalogue** : changer le nom ou la valeur de remplacement d'un produit ne demande plus de nouvelle signature ; seuls les articles, quantités, dates, lieu et montants comptent. Les contrats signés en 3.2.0 restent valables.
+- **Signature** : la toile se recale quand le cadre change de taille (barre de défilement, téléphone tourné), le trait reste sous le doigt et le tracé déjà fait est gardé.
+- **PDF du contrat** : refusé pour une demande à la corbeille ou en brouillon, et quand la fonction est désactivée.
+- **Rapidité** : l'état du contrat est calculé une fois par demande et par page.
+- **Avis Google** : le panneau du bureau n'en parle que si l'invitation a vraiment été montrée (lien renseigné).
+- Messages du script de signature traduisibles ; paramètre `$filtre` de `ETR_Stripe::a_payer()` documenté.
+
 ### Contrat de location signé en ligne, avis Google (3.2.0)
 
 Deux fonctions activables (Espace traiteur › Fonctions), désactivées par défaut.
