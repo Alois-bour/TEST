@@ -600,6 +600,7 @@ class ETR_Gestion {
 		wp_enqueue_style( 'espace-traiteur-gestion', ETR_URL . 'assets/css/gestion.css', array( 'espace-traiteur' ), ETR_VERSION );
 		wp_enqueue_script( 'espace-traiteur-gestion', ETR_URL . 'assets/js/gestion.js', array(), ETR_VERSION, true );
 		wp_enqueue_script( 'espace-traiteur-app', ETR_URL . 'assets/js/app.js', array(), ETR_VERSION, true );
+		wp_enqueue_script( 'espace-traiteur-cookies', ETR_URL . 'assets/js/cookies.js', array(), ETR_VERSION, true );
 		wp_localize_script( 'espace-traiteur-app', 'etrApp', ETR_PWA::config_script() );
 		if ( ETR_Cles_Acces::disponible() && ( ETR_Equipe_Acces::ecran() || is_user_logged_in() ) ) {
 			wp_enqueue_script( 'espace-traiteur-cles', ETR_URL . 'assets/js/cles-acces.js', array(), ETR_VERSION, true );
@@ -1269,6 +1270,8 @@ class ETR_Gestion {
 			$liens[] = array( admin_url( 'edit.php?post_type=etr_demande&page=etr-reglages' ), __( 'Réglages', 'espace-traiteur' ), 'reglages' );
 			$liens[] = array( admin_url(), __( 'Administration WordPress', 'espace-traiteur' ), 'externe' );
 		}
+		// Choix des cookies : le bouton flottant de l'extension est masqué dans l'application (cookies.js).
+		$liens[] = array( '#etr-cookies', __( 'Cookies', 'espace-traiteur' ), 'cookies' );
 		$liens[] = array( wp_logout_url( self::url() ), __( 'Se déconnecter', 'espace-traiteur' ), 'sortie' );
 		return $liens;
 	}
