@@ -123,6 +123,12 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Comptes traiteurs dans l'équipe (3.1.1)
+
+- **Application de l'équipe** : un compte traiteur qui essaie de s'y connecter voit pourquoi c'est refusé, un lien vers l'espace traiteur, et comment obtenir l'accès.
+- **Équipe › Ajouter** : l'adresse d'un compte traiteur existant est acceptée ; le compte reçoit les rôles d'équipe choisis, garde son mot de passe et son espace traiteur. L'adresse d'un membre de l'équipe ou d'un administrateur reste refusée.
+- Un traiteur qui a un rôle d'équipe (préparateur, livreur, et plus seulement bureau) peut se connecter à l'application.
+
 ### Application : fiche en onglets et « À faire » (3.1.0)
 
 - **Fiche d'une demande en onglets** : Résumé · Matériel · Échanges · Argent (bureau) · Historique. Pastilles sur les onglets (point d'argent à traiter, incident ouvert, message du traiteur sans réponse). Les onglets sont de vrais liens (`?onglet=argent`), changent sans rechargement, restent en haut de l'écran, et le même onglet revient après un enregistrement.

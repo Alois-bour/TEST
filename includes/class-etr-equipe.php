@@ -354,7 +354,7 @@ class ETR_Equipe {
 	 *
 	 * @param array $donnees nom, email, telephone (bruts), roles (liste de rôles d'équipe).
 	 * @param bool  $inviter Envoyer l'invitation tout de suite.
-	 * @return array|WP_Error { user_id, invitation : true envoyée, false échec, null non demandée }
+	 * @return array|WP_Error { user_id, invitation : true envoyée, false échec, null non demandée, existant : compte traiteur complété }
 	 */
 	public static function creer_membre( $donnees, $inviter = false ) {
 		$nom       = sanitize_text_field( isset( $donnees['nom'] ) ? $donnees['nom'] : '' );
@@ -368,11 +368,25 @@ class ETR_Equipe {
 		if ( ! is_email( $email ) ) {
 			return new WP_Error( 'email' );
 		}
-		if ( email_exists( $email ) ) {
-			return new WP_Error( 'email_existe' );
-		}
 		if ( ! $roles ) {
 			return new WP_Error( 'role' );
+		}
+		$existant = email_exists( $email ) ? get_user_by( 'email', $email ) : false;
+		if ( $existant ) {
+			// Compte traiteur déjà existant : il reçoit les rôles d'équipe et garde son mot de passe
+			// et son espace traiteur. Un compte déjà dans l'équipe (ou administrateur) est refusé.
+			if ( self::acces( $existant->ID ) || ! etr_est_traiteur( $existant->ID ) || user_can( $existant->ID, 'edit_posts' ) ) {
+				return new WP_Error( 'email_existe' );
+			}
+			self::appliquer_roles( $existant, $roles );
+			if ( '' !== $telephone && '' === (string) get_user_meta( $existant->ID, 'etr_telephone', true ) ) {
+				update_user_meta( $existant->ID, 'etr_telephone', $telephone );
+			}
+			return array(
+				'user_id'    => $existant->ID,
+				'invitation' => null,
+				'existant'   => true,
+			);
 		}
 
 		$base  = sanitize_user( strtolower( remove_accents( strstr( $email, '@', true ) ) ), true );

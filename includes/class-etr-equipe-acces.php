@@ -47,6 +47,13 @@ class ETR_Equipe_Acces {
 	private static $erreur = '';
 
 	/**
+	 * Le refus vient d'un compte traiteur (message d'aide en plus).
+	 *
+	 * @var bool
+	 */
+	private static $hors_espace = false;
+
+	/**
 	 * Confirmation à afficher.
 	 *
 	 * @var string
@@ -217,8 +224,9 @@ class ETR_Equipe_Acces {
 		);
 		if ( is_wp_error( $user ) ) {
 			ETR_Comptes::compter_echec( $cle );
-			self::$erreur = 'etr_hors_espace' === $user->get_error_code()
-				? __( 'Les traiteurs se connectent depuis l’espace traiteur, pas depuis l’application de l’équipe.', 'espace-traiteur' )
+			self::$hors_espace = 'etr_hors_espace' === $user->get_error_code();
+			self::$erreur      = self::$hors_espace
+				? __( 'Ce compte est un compte traiteur : il se connecte depuis l’espace traiteur, pas depuis l’application de l’équipe.', 'espace-traiteur' )
 				: __( 'Identifiant ou mot de passe incorrect.', 'espace-traiteur' );
 			return;
 		}
@@ -359,7 +367,13 @@ class ETR_Equipe_Acces {
 			echo '<div class="etr-auth__message etr-auth__message--succes" role="status"><p>' . esc_html( self::$succes ) . '</p></div>';
 		}
 		if ( self::$erreur ) {
-			echo '<div class="etr-auth__message etr-auth__message--erreur" role="alert"><p>' . esc_html( self::$erreur ) . '</p></div>';
+			echo '<div class="etr-auth__message etr-auth__message--erreur" role="alert"><p>' . esc_html( self::$erreur ) . '</p>';
+			if ( self::$hors_espace ) {
+				// Compte traiteur : où aller, et comment obtenir l'accès s'il fait aussi partie de l'équipe.
+				echo '<p><a href="' . esc_url( etr_url() ) . '">' . esc_html__( 'Ouvrir l’espace traiteur', 'espace-traiteur' ) . '</a></p>';
+				echo '<p>' . esc_html__( 'Vous faites partie de l’équipe ? Connectez-vous avec votre compte d’équipe, ou demandez à un administrateur de donner un rôle à ce compte (Bureau, Préparateur ou Livreur) dans Espace traiteur › Équipe.', 'espace-traiteur' ) . '</p>';
+			}
+			echo '</div>';
 		}
 	}
 
