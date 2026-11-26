@@ -274,11 +274,24 @@ class ETR_Stripe {
 	}
 
 	/**
-	 * Enregistre un paiement.
+	 * Remplace l’état d’un paiement (nouvelle caution).
 	 *
 	 * @param int    $id   Demande.
 	 * @param string $type acompte | solde | caution.
 	 * @param array  $data Données.
+	 */
+	private static function remplacer( $id, $type, $data ) {
+		$p          = self::paiements( $id );
+		$p[ $type ] = $data; // Nouvelle caution : rien de l'ancienne (débit en attente, essais) n'est repris.
+		update_post_meta( $id, self::META, $p );
+	}
+
+	/**
+	 * Complète l'état d'un paiement.
+	 *
+	 * @param int    $id   Demande.
+	 * @param string $type acompte | solde | caution.
+	 * @param array  $data Champs.
 	 */
 	private static function noter( $id, $type, $data ) {
 		$p          = self::paiements( $id );
@@ -452,9 +465,12 @@ class ETR_Stripe {
 			exit;
 		}
 		// Une ancienne page de paiement encore ouverte ne doit plus pouvoir être payée.
+		// Pour le solde (acompte compris), une page d'acompte restée ouverte est fermée aussi.
 		$ancien = self::paiements( $id );
-		if ( isset( $ancien[ $type ]['statut'], $ancien[ $type ]['session'] ) && 'en_cours' === $ancien[ $type ]['statut'] ) {
-			self::api( 'POST', 'checkout/sessions/' . rawurlencode( $ancien[ $type ]['session'] ) . '/expire' );
+		foreach ( 'solde' === $type ? array( 'solde', 'acompte' ) : array( $type ) as $t ) {
+			if ( isset( $ancien[ $t ]['statut'], $ancien[ $t ]['session'] ) && 'en_cours' === $ancien[ $t ]['statut'] ) {
+				self::api( 'POST', 'checkout/sessions/' . rawurlencode( $ancien[ $t ]['session'] ) . '/expire' );
+			}
 		}
 		$session = self::creer_session( $id, $type, $montant );
 		if ( is_wp_error( $session ) || empty( $session['url'] ) || 'checkout.stripe.com' !== wp_parse_url( $session['url'], PHP_URL_HOST ) ) {
@@ -628,8 +644,20 @@ class ETR_Stripe {
 		if ( isset( $deja[ $type ]['session'], $deja[ $type ]['statut'] ) && $deja[ $type ]['session'] === $s['id'] && 'en_cours' !== $deja[ $type ]['statut'] ) {
 			return true; // Déjà enregistré (webhook et retour).
 		}
-		if ( in_array( $type, array( 'acompte', 'solde' ), true ) && isset( $deja[ $type ]['statut'] ) && 'paye' === $deja[ $type ]['statut'] && $deja[ $type ]['session'] !== $s['id'] ) {
-			// Deuxième paiement (ancien onglet) : signalé au bureau pour remboursement, rien n'est compté deux fois.
+		$deja_paye = in_array( $type, array( 'acompte', 'solde' ), true ) && isset( $deja[ $type ]['statut'] ) && 'paye' === $deja[ $type ]['statut'] && $deja[ $type ]['session'] !== $s['id'];
+		if ( 'acompte' === $type && ! $deja_paye && class_exists( 'ETR_Facture' ) ) {
+			// Acompte payé depuis un vieil onglet après le règlement de la facture (acompte compris).
+			$f         = ETR_Facture::facture( $id );
+			$deja_paye = $f && ! empty( $f['payee'] );
+		}
+		if ( $deja_paye ) {
+			// Deuxième paiement (ancien onglet) : signalé au bureau pour remboursement, rien n'est
+			// compté deux fois ; seulement une fois l'argent vraiment reçu (un SEPA peut échouer).
+			$pi = self::api( 'GET', 'payment_intents/' . rawurlencode( (string) $s['payment_intent'] ) );
+			if ( is_wp_error( $pi ) || 'succeeded' !== $pi['status'] ) {
+				self::$a_reessayer = self::passager( $pi );
+				return false;
+			}
 			$doublons   = isset( $deja['doublons'] ) && is_array( $deja['doublons'] ) ? $deja['doublons'] : array();
 			if ( ! in_array( $s['id'], $doublons, true ) ) {
 				$doublons[] = $s['id'];
@@ -652,7 +680,7 @@ class ETR_Stripe {
 				self::$a_reessayer = self::passager( $si );
 				return false;
 			}
-			self::noter( $id, 'caution', array( 'session' => $s['id'], 'mode' => 'carte', 'client' => $si['customer'] ? $si['customer'] : $s['customer'], 'carte' => $si['payment_method'], 'montant' => (float) $acompte['caution'], 'statut' => 'enregistree', 'le' => time() ) );
+			self::remplacer( $id, 'caution', array( 'session' => $s['id'], 'mode' => 'carte', 'client' => $si['customer'] ? $si['customer'] : $s['customer'], 'carte' => $si['payment_method'], 'montant' => (float) $acompte['caution'], 'statut' => 'enregistree', 'le' => time() ) );
 			$acompte['caution_recue'] = $aujourdhui;
 			update_post_meta( $id, ETR_Devis::META_ACOMPTE, $acompte );
 			ETR_Historique::ajouter( $id, 'paiement', __( 'Caution : carte enregistrée en ligne (Stripe)', 'espace-traiteur' ), 0 );
@@ -673,7 +701,7 @@ class ETR_Stripe {
 			if ( 'requires_capture' !== $pi['status'] ) {
 				return false;
 			}
-			self::noter( $id, 'caution', array( 'session' => $s['id'], 'mode' => 'empreinte', 'pi' => $pi['id'], 'montant' => $montant, 'statut' => 'bloquee', 'expire' => (int) $pi['created'] + 7 * DAY_IN_SECONDS, 'le' => time() ) );
+			self::remplacer( $id, 'caution', array( 'session' => $s['id'], 'mode' => 'empreinte', 'pi' => $pi['id'], 'montant' => $montant, 'statut' => 'bloquee', 'expire' => (int) $pi['created'] + 7 * DAY_IN_SECONDS, 'le' => time() ) );
 			$acompte['caution_recue'] = $aujourdhui;
 			update_post_meta( $id, ETR_Devis::META_ACOMPTE, $acompte );
 			/* translators: %s : montant. */
@@ -863,7 +891,7 @@ class ETR_Stripe {
 		if ( is_wp_error( $r ) ) {
 			return $r;
 		}
-		self::noter( $id, 'caution', array( 'statut' => 'liberee', 'libere_le' => time() ) );
+		self::noter( $id, 'caution', array( 'statut' => 'liberee', 'libere_le' => time(), 'debit_attente' => null ) );
 		$a                   = ETR_Devis::acompte( $id );
 		$a['caution_rendue'] = current_time( 'Y-m-d' );
 		update_post_meta( $id, ETR_Devis::META_ACOMPTE, $a );
@@ -921,7 +949,8 @@ class ETR_Stripe {
 			return new WP_Error( 'etr_caution', sprintf( __( 'Un débit de %s est peut-être déjà passé (Stripe n’a pas répondu). Réessayez avec ce même montant, ou vérifiez dans le tableau de bord Stripe.', 'espace-traiteur' ), ETR_Devis::prix( $attente['montant'] ) ) );
 		}
 		$essai = isset( $c['essai'] ) ? (int) $c['essai'] : 0;
-		$cle   = 'etr-debit-' . $id . '-' . $essai; // Indépendante du montant.
+		// Indépendante du montant, propre à ce site et à cette caution (empreinte ou carte).
+		$cle   = 'etr-debit-' . substr( md5( home_url() . '|' . ( $c['pi'] ?? '' ) . '|' . ( $c['carte'] ?? '' ) . '|' . ( $c['session'] ?? '' ) ), 0, 16 ) . '-' . $id . '-' . $essai;
 		self::noter( $id, 'caution', array( 'debit_attente' => array( 'montant' => $montant, 'pi' => $attente['pi'] ?? '' ) ) );
 		if ( $attente && ! empty( $attente['pi'] ) ) {
 			// Débit déjà créé chez Stripe (en traitement) : on lit simplement où il en est.

@@ -234,6 +234,10 @@ class ETR_Facture {
 	 */
 	public static function avancer_compteur( $prochain ) {
 		if ( ! self::verrouiller() ) {
+			// Facture en cours de numérotation : rien n'est perdu sans le dire.
+			if ( function_exists( 'add_settings_error' ) ) {
+				add_settings_error( self::OPTION, 'etr_compteur_occupe', __( 'Le prochain numéro de facture n’a pas pu être changé (une facture était en cours de numérotation). Enregistrez de nouveau.', 'espace-traiteur' ) );
+			}
 			return;
 		}
 		$c     = self::compteur();
@@ -361,7 +365,7 @@ class ETR_Facture {
 	 */
 	public static function reglements( $id, $f = null ) {
 		$f       = null === $f ? self::facture( $id ) : $f;
-		$ttc     = $f ? (float) $f['ttc'] : 0.0;
+		$ttc     = isset( $f['ttc'] ) ? (float) $f['ttc'] : 0.0;
 		$acompte = 0.0;
 		$a       = class_exists( 'ETR_Devis' ) ? ETR_Devis::acompte( $id ) : array();
 		if ( ! empty( $a['acompte'] ) && ! empty( $a['acompte_recu'] ) ) {
@@ -373,13 +377,16 @@ class ETR_Facture {
 			$caution = (float) $s['caution']['debite']; // Casse et manquants déjà prélevés sur la caution.
 		}
 		$acompte = min( $ttc, $acompte );
-		// La caution débitée ne réduit la facture que pour la casse qui y figure (jamais au-delà).
-		$plafond = isset( $f['casse'] ) ? (float) $f['casse'] : $ttc;
+		$debite  = $caution;
+		// Avec la casse sur la facture, la caution débitée ne la réduit que de cette casse (le reste
+		// du débit est hors facture). Sans la fonction « casse », tout le débit est déduit.
+		$plafond = ETR_Modules::actif( 'casse' ) && isset( $f['casse'] ) ? (float) $f['casse'] : $ttc;
 		$caution = min( $ttc - $acompte, $plafond, $caution );
 		return array(
-			'acompte' => round( $acompte, 2 ),
-			'caution' => round( $caution, 2 ),
-			'reste'   => round( max( 0, $ttc - $acompte - $caution ), 2 ),
+			'acompte'      => round( $acompte, 2 ),
+			'caution'      => round( $caution, 2 ),
+			'reste'        => round( max( 0, $ttc - $acompte - $caution ), 2 ),
+			'hors_facture' => round( max( 0, $debite - $caution ), 2 ), // Débité sur la caution, non déduit.
 		);
 	}
 
@@ -566,6 +573,11 @@ class ETR_Facture {
 		/* translators: 1 : numéro, 2 : date, 3 : TTC. */
 		echo '<p><strong>' . esc_html( $f['numero'] ) . '</strong> · ' . esc_html( sprintf( __( 'du %1$s · %2$s TTC', 'espace-traiteur' ), wp_date( 'j F Y', (int) $f['le'] ), ETR_Devis::prix( $f['ttc'] ) ) ) . '</p>';
 		echo $f['payee'] ? '<p class="etr-pastille-etat etr-pastille-etat--ok">' . esc_html( sprintf( /* translators: %s : date. */ __( 'Payée le %s', 'espace-traiteur' ), etr_format_date( $f['payee'] ) ) ) . '</p>' : '<p class="etr-pastille-etat etr-pastille-etat--cours">' . esc_html( sprintf( /* translators: 1 : montant, 2 : date. */ __( 'Reste %1$s à payer avant le %2$s', 'espace-traiteur' ), ETR_Devis::prix( self::reglements( $id, $f )['reste'] ), etr_format_date( $f['echeance'] ) ) ) . '</p>';
+		$hors = self::reglements( $id, $f )['hors_facture'];
+		if ( $hors > 0 ) {
+			/* translators: %s : montant. */
+			echo '<p class="etr-muted">' . esc_html( sprintf( __( '%s débités sur la caution au-delà de la casse facturée : hors facture (non déduits).', 'espace-traiteur' ), ETR_Devis::prix( $hors ) ) ) . '</p>';
+		}
 		echo '<p><a class="etr-lien" target="_blank" href="' . esc_url( self::url_pdf( $id ) ) . '">' . esc_html__( 'Voir la facture (PDF)', 'espace-traiteur' ) . '</a></p>';
 		echo '<form method="post" class="etr-facture__payee" action="' . esc_url( $url ) . '">' . wp_nonce_field( 'etr_facture_' . $id, 'etr_nonce', true, false ) . '<input type="hidden" name="etr_gestion_action" value="facture"><input type="hidden" name="quoi" value="payee"><input type="hidden" name="demande_id" value="' . (int) $id . '"><label>' . esc_html__( 'Payée le', 'espace-traiteur' ) . ' <input type="date" name="payee" value="' . esc_attr( $f['payee'] ) . '"></label> <button type="submit" class="etr-btn etr-btn--discret">' . esc_html__( 'Enregistrer', 'espace-traiteur' ) . '</button></form>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<form method="post" action="' . esc_url( $url ) . '">' . wp_nonce_field( 'etr_facture_' . $id, 'etr_nonce', true, false ) . '<input type="hidden" name="etr_gestion_action" value="facture"><input type="hidden" name="quoi" value="envoyer"><input type="hidden" name="demande_id" value="' . (int) $id . '"><button type="submit" class="etr-btn etr-btn--discret">' . esc_html__( 'Renvoyer au traiteur', 'espace-traiteur' ) . '</button></form></section>'; // phpcs:ignore WordPress.Security.EscapeOutput

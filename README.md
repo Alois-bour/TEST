@@ -123,6 +123,16 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Corrections de la troisième revue (3.0.4)
+
+- **Téléphone partagé** : à la déconnexion, seules les saisies de la personne qui part sont comptées et supprimées ; celles d'un collègue restent. Les saisies gardées avant la 3.0.3 (sans auteur) ne partent plus d'office : elles sont signalées et ne partent qu'avec « Réessayer ».
+- **Stripe** : un second paiement n'est signalé « à rembourser » qu'une fois réussi (un SEPA en cours n'est pas compté) ; un acompte payé depuis un vieil onglet après le règlement de la facture est signalé en double ; démarrer le paiement du solde ferme la page d'acompte restée ouverte.
+- **Caution** : une nouvelle caution repart de zéro (débit en attente, essais), la libération efface le débit en attente ; clé d'idempotence propre au site et à la caution.
+- **Facture** : sans la fonction « casse », le débit de caution est déduit de la facture ; avec, la part non déduite est indiquée « hors facture » sur la fiche.
+- **Compteur de factures** : un changement du prochain numéro impossible pendant une numérotation est signalé dans les réglages.
+- **Face ID** : essais par adresse IP comptés de façon atomique, avant la vérification, par quart d'heure fixe.
+- **Espace traiteur** : Cmd/Ctrl-clic sur « Se déconnecter » laissé au navigateur.
+
 ### Corrections de la seconde revue (3.0.3)
 
 - **Terrain** : une saisie refusée par le serveur n'est plus envoyée une seconde fois ; une saisie laissée par une autre personne sur un téléphone partagé ne bloque plus les envois de la personne connectée ; déconnexion : un seul déroulé même si l'on touche plusieurs fois, 8 s d'attente au plus.

@@ -29,6 +29,9 @@ delete_option( 'etr_journal_liens' );
 foreach ( array( 'etr_modules', 'etr_hors_service', 'etr_relances_jour', 'etr_cgv_url', 'etr_devis_validite', 'etr_estimation', 'etr_estimation_depart', 'etr_couleurs', 'etr_logistique', 'etr_traiteur_plus', 'etr_stock_plus', 'etr_inventaires', 'etr_alerte_stock_jour', 'etr_facturation', 'etr_stripe', 'etr_acompte_defauts', 'etr_hors_service', 'etr_facture_compteur' ) as $etr_option ) {
 	delete_option( $etr_option ); // Fonctions activables (2.7.0).
 }
+// Compteurs d'essais Face ID par adresse IP (3.0.3).
+global $wpdb;
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( 'etr_echecs_cle_ip_' ) . '%' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 delete_option( 'etr_push_vapid' );
 delete_option( 'etr_rappel_veille' );
 delete_metadata( 'user', 0, 'etr_push_appareils', '', true );

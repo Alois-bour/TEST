@@ -85,10 +85,13 @@
 	var sortie = false;
 	document.addEventListener( 'click', function ( e ) {
 		var lien = e.target.closest( 'a[href*="action=logout"]' );
-		if ( ! lien || sortie ) {
+		if ( ! lien || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey ) {
 			return;
 		}
 		e.preventDefault();
+		if ( sortie ) {
+			return;
+		}
 		sortie = true;
 		var fin = navigator.serviceWorker.getRegistration( C.portee ).then( function ( reg ) {
 			return reg ? reg.pushManager.getSubscription() : null;

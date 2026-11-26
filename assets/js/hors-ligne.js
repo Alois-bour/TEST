@@ -93,7 +93,11 @@
 	 * @return {boolean}
 	 */
 	function aMoi( e ) {
-		return ! e.par || ! C.utilisateur || parseInt( e.par, 10 ) === parseInt( C.utilisateur, 10 );
+		if ( ! C.utilisateur ) {
+			return true;
+		}
+		// Sans auteur (saisie d'avant la 3.0.3) : jamais envoyée d'office, voir sansAuteur().
+		return !! e.par && parseInt( e.par, 10 ) === parseInt( C.utilisateur, 10 );
 	}
 
 	function reconstruire( envoi ) {
@@ -327,6 +331,7 @@
 					reessayer.textContent = 'Réessayer';
 					reessayer.addEventListener( 'click', function () {
 						envoi.erreur = '';
+						envoi.par    = C.utilisateur || envoi.par; // Reprise explicitement par la personne connectée.
 						transaction( 'readwrite', function ( m ) {
 							return m.put( envoi );
 						} ).then( function () {
@@ -398,7 +403,29 @@
 			envoyer();
 		}
 	} );
-	majIndicateur().then( function ( n ) {
+	// Saisies gardées avant la 3.0.3, sans auteur : on ne sait pas qui les a faites. Elles sont
+	// signalées et ne partent qu'avec « Réessayer » (la personne connectée les reprend à son nom).
+	function sansAuteur() {
+		if ( ! C.utilisateur ) {
+			return Promise.resolve();
+		}
+		return tous().then( function ( liste ) {
+			var orphelines = liste.filter( function ( e ) {
+				return ! e.par && ! e.erreur;
+			} );
+			if ( ! orphelines.length ) {
+				return null;
+			}
+			return transaction( 'readwrite', function ( m ) {
+				orphelines.forEach( function ( e ) {
+					e.erreur = 'Saisie gardée avant la mise à jour de l’application : vérifiez qu’elle est bien de vous, puis touchez « Réessayer ».';
+					m.put( e );
+				} );
+			} );
+		} ).catch( function () {} );
+	}
+
+	sansAuteur().then( majIndicateur ).then( function ( n ) {
 		if ( n ) {
 			envoyer();
 		}
@@ -444,7 +471,9 @@
 			setTimeout( r, 8000 );
 		} ) ] ).then( function () {
 			return tous();
-		} ).then( function ( liste ) {
+		} ).then( function ( toutes ) {
+			// Seules les saisies de la personne qui part : celles d'un collègue restent pour lui.
+			var liste = toutes.filter( aMoi );
 			if ( ! liste.length ) {
 				return partir();
 			}
@@ -457,7 +486,9 @@
 					return null;
 				}
 				return transaction( 'readwrite', function ( m ) {
-					return m.clear();
+					liste.forEach( function ( e ) {
+						m.delete( e.id );
+					} );
 				} ).then( partir );
 			} );
 		} ).catch( partir );
