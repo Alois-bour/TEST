@@ -30,7 +30,7 @@ class ETR_Devis {
 	public static function init() {
 		add_action( 'etr_gestion_fiche_argent', array( __CLASS__, 'panneau_devis' ), 20 );
 		add_action( 'etr_gestion_fiche_argent', array( __CLASS__, 'panneau_acompte' ), 30 );
-		add_action( 'etr_gestion_fiche_argent', array( __CLASS__, 'panneau_casse' ), 45 );
+		add_action( 'etr_gestion_fiche_argent', array( __CLASS__, 'panneau_casse' ), 38 ); // Avant la facture.
 		add_action( 'etr_gestion_action', array( __CLASS__, 'actions_bureau' ) );
 		add_action( 'etr_traiteur_paiement', array( __CLASS__, 'encart_traiteur' ), 5 );
 		add_action( 'etr_traiteur_action', array( __CLASS__, 'action_traiteur' ) );

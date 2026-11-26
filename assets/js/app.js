@@ -302,17 +302,54 @@
 	}
 	window.etrToast = toast;
 
-	// Estimation de la livraison : « Utiliser ce prix » remplit les frais de livraison.
-	document.addEventListener( 'click', function ( e ) {
-		var bouton = e.target.closest( '[data-remplir-livraison]' );
-		var champ  = document.getElementById( 'etr-livraison' );
-		if ( ! bouton || ! champ ) {
+	// Prix de la location : total recalculé pendant la saisie, prix conseillé reporté d'un
+	// toucher, et rappel d'enregistrer tant que le formulaire est modifié.
+	( function () {
+		var form = document.querySelector( '[data-tarif]' );
+		if ( ! form ) {
 			return;
 		}
-		champ.value = bouton.getAttribute( 'data-remplir-livraison' );
-		champ.focus();
-		toast( 'Prix reporté : touchez « Mettre à jour le prix » pour l’enregistrer.' );
-	} );
+		var remise    = form.querySelector( '#etr-remise' );
+		var livraison = form.querySelector( '#etr-livraison' );
+		var sousTotal = parseFloat( form.getAttribute( 'data-sous-total' ) ) || 0;
+		var etat      = form.querySelector( '[data-tarif-etat]' );
+		var initial   = remise.value + '|' + livraison.value;
+		var format    = new Intl.NumberFormat( document.documentElement.lang || 'fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 } );
+		function euros( m ) {
+			return format.format( m ) + '\u00a0€';
+		}
+		function lire( v ) {
+			v = String( v ).replace( /[\s\u00a0€%]/g, '' ).replace( ',', '.' );
+			return v === '' || isNaN( v ) ? null : Math.max( 0, parseFloat( v ) );
+		}
+		function afficher( cle, texte ) {
+			var o = form.querySelector( '[data-tarif-' + cle + ']' );
+			if ( o ) {
+				o.textContent = texte;
+			}
+		}
+		function calculer() {
+			var pct = Math.min( 100, lire( remise.value ) || 0 );
+			var liv = lire( livraison.value );
+			var r   = Math.round( sousTotal * pct ) / 100;
+			afficher( 'remise', r ? '− ' + euros( r ) : '—' );
+			afficher( 'livraison', liv === null ? 'à chiffrer' : ( liv ? '+ ' + euros( liv ) : 'offertes' ) );
+			afficher( 'total', euros( sousTotal - r + ( liv || 0 ) ) );
+			var modifie = remise.value + '|' + livraison.value !== initial;
+			form.classList.toggle( 'est-modifie', modifie );
+			etat.textContent = modifie ? 'Pas encore enregistré' : '';
+		}
+		form.addEventListener( 'input', calculer );
+		form.addEventListener( 'click', function ( e ) {
+			var bouton = e.target.closest( '[data-remplir-livraison]' );
+			if ( ! bouton ) {
+				return;
+			}
+			livraison.value = bouton.getAttribute( 'data-remplir-livraison' );
+			calculer();
+			toast( 'Prix conseillé ajouté : touchez « Enregistrer le prix ».' );
+		} );
+	}() );
 
 	// Confirmation après une action (« Statut enregistré… ») : en toast, et l'adresse est nettoyée
 	// pour qu'un rechargement ne la réaffiche pas.
@@ -688,25 +725,5 @@
 				afficher( retour.onglet, true );
 			}
 		} catch ( err ) {}
-
-		// « Valider ou refuser » (prochaine étape) : le panneau du statut.
-		document.addEventListener( 'click', function ( e ) {
-			if ( ! e.target.closest( '[data-ouvrir-statut]' ) ) {
-				return;
-			}
-			var bouton = document.querySelector( '.etr-barre-action--feuilles .etr-btn:not(.etr-btn--discret)' );
-			if ( telephone.matches && bouton ) {
-				bouton.click();
-				return;
-			}
-			var panneau = document.querySelector( '.etr-decision' );
-			if ( panneau ) {
-				panneau.scrollIntoView( { behavior: 'smooth', block: 'start' } );
-				var choix = panneau.querySelector( 'input[type="radio"]:checked, input[type="radio"]' );
-				if ( choix ) {
-					choix.focus( { preventScroll: true } );
-				}
-			}
-		} );
 	}() );
 }() );

@@ -123,6 +123,33 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Onglet « Finances » et corrections du parcours (3.3.1)
+
+- L'onglet **Argent** de la fiche devient **Finances**. En tête, le **compte de la demande** :
+  - à gauche, le **Prix** : matériel, remise, livraison et reprise, total de la location, plus la casse et la facture une fois établie, avec la source du chiffre (estimation, devis envoyé, devis accepté, facture) ;
+  - à droite, les **Règlements** : acompte, caution (garantie, hors reste à payer), prélèvements sur la caution, puis **Reste à payer** ou « Facture réglée » ;
+  - dessous, la frise « Où en est-on ».
+- **Fixer le prix**, un seul formulaire « Prix de la location » qui se lit comme un calcul :
+  - matériel (prix du catalogue) ;
+  - remise en % (montant déduit affiché) ;
+  - livraison et reprise ;
+  - **total recalculé pendant la saisie**.
+
+  Sous la livraison, le **prix conseillé** s'affiche en une ligne avec un bouton « Prendre 140 € » ; le détail est replié dans « Voir le calcul », qui contient aussi « Actualiser l'estimation ». Un seul bouton enregistre : **« Enregistrer le prix »**, avec « Pas encore enregistré » tant qu'une modification attend.
+- La suite de l'onglet est rangée en **parties numérotées**, dans l'ordre du travail. Les numéros suivent les fonctions activées.
+  1. Fixer le prix
+  2. Devis et contrat
+  3. Acompte et caution
+  4. Après la reprise : casse et facture (la casse avant la facture)
+- **Corrections du parcours** :
+  - « Refaire la reprise » est proposé au livreur ;
+  - le lien « Étiquettes » est proposé au préparateur et au livreur pour réimprimer ;
+  - une commande prête sans colis passe l'étape « Chargée » ;
+  - le filtre d'étape est gardé dans la recherche et l'export ;
+  - « Établir la facture » n'apparaît qu'une fois la facture possible et n'est plus proposé deux fois ;
+  - l'écran « À préparer » est rangé dans le bon onglet ;
+  - le lien « Cookies » est masqué dans le menu de l'application.
+
 ### Parcours clair dans l'application de l'équipe (3.3.0)
 
 - **Parcours en sept étapes** en tête de chaque fiche : Reçue → Validée → Préparée → Chargée → Livrée → Reprise → Clôturée, chaque étape cochée avec sa date ou son état (« 0 / 255 articles », « 2 / 3 colis scannés », « prévue demain »).

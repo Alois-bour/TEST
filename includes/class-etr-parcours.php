@@ -82,7 +82,8 @@ class ETR_Parcours {
 		);
 		$e['chargee'] = array(
 			$l['chargee'],
-			(bool) $livraison || $apres || ( $bilan['colis'] && $bilan['sortis'] >= $bilan['colis'] ),
+			// Rien à scanner (prête sans colis) : le chargement ne bloque pas.
+			(bool) $livraison || $apres || ( $bilan['colis'] && $bilan['sortis'] >= $bilan['colis'] ) || ( $prepa['prete'] && ! $bilan['colis'] ),
 			$bilan['colis']
 				/* translators: 1 : chargés, 2 : colis. */
 				? sprintf( __( '%1$s / %2$s colis scannés', 'espace-traiteur' ), number_format_i18n( $bilan['sortis'] ), number_format_i18n( $bilan['colis'] ) )
@@ -245,17 +246,21 @@ class ETR_Parcours {
 			case 'cloturee':
 				$ecarts = $reprise ? ETR_Operations::texte_ecarts( (int) $reprise['manquants'], (int) $reprise['casses'] ) : '';
 				if ( $bureau ) {
-					$moi( __( 'Régler les écarts puis clôturer', 'espace-traiteur' ), $ecarts ? sprintf( /* translators: %s : écarts. */ __( 'À la reprise : %s. Facturez la casse ou retrouvez les manquants (onglet Argent), puis clôturez.', 'espace-traiteur' ), $ecarts ) : '' );
+					$moi( __( 'Régler les écarts puis clôturer', 'espace-traiteur' ), $ecarts ? sprintf( /* translators: %s : écarts. */ __( 'À la reprise : %s. Facturez la casse ou retrouvez les manquants (onglet Finances), puis clôturez.', 'espace-traiteur' ), $ecarts ) : '' );
 					$a['boutons'][] = self::bouton_decision( $id, 'cloturee', __( 'Clôturer la demande', 'espace-traiteur' ), true );
-					$a['boutons'][] = self::lien( self::url( array( 'vue' => 'demande', 'id' => $id, 'onglet' => 'argent' ) ), __( 'Voir l’argent', 'espace-traiteur' ), false, 'suite', 'argent' );
+					$a['boutons'][] = self::lien( self::url( array( 'vue' => 'demande', 'id' => $id, 'onglet' => 'argent' ) ), __( 'Voir les finances', 'espace-traiteur' ), false, 'suite', 'argent' );
 				} else {
 					$attente( __( 'le bureau', 'espace-traiteur' ), __( 'Écarts à régler', 'espace-traiteur' ), $ecarts );
+				}
+				if ( $livreur && 'livree' === $statut ) {
+					// Matériel retrouvé, erreur de comptage : la reprise se refait tant que ce n'est pas clôturé.
+					$a['boutons'][] = self::lien( self::url( array( 'vue' => 'reprendre', 'id' => $id ) ), __( 'Refaire la reprise', 'espace-traiteur' ), false, 'reprise' );
 				}
 				break;
 			default:
 				$a['sur']   = __( 'Terminé', 'espace-traiteur' );
 				$a['titre'] = __( 'Dossier terminé', 'espace-traiteur' );
-				if ( $bureau && class_exists( 'ETR_Facture' ) && ETR_Modules::actif( 'facture' ) && ! ETR_Facture::facture( $id ) ) {
+				if ( $bureau && class_exists( 'ETR_Facture' ) && ETR_Modules::actif( 'facture' ) && ! ETR_Facture::facture( $id ) && ETR_Facture::etablissable( $id ) ) {
 					$a['a_moi']     = true;
 					$a['sur']       = __( 'À vous de jouer', 'espace-traiteur' );
 					$a['titre']     = __( 'Établir la facture', 'espace-traiteur' );
@@ -379,6 +384,10 @@ class ETR_Parcours {
 		if ( $a['texte'] ) {
 			echo '<p class="etr-parcours__texte">' . esc_html( $a['texte'] ) . '</p>';
 		}
+		// Réimprimer une étiquette (abîmée au chargement…) : pour le préparateur et le livreur.
+		if ( 'validee' === etr_get_statut( $id ) && ETR_Operations::bilan_colis( $id )['colis'] && ( ETR_Equipe::preparateur() || ETR_Equipe::livreur() ) ) {
+			$a['boutons'][] = '<a class="etr-btn etr-btn--discret" href="' . esc_url( self::url( array( 'vue' => 'etiquettes', 'id' => $id ) ) ) . '" target="_blank">' . ETR_Gestion::icone( 'telecharger' ) . '<span>' . esc_html__( 'Étiquettes', 'espace-traiteur' ) . '</span></a>';
+		}
 		if ( $a['boutons'] ) {
 			echo '<div class="etr-parcours__boutons">' . implode( '', $a['boutons'] ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput -- construits et échappés ci-dessus.
 		}
@@ -447,6 +456,10 @@ class ETR_Parcours {
 	 * @return array { a_faire: int[] (par date de livraison), pretes: int[] }
 	 */
 	public static function preparations() {
+		static $resultat = null; // Pastille de l'onglet et écran : une seule lecture par page.
+		if ( null !== $resultat ) {
+			return $resultat;
+		}
 		$ids = get_posts(
 			array(
 				'post_type'     => 'etr_demande',
@@ -477,7 +490,8 @@ class ETR_Parcours {
 		}
 		asort( $a_faire );
 		asort( $pretes );
-		return array( 'a_faire' => $a_faire, 'pretes' => $pretes );
+		$resultat = array( 'a_faire' => $a_faire, 'pretes' => $pretes );
+		return $resultat;
 	}
 
 	/**

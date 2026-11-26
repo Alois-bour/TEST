@@ -1,6 +1,6 @@
 <?php
 /**
- * Fiche d'une demande dans l'application de l'équipe : onglets, prochaine étape, argent en un
+ * Fiche d'une demande dans l'application de l'équipe : onglets, prochaine étape, finances en un
  * coup d'œil, et liste « À faire » de l'accueil du bureau.
  *
  * Les panneaux des fonctions activables se placent dans un onglet avec les actions
@@ -33,7 +33,7 @@ class ETR_Fiche {
 			'resume'     => array( __( 'Résumé', 'espace-traiteur' ), 0 ),
 			'materiel'   => array( __( 'Matériel', 'espace-traiteur' ), isset( $par['materiel'] ) ? $par['materiel'] : 0 ),
 			'echanges'   => array( __( 'Échanges', 'espace-traiteur' ), $echanges ),
-			'argent'     => array( __( 'Argent', 'espace-traiteur' ), isset( $par['argent'] ) ? $par['argent'] : 0 ),
+			'argent'     => array( __( 'Finances', 'espace-traiteur' ), isset( $par['argent'] ) ? $par['argent'] : 0 ),
 			'historique' => array( __( 'Historique', 'espace-traiteur' ), 0 ),
 		);
 		if ( ! ETR_Equipe::bureau() ) {
@@ -204,7 +204,7 @@ class ETR_Fiche {
 			array_filter(
 				self::taches( $id ),
 				function ( $t ) {
-					return ! in_array( $t['cle'], array( 'etudier', 'ecarts' ), true );
+					return ! in_array( $t['cle'], array( 'etudier', 'ecarts', 'facture' ), true );
 				}
 			)
 		);
@@ -220,7 +220,7 @@ class ETR_Fiche {
 	}
 
 	/* ------------------------------------------------------------------ */
-	/* Argent en un coup d'œil                                            */
+	/* Finances : compte de la demande                                    */
 	/* ------------------------------------------------------------------ */
 
 	/**
@@ -282,9 +282,10 @@ class ETR_Fiche {
 				$etapes[] = array( __( 'Facture', 'espace-traiteur' ), sprintf( /* translators: %s : montant. */ __( 'reste %s', 'espace-traiteur' ), ETR_Devis::prix( ETR_Facture::reglements( $id, $f )['reste'] ) ), 'a-faire', ETR_Devis::prix( $f['ttc'] ) );
 			}
 		}
-		echo '<section class="etr-panneau etr-argent"><div class="etr-argent__tete"><h2 class="etr-panneau__titre">' . esc_html__( 'En un coup d’œil', 'espace-traiteur' ) . '</h2>';
-		echo '<p class="etr-argent__total"><span>' . esc_html__( 'Montant indicatif', 'espace-traiteur' ) . '</span><strong>' . esc_html( ETR_Devis::prix( $total ) ) . '</strong></p></div>';
+		echo '<section class="etr-panneau etr-argent etr-compte"><h2 class="etr-panneau__titre">' . esc_html__( 'Compte de la demande', 'espace-traiteur' ) . '</h2>';
+		self::compte( $id );
 		if ( $etapes ) {
+			echo '<h3 class="etr-compte__sous-titre">' . esc_html__( 'Où en est-on', 'espace-traiteur' ) . '</h3>';
 			echo '<ol class="etr-argent__frise">';
 			foreach ( $etapes as $e ) {
 				echo '<li class="etr-argent__etape etr-argent__etape--' . esc_attr( $e[2] ) . '"><span class="etr-argent__puce" aria-hidden="true">' . ( 'fait' === $e[2] ? ETR_Gestion::icone( 'coche' ) : '' ) . '</span><span class="etr-argent__nom">' . esc_html( $e[0] ) . '</span><span class="etr-argent__etat">' . esc_html( $e[1] ) . '</span>' . ( $e[3] ? '<span class="etr-argent__montant">' . esc_html( $e[3] ) . '</span>' : '' ) . '</li>'; // phpcs:ignore WordPress.Security.EscapeOutput -- icône statique.
@@ -294,6 +295,172 @@ class ETR_Fiche {
 			echo '<p class="etr-muted">' . esc_html__( 'Devis, acompte, caution et facture s’activent dans Espace traiteur › Fonctions.', 'espace-traiteur' ) . '</p>';
 		}
 		echo '</section>';
+	}
+
+	/**
+	 * Le compte de la demande, en deux colonnes : ce qu'elle coûte (et d'où vient ce prix),
+	 * ce qui est réglé et ce qu'il reste à payer.
+	 *
+	 * @param int $id Demande.
+	 */
+	private static function compte( $id ) {
+		$p      = function ( $montant ) {
+			return ETR_Devis::prix( $montant );
+		};
+		$devis  = ETR_Modules::actif( 'devis' ) ? ETR_Devis::devis( $id ) : array();
+		$f      = ETR_Modules::actif( 'facture' ) && class_exists( 'ETR_Facture' ) ? ETR_Facture::facture( $id ) : array();
+		$ch     = etr_chiffrage( $id );
+		$prix   = array();
+		$source = '';
+		if ( $devis ) {
+			$c = isset( $devis['chiffrage'] ) && is_array( $devis['chiffrage'] ) ? wp_parse_args( $devis['chiffrage'], array( 'sous_total' => 0, 'remise_pct' => 0, 'remise' => 0, 'livraison' => null, 'total' => $devis['total'] ) ) : $ch;
+			$source = ! empty( $devis['accepte'] )
+				/* translators: %s : date. */
+				? sprintf( __( 'Devis accepté le %s', 'espace-traiteur' ), wp_date( 'j F', (int) $devis['accepte']['le'] ) )
+				/* translators: %s : date. */
+				: sprintf( __( 'Devis envoyé le %s, pas encore accepté', 'espace-traiteur' ), wp_date( 'j F', (int) $devis['envoye'] ) );
+		} else {
+			$c      = $ch;
+			$source = __( 'Estimation aux prix actuels (pas encore de devis)', 'espace-traiteur' );
+		}
+		$prix[] = array( __( 'Matériel', 'espace-traiteur' ), $p( $c['sous_total'] ), '' );
+		if ( (float) $c['remise_pct'] ) {
+			/* translators: %s : pourcentage. */
+			$prix[] = array( sprintf( __( 'Remise (%s %%)', 'espace-traiteur' ), number_format_i18n( (float) $c['remise_pct'], fmod( (float) $c['remise_pct'], 1 ) ? 2 : 0 ) ), '− ' . $p( $c['remise'] ), '' );
+		}
+		$prix[] = array( __( 'Livraison et reprise', 'espace-traiteur' ), null === $c['livraison'] ? __( 'à chiffrer', 'espace-traiteur' ) : ( (float) $c['livraison'] ? $p( $c['livraison'] ) : __( 'offertes', 'espace-traiteur' ) ), null === $c['livraison'] ? 'a-faire' : '' );
+		$prix[] = array( __( 'Total de la location', 'espace-traiteur' ), $p( $c['total'] ), 'total' );
+		$total  = (float) $c['total'];
+		if ( $f ) {
+			if ( ! empty( $f['casse'] ) ) {
+				$prix[] = array( __( 'Casse et manquants', 'espace-traiteur' ), '+ ' . $p( $f['casse'] ), '' );
+			}
+			/* translators: %s : numéro. */
+			$prix[] = array( sprintf( __( 'Facture %s', 'espace-traiteur' ), $f['numero'] ), $p( $f['ttc'] ), 'total' );
+			$total  = (float) $f['ttc'];
+			/* translators: %s : date. */
+			$source = sprintf( __( 'Facture établie le %s', 'espace-traiteur' ), wp_date( 'j F', (int) $f['le'] ) );
+		}
+		if ( $ch['sans_prix'] && ! $f ) {
+			/* translators: %s : nombre. */
+			$source .= ' · ' . sprintf( _n( '%s article sans prix', '%s articles sans prix', $ch['sans_prix'], 'espace-traiteur' ), number_format_i18n( $ch['sans_prix'] ) );
+		}
+
+		$regle = array();
+		$recu  = 0.0;
+		if ( ETR_Modules::actif( 'acompte' ) ) {
+			$a = ETR_Devis::acompte( $id );
+			if ( (float) $a['acompte'] > 0 ) {
+				/* translators: %s : date. */
+				$regle[] = array( __( 'Acompte', 'espace-traiteur' ), $p( $a['acompte'] ), $a['acompte_recu'] ? 'fait' : 'a-faire', $a['acompte_recu'] ? sprintf( __( 'reçu le %s', 'espace-traiteur' ), etr_format_date( $a['acompte_recu'] ) ) : __( 'à recevoir', 'espace-traiteur' ) );
+				$recu   += $a['acompte_recu'] ? (float) $a['acompte'] : 0.0;
+			}
+			if ( (float) $a['caution'] > 0 ) {
+				$s    = class_exists( 'ETR_Stripe' ) && ETR_Modules::actif( 'stripe' ) ? ( ETR_Stripe::paiements( $id )['caution'] ?? array() ) : array();
+				$etat = $a['caution_rendue'] ? __( 'rendue', 'espace-traiteur' ) : ( $a['caution_recue'] ? __( 'reçue (non encaissée)', 'espace-traiteur' ) : __( 'à recevoir', 'espace-traiteur' ) );
+				$noms = array(
+					'bloquee'     => __( 'empreinte bancaire bloquée', 'espace-traiteur' ),
+					'enregistree' => __( 'carte enregistrée', 'espace-traiteur' ),
+					'debitee'     => __( 'débitée', 'espace-traiteur' ),
+					'liberee'     => __( 'libérée', 'espace-traiteur' ),
+				);
+				$etat    = isset( $s['statut'], $noms[ $s['statut'] ] ) ? $noms[ $s['statut'] ] : $etat;
+				$regle[] = array( __( 'Caution (garantie)', 'espace-traiteur' ), $p( $a['caution'] ), $a['caution_recue'] || isset( $noms[ $s['statut'] ?? '' ] ) ? 'fait' : 'a-faire', $etat );
+			}
+		}
+		if ( $f ) {
+			$r = ETR_Facture::reglements( $id, $f );
+			if ( $r['caution'] > 0 ) {
+				$regle[] = array( __( 'Prélevé sur la caution', 'espace-traiteur' ), $p( $r['caution'] ), 'fait', '' );
+			}
+			$reste = ! empty( $f['payee'] ) ? 0.0 : (float) $r['reste'];
+		} else {
+			$reste = max( 0, $total - $recu );
+		}
+
+		echo '<div class="etr-compte__grille">';
+		echo '<div class="etr-compte__bloc"><h3 class="etr-compte__sous-titre">' . esc_html__( 'Prix', 'espace-traiteur' ) . '</h3><dl class="etr-compte__lignes">';
+		foreach ( $prix as $l ) {
+			echo '<div class="' . esc_attr( $l[2] ? 'est-' . $l[2] : '' ) . '"><dt>' . esc_html( $l[0] ) . '</dt><dd>' . esc_html( $l[1] ) . '</dd></div>';
+		}
+		echo '</dl><p class="etr-compte__source">' . esc_html( $source ) . '</p></div>';
+
+		echo '<div class="etr-compte__bloc"><h3 class="etr-compte__sous-titre">' . esc_html__( 'Règlements', 'espace-traiteur' ) . '</h3><dl class="etr-compte__lignes">';
+		if ( ! $regle ) {
+			echo '<div><dt>' . esc_html__( 'Aucun acompte ni caution demandés', 'espace-traiteur' ) . '</dt><dd></dd></div>';
+		}
+		foreach ( $regle as $l ) {
+			echo '<div class="est-' . esc_attr( $l[2] ) . '"><dt>' . esc_html( $l[0] ) . ( $l[3] ? '<small>' . esc_html( $l[3] ) . '</small>' : '' ) . '</dt><dd>' . esc_html( $l[1] ) . '</dd></div>';
+		}
+		$paye = $f && ! empty( $f['payee'] );
+		echo '<div class="est-total' . ( $reste > 0 ? ' est-du' : '' ) . '"><dt>' . esc_html( $paye ? __( 'Facture réglée', 'espace-traiteur' ) : __( 'Reste à payer', 'espace-traiteur' ) ) . ( $paye ? '<small>' . esc_html( sprintf( /* translators: %s : date. */ __( 'le %s', 'espace-traiteur' ), etr_format_date( $f['payee'] ) ) ) . '</small>' : '' ) . '</dt><dd>' . esc_html( $p( $reste ) ) . '</dd></div>';
+		echo '</dl>';
+		if ( ! empty( $regle ) && array_filter( $regle, function ( $l ) { return 0 === strpos( $l[0], __( 'Caution', 'espace-traiteur' ) ); } ) ) {
+			echo '<p class="etr-compte__source">' . esc_html__( 'La caution est une garantie : elle n’entre pas dans le reste à payer, sauf ce qui en est prélevé pour la casse.', 'espace-traiteur' ) . '</p>';
+		}
+		echo '</div></div>';
+	}
+
+	/**
+	 * Titres numérotés de l'onglet Finances, dans l'ordre du dossier (placés entre les panneaux
+	 * des fonctions grâce aux priorités du crochet « etr_gestion_fiche_argent »).
+	 */
+	public static function init() {
+		add_action( 'etr_gestion_fiche_argent', array( __CLASS__, 'titre_devis' ), 15 );
+		add_action( 'etr_gestion_fiche_argent', array( __CLASS__, 'titre_acompte' ), 28 );
+		add_action( 'etr_gestion_fiche_argent', array( __CLASS__, 'titre_apres' ), 37 );
+	}
+
+	/**
+	 * Titre d'une partie de l'onglet Finances.
+	 *
+	 * @param int    $n     Numéro.
+	 * @param string $titre Titre.
+	 * @param string $aide  Aide.
+	 */
+	public static function titre_finances( $n, $titre, $aide = '' ) {
+		echo '<h2 class="etr-pas-titre etr-finances__titre"><span class="etr-pas-titre__n" aria-hidden="true">' . (int) $n . '</span><span>' . esc_html( $titre ) . ( $aide ? '<small>' . esc_html( $aide ) . '</small>' : '' ) . '</span></h2>';
+	}
+
+	/**
+	 * Partie 2 : devis et contrat.
+	 */
+	public static function titre_devis() {
+		if ( ETR_Modules::actif( 'devis' ) || ETR_Modules::actif( 'contrat' ) ) {
+			self::titre_finances( 2, ETR_Modules::actif( 'contrat' ) ? __( 'Devis et contrat', 'espace-traiteur' ) : __( 'Devis', 'espace-traiteur' ), __( 'Le traiteur accepte le devis, puis signe le contrat, depuis son espace.', 'espace-traiteur' ) );
+		}
+	}
+
+	/**
+	 * Partie 3 : acompte et caution.
+	 */
+	public static function titre_acompte() {
+		if ( ETR_Modules::actif( 'acompte' ) ) {
+			self::titre_finances( self::numero( 3 ), __( 'Acompte et caution', 'espace-traiteur' ), __( 'Avant la livraison. L’acompte est déduit de la facture ; la caution est une garantie, rendue après la reprise.', 'espace-traiteur' ) );
+		}
+	}
+
+	/**
+	 * Partie 4 : après la reprise.
+	 */
+	public static function titre_apres() {
+		if ( ETR_Modules::actif( 'casse' ) || ETR_Modules::actif( 'facture' ) ) {
+			self::titre_finances( self::numero( 4 ), ETR_Modules::actif( 'facture' ) ? __( 'Après la reprise : casse et facture', 'espace-traiteur' ) : __( 'Après la reprise : casse et manquants', 'espace-traiteur' ), __( 'La facture s’établit une fois le matériel repris, casse et manquants connus.', 'espace-traiteur' ) );
+		}
+	}
+
+	/**
+	 * Numéro d'une partie, sans trou quand une partie précédente est désactivée.
+	 *
+	 * @param int $partie Partie (3 ou 4).
+	 * @return int
+	 */
+	private static function numero( $partie ) {
+		$n = 2 + ( ETR_Modules::actif( 'devis' ) || ETR_Modules::actif( 'contrat' ) ? 1 : 0 );
+		if ( 4 === $partie && ETR_Modules::actif( 'acompte' ) ) {
+			++$n;
+		}
+		return $n;
 	}
 
 	/* ------------------------------------------------------------------ */

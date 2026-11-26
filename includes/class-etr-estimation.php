@@ -455,31 +455,42 @@ class ETR_Estimation {
 	}
 
 	/**
-	 * Encart d'estimation (HTML).
+	 * Chiffrage de la livraison d'une demande.
 	 *
-	 * @param int  $id     Demande.
-	 * @param bool $bouton Bouton « Utiliser ce prix » (formulaire de tarif de l'application).
-	 * @return string
+	 * @param int $id Demande.
+	 * @return array|WP_Error { trajet, p (paramètres, gazole compris), gazole, c (chiffrage) }
 	 */
-	public static function html( $id, $bouton = false ) {
+	private static function calcul( $id ) {
 		$trajet = self::trajet( $id );
-		$html   = '<div class="etr-estimation"><p class="etr-estimation__titre">' . esc_html__( 'Estimation de la livraison', 'espace-traiteur' ) . ' <span class="etr-estimation__prive">' . esc_html__( 'non visible par le traiteur', 'espace-traiteur' ) . '</span></p>';
 		if ( is_wp_error( $trajet ) ) {
-			$html .= '<p class="etr-muted">' . esc_html( $trajet->get_error_message() ) . '</p>';
-			if ( $bouton ) {
-				$html .= '<p class="etr-estimation__actions"><button type="submit" class="etr-btn etr-btn--discret" form="etr-estimation-recalculer">' . esc_html__( 'Réessayer', 'espace-traiteur' ) . '</button></p>';
-			}
-			return $html . '</div>';
+			return $trajet;
 		}
 		$p           = self::parametres();
 		$gazole      = self::gazole();
 		$p['gazole'] = $gazole['prix'];
-		$c           = self::chiffrer( $trajet, $p, (int) apply_filters( 'etr_estimation_camions', 1, $id ) );
+		return array(
+			'trajet' => $trajet,
+			'p'      => $p,
+			'gazole' => $gazole,
+			'c'      => self::chiffrer( $trajet, $p, (int) apply_filters( 'etr_estimation_camions', 1, $id ) ),
+		);
+	}
+
+	/**
+	 * Détail du calcul (trajet, gazole, camion, personnel, coût de revient, prix conseillé).
+	 *
+	 * @param array $k Résultat de calcul().
+	 * @return string HTML.
+	 */
+	private static function detail( $k ) {
+		$trajet = $k['trajet'];
+		$p      = $k['p'];
+		$c      = $k['c'];
 		$prix   = function ( $m ) {
 			return number_format_i18n( $m, 2 ) . ' €';
 		};
 		/* translators: 1 : distance, 2 : durée, 3 : lieu trouvé. */
-		$html  .= '<p class="etr-estimation__trajet">' . esc_html( sprintf( __( '%1$s km et %2$s par trajet, jusqu’à « %3$s »', 'espace-traiteur' ), number_format_i18n( $trajet['km'], 1 ), self::duree( $trajet['minutes'] / 60 ), $trajet['arrivee'] ) ) . ( 'vol' === $trajet['source'] ? ' <em>' . esc_html__( '(approximation à vol d’oiseau : itinéraire indisponible)', 'espace-traiteur' ) . '</em>' : '' ) . '</p>';
+		$html = '<p class="etr-estimation__trajet">' . esc_html( sprintf( __( '%1$s km et %2$s par trajet, jusqu’à « %3$s »', 'espace-traiteur' ), number_format_i18n( $trajet['km'], 1 ), self::duree( $trajet['minutes'] / 60 ), $trajet['arrivee'] ) ) . ( 'vol' === $trajet['source'] ? ' <em>' . esc_html__( '(approximation à vol d’oiseau : itinéraire indisponible)', 'espace-traiteur' ) . '</em>' : '' ) . '</p>';
 		if ( $c['camions'] > 1 ) {
 			/* translators: %s : nombre de camions. */
 			$html .= '<p class="etr-estimation__trajet"><strong>' . esc_html( sprintf( __( 'Volume du matériel : %s camions pleins, chaque passage compte autant d’allers-retours.', 'espace-traiteur' ), number_format_i18n( $c['camions'] ) ) ) . '</strong></p>';
@@ -501,16 +512,28 @@ class ETR_Estimation {
 		}
 		/* translators: %s : marge. */
 		$html .= '<div class="etr-estimation__prix"><dt>' . esc_html( sprintf( __( 'Prix conseillé (marge %s %%)', 'espace-traiteur' ), number_format_i18n( $p['marge'] ) ) ) . '</dt><dd>' . esc_html( $prix( $c['prix'] ) ) . '</dd></div></dl>';
-		$html .= '<p class="etr-muted etr-estimation__note">' . esc_html( $gazole['texte'] ) . ' ' . esc_html__( 'Livraison puis reprise : deux allers-retours depuis le dépôt. Indication à ajuster (accès, étages, horaires, péages).', 'espace-traiteur' ) . '</p>';
-		if ( $bouton ) {
-			$html .= '<p class="etr-estimation__actions"><button type="button" class="etr-btn etr-btn--discret" data-remplir-livraison="' . esc_attr( str_replace( '.', ',', (string) $c['prix'] ) ) . '">' . esc_html__( 'Utiliser ce prix', 'espace-traiteur' ) . '</button>';
-			$html .= '<button type="submit" class="etr-btn etr-btn--discret" form="etr-estimation-recalculer">' . esc_html__( 'Recalculer', 'espace-traiteur' ) . '</button></p>';
-		}
-		return $html . '</div>';
+		$html .= '<p class="etr-muted etr-estimation__note">' . esc_html( $k['gazole']['texte'] ) . ' ' . esc_html__( 'Livraison puis reprise : deux allers-retours depuis le dépôt. Indication à ajuster (accès, étages, horaires, péages).', 'espace-traiteur' ) . '</p>';
+		return $html;
 	}
 
 	/**
-	 * Dans le formulaire « Tarification » de la fiche (bureau).
+	 * Encart d'estimation (HTML), pour la fiche de l'administration.
+	 *
+	 * @param int $id Demande.
+	 * @return string
+	 */
+	public static function html( $id ) {
+		$k    = self::calcul( $id );
+		$html = '<div class="etr-estimation"><p class="etr-estimation__titre">' . esc_html__( 'Estimation de la livraison', 'espace-traiteur' ) . ' <span class="etr-estimation__prive">' . esc_html__( 'non visible par le traiteur', 'espace-traiteur' ) . '</span></p>';
+		if ( is_wp_error( $k ) ) {
+			return $html . '<p class="etr-muted">' . esc_html( $k->get_error_message() ) . '</p></div>';
+		}
+		return $html . self::detail( $k ) . '</div>';
+	}
+
+	/**
+	 * Sous le champ « Livraison et reprise » de la fiche (bureau) : prix conseillé en une
+	 * ligne, bouton qui le reporte dans le champ, détail du calcul replié.
 	 *
 	 * @param int $id Demande.
 	 */
@@ -518,7 +541,30 @@ class ETR_Estimation {
 		if ( ! ETR_Modules::actif( 'estimation_livraison' ) || ! ETR_Equipe::bureau() ) {
 			return;
 		}
-		echo self::html( $id, true ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans html().
+		$k        = self::calcul( $id );
+		$prive    = '<span class="etr-estimation__prive">' . esc_html__( 'visible par l’équipe seulement', 'espace-traiteur' ) . '</span>';
+		$actualiser = '<button type="submit" class="etr-lien etr-estimation__actualiser" form="etr-estimation-recalculer">' . esc_html__( 'Actualiser l’estimation', 'espace-traiteur' ) . '</button>';
+		echo '<div class="etr-estimation etr-estimation--conseil">';
+		if ( is_wp_error( $k ) ) {
+			echo '<p class="etr-estimation__conseil"><span>' . esc_html__( 'Prix conseillé indisponible', 'espace-traiteur' ) . ' ' . $prive . '<small>' . esc_html( $k->get_error_message() ) . '</small></span>' . $actualiser . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé ci-dessus.
+			return;
+		}
+		$c      = $k['c'];
+		$euros  = function ( $m ) {
+			return number_format_i18n( $m, 2 ) . "\xc2\xa0€";
+		};
+		$valeur = str_replace( '.', ',', (string) $c['prix'] );
+		echo '<p class="etr-estimation__conseil"><span>';
+		/* translators: %s : prix conseillé. */
+		echo '<strong>' . esc_html( sprintf( __( 'Prix conseillé : %s', 'espace-traiteur' ), $euros( $c['prix'] ) ) ) . '</strong> ' . $prive; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé ci-dessus.
+		/* translators: 1 : km, 2 : coût de revient. */
+		echo '<small>' . esc_html( sprintf( __( '%1$s km par trajet · coût de revient %2$s', 'espace-traiteur' ), number_format_i18n( $k['trajet']['km'], 1 ), $euros( $c['cout'] ) ) ) . '</small></span>';
+		/* translators: %s : prix conseillé. */
+		echo '<button type="button" class="etr-btn etr-btn--discret" data-remplir-livraison="' . esc_attr( $valeur ) . '">' . esc_html( sprintf( __( 'Prendre %s', 'espace-traiteur' ), $euros( $c['prix'] ) ) ) . '</button></p>';
+		echo '<details class="etr-estimation__plus"><summary>' . esc_html__( 'Voir le calcul', 'espace-traiteur' ) . '</summary>';
+		echo self::detail( $k ); // phpcs:ignore WordPress.Security.EscapeOutput -- échappé dans detail().
+		echo '<p class="etr-estimation__actions">' . $actualiser . '<small class="etr-muted">' . esc_html__( 'Relit la distance et le prix du gazole (après un changement d’adresse).', 'espace-traiteur' ) . '</small></p>'; // phpcs:ignore WordPress.Security.EscapeOutput -- échappé ci-dessus.
+		echo '</details></div>';
 	}
 
 	/**
