@@ -123,6 +123,10 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Logo à gauche dans l'application (3.3.2)
+
+- Application de l'équipe installée sur iPhone : le logo (ou le nom du site) est aligné à gauche dans l'en-tête, la loupe reste à droite.
+
 ### Onglet « Finances » et corrections du parcours (3.3.1)
 
 - L'onglet **Argent** de la fiche devient **Finances**. En tête, le **compte de la demande** :

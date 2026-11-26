@@ -936,7 +936,7 @@ html:active-view-transition-type(onglet)::view-transition-new(etr-contenu) { ani
 
 /* Application installée sur téléphone : en-tête compact, grand titre qui se replie, onglet « Plus ». */
 @media (max-width: 900px) {
-	.etr-installee .etr-gestion .etr-app__barre { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: nowrap; gap: 0; align-items: center; justify-content: center; align-self: start; height: calc(50px + env(safe-area-inset-top)); min-height: 0; padding: env(safe-area-inset-top) 16px 0; border: 0; background: var(--etr-nuit); } /* Pas de backdrop-filter : il piégerait la barre d'onglets (position fixe) dans l'en-tête. */
+	.etr-installee .etr-gestion .etr-app__barre { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: nowrap; gap: 0; align-items: center; justify-content: flex-start; align-self: start; height: calc(50px + env(safe-area-inset-top)); min-height: 0; padding: env(safe-area-inset-top) 60px 0 16px; border: 0; background: var(--etr-nuit); } /* Pas de backdrop-filter : il piégerait la barre d'onglets (position fixe) dans l'en-tête. */
 	.etr-installee .etr-gestion .etr-app__compte { display: none; }
 	.etr-installee .etr-gestion .etr-app__logo { display: flex; align-items: center; height: 50px; margin: 0; padding: 0; transition: opacity .2s ease; }
 	.etr-installee .etr-gestion .etr-app__nom-site { margin: 0; line-height: 1; }
