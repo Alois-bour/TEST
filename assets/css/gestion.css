@@ -1364,6 +1364,8 @@ html:active-view-transition-type(onglet)::view-transition-new(etr-contenu) { ani
 	.etr-arret__actions [data-action-etape] { flex: 1 0 100%; order: 10; justify-content: center; min-height: 48px; font-size: 16px; }
 	/* Itinéraire en icône seule : « En route · arrivée » tient sur une ligne. */
 	.etr-arret__actions > .etr-btn--discret.etr-arret__itineraire { flex: none; padding-left: 12px; padding-right: 12px; }
+	/* Action secondaire qui suit l'action principale (« Livrer » après « Charger les colis ») : sur sa ligne. */
+	.etr-arret__actions [data-action-etape] ~ .etr-btn--discret { flex: 1 0 100%; order: 11; justify-content: center; }
 	.etr-arret__actions [data-en-route] span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.etr-arret__actions .etr-arret__itineraire span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
@@ -1396,4 +1398,115 @@ html:active-view-transition-type(onglet)::view-transition-new(etr-contenu) { ani
 .etr-menu-export small { font-weight: 400; font-size: 13px; color: var(--etr-gris); }
 @media (max-width: 640px) {
 	.etr-menu-export ul { right: auto; left: 0; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Parcours d'une demande : frise, action du moment (3.3.0)           */
+/* ------------------------------------------------------------------ */
+
+.etr-parcours { display: flex; flex-direction: column; gap: 16px; padding: 18px 20px 20px; border: 1px solid var(--etr-trait); border-radius: 16px; background: var(--etr-fond-carte, #fff); }
+.etr-parcours__frise { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; counter-reset: none; }
+.etr-parcours__etape { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; text-align: center; }
+/* Trait entre les étapes */
+.etr-parcours__etape::before { content: ""; position: absolute; top: 13px; right: 50%; left: -50%; height: 2px; background: var(--etr-trait); }
+.etr-parcours__etape:first-child::before { display: none; }
+.etr-parcours__etape.est-fait::before,
+.etr-parcours__etape.est-courant::before { background: var(--etr-olive); }
+.etr-parcours__puce { position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--etr-trait); border-radius: 50%; background: var(--etr-fond-carte, #fff); color: var(--etr-gris); font: 600 12px/1 var(--etr-sans); }
+.etr-parcours__puce .etr-icone { width: 15px; height: 15px; stroke-width: 2.6; }
+.etr-parcours__etape.est-fait .etr-parcours__puce { border-color: var(--etr-olive); background: var(--etr-olive); color: #fff; }
+.etr-parcours__etape.est-courant .etr-parcours__puce { border-color: var(--etr-ambre); color: var(--etr-ambre); box-shadow: 0 0 0 4px var(--etr-ambre-clair); }
+.etr-parcours__nom { font-size: 12px; font-weight: 500; color: var(--etr-gris); line-height: 1.2; }
+.etr-parcours__etape.est-fait .etr-parcours__nom { color: var(--etr-texte); }
+.etr-parcours__etape.est-courant .etr-parcours__nom { color: var(--etr-encre); font-weight: 700; }
+.etr-parcours__detail { display: block; font-size: 11px; line-height: 1.3; color: var(--etr-gris); }
+.etr-parcours__frise.est-close { opacity: .5; }
+.etr-parcours__carte { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px 18px; border-radius: 12px; background: var(--etr-voile); }
+.etr-parcours__carte.est-a-moi { background: var(--etr-ambre-clair); }
+.etr-app .etr-parcours__sur { margin: 0; font: 700 11px/1.2 var(--etr-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--etr-gris); }
+.etr-parcours__carte.est-a-moi .etr-parcours__sur { color: var(--etr-ambre); }
+.etr-app .etr-parcours__titre { margin: 0; font: 400 22px/1.25 var(--etr-serif); color: var(--etr-encre); }
+.etr-app .etr-parcours__texte { margin: 0; font-size: 14px; color: var(--etr-texte); }
+.etr-parcours__boutons { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin-top: 4px; }
+.etr-parcours__form { margin: 0; }
+.etr-parcours__refus > summary { list-style: none; cursor: pointer; }
+.etr-parcours__refus > summary::-webkit-details-marker { display: none; }
+.etr-parcours__refus[open] { flex-basis: 100%; }
+.etr-parcours__refus[open] > summary { margin-bottom: 10px; }
+.etr-parcours__refus form { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.etr-parcours__refus textarea { width: 100%; }
+
+/* « Aussi à faire » (bureau) */
+.etr-aussi { padding: 14px 18px; border: 1px solid var(--etr-trait); border-radius: 14px; background: var(--etr-fond-carte, #fff); }
+.etr-app .etr-aussi__titre { margin: 0 0 6px; font: 600 12px/1.2 var(--etr-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--etr-gris); }
+.etr-aussi ul { margin: 0; padding: 0; list-style: none; }
+.etr-aussi li + li { border-top: 1px solid var(--etr-trait-doux); }
+.etr-app .etr-aussi a { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; color: var(--etr-encre); text-decoration: none; font-size: 15px; }
+.etr-aussi .etr-icone { width: 16px; height: 16px; flex: none; color: var(--etr-gris); }
+.etr-aussi li.est-urgent a span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--etr-ambre); vertical-align: 1px; }
+
+/* Accueil du bureau : demandes par étape */
+.etr-pipeline { margin: 0 0 32px; }
+.etr-pipeline ol { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; border: 1px solid var(--etr-trait); border-radius: 16px; background: var(--etr-fond-carte, #fff); overflow: hidden; }
+.etr-pipeline li + li { border-left: 1px solid var(--etr-trait-doux); }
+.etr-app .etr-pipeline a { display: flex; flex-direction: column; gap: 4px; height: 100%; padding: 14px 16px; color: var(--etr-encre); text-decoration: none; }
+.etr-app .etr-pipeline a:hover { background: var(--etr-voile); }
+.etr-pipeline strong { font: 400 30px/1 var(--etr-serif); font-variant-numeric: lining-nums tabular-nums; }
+.etr-pipeline span { font-size: 13px; color: var(--etr-gris); line-height: 1.3; }
+.etr-pipeline li.est-vide strong { color: var(--etr-gris); }
+.etr-app .etr-filtre-etape { margin: -8px 0 16px; font-weight: 500; }
+
+/* Écran « À préparer » */
+.etr-a-preparer { margin: 0 0 28px; }
+.etr-a-preparer.est-urgent .etr-section-titre { color: var(--etr-ambre); }
+.etr-a-preparer__liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin: 12px 0 0; padding: 0; list-style: none; }
+.etr-app .etr-a-preparer__carte a { display: flex; flex-direction: column; gap: 10px; height: 100%; padding: 16px 18px; border: 1px solid var(--etr-trait); border-radius: 14px; background: var(--etr-fond-carte, #fff); color: var(--etr-encre); text-decoration: none; }
+.etr-a-preparer.est-urgent .etr-a-preparer__carte a { box-shadow: inset 3px 0 0 var(--etr-ambre); }
+.etr-a-preparer__tete { display: flex; flex-direction: column; gap: 2px; }
+.etr-a-preparer__tete span { color: var(--etr-gris); font-size: 14px; }
+.etr-a-preparer__quand { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--etr-texte); }
+.etr-a-preparer__quand .etr-icone { width: 16px; height: 16px; color: var(--etr-gris); }
+.etr-a-preparer__progres { display: flex; flex-direction: column; gap: 4px; }
+.etr-a-preparer__progres small { font-size: 13px; color: var(--etr-gris); }
+.etr-a-preparer__bouton { align-self: flex-start; pointer-events: none; }
+
+/* Tournée : mini-suite et attente */
+.etr-mini-suite { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 10px; padding: 0; list-style: none; font-size: 12px; }
+.etr-mini-suite li { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; background: var(--etr-voile); color: var(--etr-gris); }
+.etr-mini-suite li + li::before { content: "›"; margin: 0 4px 0 -6px; color: var(--etr-trait); }
+.etr-mini-suite .etr-icone { width: 12px; height: 12px; stroke-width: 3; }
+.etr-mini-suite li.est-fait { background: var(--etr-olive-clair); color: var(--etr-olive-fonce); }
+.etr-mini-suite li.est-courant { background: var(--etr-ambre-clair); color: var(--etr-ambre); font-weight: 600; }
+.etr-app .etr-btn--attente { border-color: var(--etr-trait); background: var(--etr-voile); color: var(--etr-gris); cursor: default; }
+
+/* Écrans du terrain : étapes numérotées */
+.etr-app .etr-pas-titre { display: flex; align-items: flex-start; gap: 12px; margin: 26px 0 12px; font: 600 17px/1.3 var(--etr-sans); color: var(--etr-encre); }
+.etr-app .etr-pas-titre:first-child { margin-top: 0; }
+.etr-pas-titre__n { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--etr-encre); color: var(--etr-voile); font: 600 14px/1 var(--etr-sans); }
+.etr-pas-titre small { display: block; margin-top: 2px; font-weight: 400; font-size: 13px; color: var(--etr-gris); }
+.etr-app .etr-scanner__contexte { margin: -6px 0 14px; padding: 10px 14px; border-radius: 10px; background: var(--etr-olive-clair); color: var(--etr-olive-fonce); font-weight: 500; }
+
+@media (max-width: 640px) {
+	.etr-parcours { padding: 14px 14px 16px; }
+	/* Les sept étapes tiennent sur un iPhone (plus de défilement). */
+	.etr-parcours__frise { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+	.etr-parcours__puce { width: 24px; height: 24px; font-size: 11px; }
+	.etr-parcours__etape::before { top: 11px; }
+	.etr-parcours__nom { font-size: 10px; letter-spacing: -.01em; }
+	.etr-parcours__detail { display: none; }
+	.etr-app .etr-parcours__titre { font-size: 20px; }
+	.etr-parcours__boutons .etr-btn, .etr-parcours__form { flex: 1 1 100%; }
+	.etr-parcours__form .etr-btn { width: 100%; justify-content: center; }
+	.etr-parcours__boutons .etr-btn { justify-content: center; }
+	.etr-parcours__refus { flex: 1 1 100%; }
+	.etr-parcours__refus > summary { width: 100%; justify-content: center; }
+	/* Cinq cases sur deux lignes (3 + 2), séparées par de fins traits. */
+	.etr-pipeline ol { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--etr-trait-doux); }
+	.etr-pipeline li { background: var(--etr-fond-carte, #fff); }
+	.etr-pipeline li + li { border-left: 0; }
+	.etr-pipeline li:last-child { grid-column: span 2; }
+	.etr-pipeline a { padding: 12px; }
+	.etr-pipeline strong { font-size: 24px; }
+	.etr-pipeline span { font-size: 12px; }
+	.etr-a-preparer__liste { grid-template-columns: 1fr; }
 }

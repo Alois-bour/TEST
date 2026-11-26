@@ -1461,3 +1461,16 @@ body.etr-plein-ecran { margin: 0; padding: 0; background: var(--etr-fond-carte, 
 @media (max-width: 900px) {
 	html:has(.etr-espace.etr-app:not(.etr-app--integre)) { scroll-padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
 }
+
+/*
+ * Bouton flottant des extensions de cookies (CookieYes, Complianz, Cookie Notice…) : sur
+ * téléphone, dans l'application de l'équipe et l'espace traiteur, il recouvrait la barre
+ * d'onglets. Il est masqué ; le lien « Cookies » du compte rouvre le réglage (cookies.js).
+ * Le bandeau de première visite, lui, s'affiche toujours.
+ */
+@media (max-width: 900px) {
+	body.etr-page-gestion :is(.cky-btn-revisit-wrapper, #cookie-law-info-again, #cmplz-manage-consent, .cmplz-manage-consent, #moove_gdpr_save_popup_settings_button, .cn-revoke-cookie, #BorlabsCookieWidget, .brlbs-cmpnt-widget, .iubenda-tp-btn, #axeptio_main_button, #CookiebotWidget),
+	body.etr-page-application.etr-plein-ecran :is(.cky-btn-revisit-wrapper, #cookie-law-info-again, #cmplz-manage-consent, .cmplz-manage-consent, #moove_gdpr_save_popup_settings_button, .cn-revoke-cookie, #BorlabsCookieWidget, .brlbs-cmpnt-widget, .iubenda-tp-btn, #axeptio_main_button, #CookiebotWidget) {
+		display: none !important;
+	}
+}

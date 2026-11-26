@@ -128,6 +128,7 @@ class ETR_Frontend {
 
 		if ( etr_est_traiteur() ) {
 			wp_enqueue_script( 'espace-traiteur', ETR_URL . 'assets/js/espace-traiteur.js', array(), ETR_VERSION, true );
+			wp_enqueue_script( 'espace-traiteur-cookies', ETR_URL . 'assets/js/cookies.js', array(), ETR_VERSION, true );
 			wp_localize_script(
 				'espace-traiteur',
 				'etrDispo',
@@ -597,6 +598,7 @@ class ETR_Frontend {
 			'plus-onglet'  => '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
 			'visage'       => '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9v4h-1M9.5 15.5c1.5 1 3.5 1 5 0"/>',
 			'cloche'       => '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+			'cookies'      => '<path d="M21 12.5A9 9 0 1 1 11.5 3a3 3 0 0 0 3.5 3.5 3 3 0 0 0 3.5 3.5 3 3 0 0 0 2.5 2.5z"/><circle cx="8.5" cy="10.5" r=".8"/><circle cx="12" cy="15.5" r=".8"/><circle cx="15.5" cy="13" r=".8"/>',
 			'facture'      => '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 8h3M9 12h7M9 16h7"/>',
 			'inventaire'   => '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M8.5 11l2 2 4-4M8.5 17h7"/>',
 			'equipe'       => '<circle cx="12" cy="7.5" r="3.5"/><path d="M5 21a7 7 0 0 1 14 0"/><path d="M12 14.5v6.5"/>',
@@ -710,6 +712,8 @@ class ETR_Frontend {
 		echo '<p class="etr-app__societe">' . esc_html( etr_nom( $user ) ) . '<span>' . esc_html( $user->user_email ) . '</span></p>';
 		echo '<ul class="etr-app__liens">';
 		echo '<li><a href="' . esc_url( home_url( '/' ) ) . '">' . self::icone( 'site' ) . '<span>' . esc_html__( 'Retour au site', 'espace-traiteur' ) . '</span></a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		// Choix des cookies (le bouton flottant de l'extension est masqué sur téléphone : cookies.js).
+		echo '<li hidden><a href="#etr-cookies" aria-label="' . esc_attr__( 'Cookies', 'espace-traiteur' ) . '">' . self::icone( 'cookies' ) . '<span>' . esc_html__( 'Cookies', 'espace-traiteur' ) . '</span></a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<li><a href="' . esc_url( wp_logout_url( etr_url() ) ) . '">' . self::icone( 'sortie' ) . '<span>' . esc_html__( 'Se déconnecter', 'espace-traiteur' ) . '</span></a></li>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '</ul></div>';
 		echo '</header>';

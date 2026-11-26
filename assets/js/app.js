@@ -254,6 +254,20 @@
 		} );
 	} );
 
+	// Liens à confirmer (« Livrer quand même »…).
+	document.addEventListener( 'click', function ( e ) {
+		var lien = e.target.closest( 'a[data-confirmer]' );
+		if ( ! lien || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0 ) {
+			return;
+		}
+		e.preventDefault();
+		confirmer( lien.getAttribute( 'data-confirmer' ), { valider: lien.textContent.trim() || 'Continuer' } ).then( function ( ok ) {
+			if ( ok ) {
+				window.location.href = lien.href;
+			}
+		} );
+	} );
+
 	/* ------------------------------------------------------------------ */
 	/* Notifications temporaires (toasts)                                 */
 	/* ------------------------------------------------------------------ */
