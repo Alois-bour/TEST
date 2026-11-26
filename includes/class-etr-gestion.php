@@ -2553,7 +2553,8 @@ class ETR_Gestion {
 		$erreurs = array(
 			'nom'          => array( 'nom', __( 'Indiquez le nom.', 'espace-traiteur' ) ),
 			'email'        => array( 'email', __( 'Cette adresse e-mail n’est pas valide.', 'espace-traiteur' ) ),
-			'email_existe' => array( 'email', __( 'Un compte existe déjà avec cette adresse e-mail.', 'espace-traiteur' ) ),
+			'email_existe'   => array( 'email', __( 'Un compte existe déjà avec cette adresse e-mail.', 'espace-traiteur' ) ),
+			'email_traiteur' => array( 'email', __( 'Cette adresse est celle d’un compte traiteur. Un traiteur garde uniquement son espace traiteur : utilisez une autre adresse pour le compte d’équipe.', 'espace-traiteur' ) ),
 			'role'         => array( 'roles', __( 'Choisissez au moins un rôle.', 'espace-traiteur' ) ),
 			'creation'     => array( '', __( 'Le compte n’a pas pu être créé. Réessayez.', 'espace-traiteur' ) ),
 		);

@@ -1431,3 +1431,11 @@ body.etr-plein-ecran { margin: 0; padding: 0; background: var(--etr-fond-carte, 
 	font-weight: 500;
 	line-height: 1.35;
 }
+
+/* Livraison et reprise : liste des dates possibles (remplace le calendrier) */
+.etr-app .etr-select-date { width: 100%; }
+.etr-app .etr-select-date:disabled { color: var(--etr-gris); }
+/* Un élément masqué le reste, quelles que soient les règles d'affichage des champs. */
+.etr-espace [hidden] { display: none !important; }
+/* Date de livraison ou de reprise : rapport à l'événement (« la veille de l'événement ») */
+.etr-date-relative { color: var(--etr-olive, #4d5b3e); font-weight: 500; }

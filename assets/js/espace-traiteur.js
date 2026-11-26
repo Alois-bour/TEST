@@ -340,8 +340,100 @@
 		];
 		var aides = { evt: aide( evt, [] ), liv: aide( liv, raccLiv ), rep: aide( rep, raccRep ) };
 
+		// Livraison et reprise : une liste des seules dates possibles autour de l'événement, à la
+		// place du calendrier (celui de l'iPhone ignore les dates limites et laissait choisir le
+		// lendemain de l'événement pour la livraison). Le champ date reste celui qui est envoyé.
+		var formatCourt = window.Intl ? new Intl.DateTimeFormat( 'fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' } ) : null;
+		function jours( a, b ) {
+			return Math.round( ( new Date( b + 'T00:00:00Z' ) - new Date( a + 'T00:00:00Z' ) ) / 86400000 );
+		}
+		function relatif( date, e ) {
+			var n = jours( e, date );
+			if ( 0 === n ) {
+				return 'le jour de l’événement';
+			}
+			if ( -1 === n ) {
+				return 'la veille';
+			}
+			if ( 1 === n ) {
+				return 'le lendemain';
+			}
+			return n < 0 ? ( -n ) + ' jours avant' : n + ' jours après';
+		}
+		function liste( input, aideDate ) {
+			var choix = document.createElement( 'select' );
+			choix.className = 'etr-select-date';
+			choix.id        = input.id + '-choix';
+			var label = document.querySelector( 'label[for="' + input.id + '"]' );
+			if ( label ) {
+				label.setAttribute( 'for', choix.id ); // Le libellé désigne la liste.
+			}
+			input.insertAdjacentElement( 'beforebegin', choix );
+			input.hidden = true;
+			aideDate.lisible.hidden = true; // La liste montre déjà la date en toutes lettres.
+			var puces = aideDate.lisible.parentNode.querySelector( '.etr-date-aide__puces' );
+			if ( puces ) {
+				puces.hidden = true;
+			}
+			choix.addEventListener( 'change', function () {
+				input.value = choix.value;
+				input.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+			} );
+			return choix;
+		}
+		var choixLiv = liste( liv, aides.liv );
+		var choixRep = liste( rep, aides.rep );
+		function remplir( choix, input, debut, fin, e ) {
+			var options = [];
+			if ( ! e ) {
+				options.push( [ '', 'Choisissez d’abord la date de l’événement' ] );
+			} else {
+				options.push( [ '', 'Le jour de l’événement (par défaut)' ] );
+				for ( var d = debut; d <= fin; d = decaler( d, 1 ) ) {
+					var texte = formatCourt ? formatCourt.format( new Date( d + 'T00:00:00Z' ) ) : d;
+					options.push( [ d, texte.charAt( 0 ).toUpperCase() + texte.slice( 1 ) + ' · ' + relatif( d, e ) ] );
+				}
+			}
+			var cle = options.map( function ( o ) {
+				return o[ 0 ];
+			} ).join( '|' );
+			if ( choix.getAttribute( 'data-cle' ) !== cle ) {
+				choix.innerHTML = '';
+				options.forEach( function ( o ) {
+					var opt = document.createElement( 'option' );
+					opt.value       = o[ 0 ];
+					opt.textContent = o[ 1 ];
+					choix.appendChild( opt );
+				} );
+				choix.setAttribute( 'data-cle', cle );
+			}
+			choix.disabled = ! e;
+			// Une date enregistrée hors des choix (ancienne demande) reste affichée, signalée par le message.
+			if ( input.value && ! choix.querySelector( 'option[value="' + input.value + '"]' ) ) {
+				var hors = document.createElement( 'option' );
+				hors.value       = input.value;
+				hors.textContent = ( formatCourt ? formatCourt.format( new Date( input.value + 'T00:00:00Z' ) ) : input.value ) + ' · à changer';
+				choix.appendChild( hors );
+				choix.setAttribute( 'data-cle', '' );
+			}
+			choix.value = input.value;
+		}
+		function majListes() {
+			var e = evt.value;
+			if ( ! e ) {
+				remplir( choixLiv, liv, '', '', '' );
+				remplir( choixRep, rep, '', '', '' );
+				return;
+			}
+			remplir( choixLiv, liv, plusTard( auj, decaler( e, -ecarts.avant ) ), e, e );
+			remplir( choixRep, rep, plusTard( e, liv.value || e ), decaler( e, ecarts.apres ), e );
+		}
+
 		function signaler( input, a, texte ) {
-			input.setCustomValidity( texte || '' );
+			// Champ caché : l'erreur est portée par la liste (le navigateur la montre à l'envoi).
+			var cible = input.hidden && input.previousElementSibling && 'SELECT' === input.previousElementSibling.tagName ? input.previousElementSibling : input;
+			input.setCustomValidity( '' );
+			cible.setCustomValidity( texte || '' );
 			a.message.textContent = texte || '';
 			a.message.classList.toggle( 'est-erreur', !! texte );
 			input.closest( '.etr-champ' ).classList.toggle( 'etr-champ--erreur', !! texte );
@@ -390,12 +482,7 @@
 				}
 			}
 			signaler( rep, aides.rep, mRep );
-			if ( ! liv.value && e && ! mLiv ) {
-				aides.liv.message.textContent = 'Sans date : livraison le jour de l’événement.';
-			}
-			if ( ! rep.value && e && ! mRep ) {
-				aides.rep.message.textContent = 'Sans date : reprise le jour de l’événement.';
-			}
+			majListes();
 			if ( retraits.liv && ! liv.value ) {
 				aides.liv.message.textContent = retraits.liv;
 			}

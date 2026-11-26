@@ -123,6 +123,19 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Dates de livraison et de reprise : seulement les dates possibles (3.1.2)
+
+- **Formulaire du traiteur** : la livraison et la reprise se choisissent dans une liste des seules dates cohérentes avec l'événement (« Samedi 5 décembre · la veille », « … · le jour de l'événement », « … · le lendemain »). Le calendrier de l'iPhone ignorait les limites et laissait choisir une livraison après l'événement. Sans date d'événement, la liste est désactivée ; si l'événement change, une date devenue impossible est retirée.
+- **Fiche, « Changer les dates » (bureau)** : même liste, construite côté serveur ; la date actuelle reste proposée même hors limites.
+- Le serveur refuse toujours une date incohérente envoyée autrement.
+- **Fiches** (traiteur, équipe, administration) : la livraison et la reprise sont dites par rapport à l'événement (« 26 novembre 2026 · la veille de l'événement ») ; sans date choisie, « Le jour de l'événement (27 novembre 2026) » au lieu d'un tiret.
+
+### Comptes traiteurs : uniquement l'espace traiteur (3.1.1)
+
+- Un compte traiteur n'a accès qu'à son espace traiteur, jamais à l'application de l'équipe, même si un rôle d'équipe lui était ajouté (par exemple depuis wp-admin).
+- **Connexion à l'application** avec un compte traiteur : message clair, lien vers l'espace traiteur ; un membre de l'équipe utilise son compte d'équipe, avec sa propre adresse.
+- **Équipe › Ajouter** : l'adresse d'un compte traiteur est refusée avec un message dédié (« utilisez une autre adresse pour le compte d'équipe »).
+
 ### Application : fiche en onglets et « À faire » (3.1.0)
 
 - **Fiche d'une demande en onglets** : Résumé · Matériel · Échanges · Argent (bureau) · Historique. Pastilles sur les onglets (point d'argent à traiter, incident ouvert, message du traiteur sans réponse). Les onglets sont de vrais liens (`?onglet=argent`), changent sans rechargement, restent en haut de l'écran, et le même onglet revient après un enregistrement.
