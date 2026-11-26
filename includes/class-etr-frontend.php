@@ -257,9 +257,15 @@ class ETR_Frontend {
 			return;
 		}
 		$demande = get_post( $demande_id );
-		if ( ! $demande || 'etr_demande' !== $demande->post_type || ! etr_peut_voir_demande( $demande_id ) || 'en_attente' !== etr_get_statut( $demande_id ) ) {
+		if ( ! $demande || 'etr_demande' !== $demande->post_type || ! etr_peut_voir_demande( $demande_id ) ) {
 			self::$erreurs[] = __( 'Cette demande ne peut plus être modifiée.', 'espace-traiteur' );
 			return;
+		}
+		if ( 'en_attente' !== etr_get_statut( $demande_id ) ) {
+			// Validée (ou traitée) entre-temps : retour à la fiche, pas de formulaire réaffiché
+			// (il deviendrait une nouvelle demande).
+			wp_safe_redirect( etr_url( array( 'etr_vue' => 'demande', 'id' => $demande_id, 'etr_msg' => 'plus_modifiable' ) ) );
+			exit;
 		}
 
 		$saisie  = isset( $_POST['etr'] ) && is_array( $_POST['etr'] ) ? wp_unslash( $_POST['etr'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
@@ -300,6 +306,9 @@ class ETR_Frontend {
 			$quantites           = isset( $_POST['quantites'] ) && is_array( $_POST['quantites'] ) ? wp_unslash( $_POST['quantites'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 			$lignes              = array();
 			foreach ( $quantites as $article_id => $quantite ) {
+				if ( (string) absint( $article_id ) !== (string) $article_id ) {
+					continue; // « 012 », « 12abc » : ignorés (sinon deux lignes du même article, stock dépassé).
+				}
 				$article_id = absint( $article_id );
 				$quantite   = is_scalar( $quantite ) ? absint( $quantite ) : 0;
 				if ( ! $article_id || ! $quantite ) {
@@ -737,8 +746,15 @@ class ETR_Frontend {
 			'modifiee' => __( 'Votre demande a bien été modifiée.', 'espace-traiteur' ),
 			'annulee' => __( 'Votre demande a été annulée.', 'espace-traiteur' ),
 		);
+		$infos = array(
+			'plus_modifiable' => __( 'Cette demande a été traitée par notre équipe entre-temps : elle ne peut plus être modifiée. Écrivez-nous pour tout changement.', 'espace-traiteur' ),
+			'devis_change'    => __( 'Le devis a été mis à jour entre-temps : relisez la nouvelle version avant de l’accepter.', 'espace-traiteur' ),
+		);
 		if ( isset( $textes[ $msg ] ) && ! self::$erreurs ) {
 			echo '<div class="etr-notice etr-notice--succes" role="status">' . self::icone( 'coche' ) . '<p>' . esc_html( $textes[ $msg ] ) . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		}
+		if ( isset( $infos[ $msg ] ) ) {
+			echo '<div class="etr-notice etr-notice--erreur" role="alert">' . self::icone( 'alerte' ) . '<p>' . esc_html( $infos[ $msg ] ) . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
 		if ( self::$erreurs ) {
 			echo '<div class="etr-notice etr-notice--erreur" role="alert"><div><p><strong>' . esc_html__( 'La demande n’a pas été envoyée. Corrigez les points suivants :', 'espace-traiteur' ) . '</strong></p><ul>';

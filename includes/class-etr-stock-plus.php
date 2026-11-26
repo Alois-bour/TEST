@@ -211,6 +211,9 @@ class ETR_Stock_Plus {
 		);
 		$d = array();
 		foreach ( $ids as $id ) {
+			if ( ETR_Operations::reprise( $id ) ) {
+				continue; // Reprise faite avec écarts (demande encore « livrée ») : le matériel rendu est revenu.
+			}
 			foreach ( etr_get_lignes( $id ) as $ligne ) {
 				$d[ (int) $ligne['article_id'] ] = ( isset( $d[ (int) $ligne['article_id'] ] ) ? $d[ (int) $ligne['article_id'] ] : 0 ) + (int) $ligne['quantite'];
 			}

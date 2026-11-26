@@ -18,6 +18,37 @@
 	var possible  = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
 	/* ------------------------------------------------------------------ */
+	/* Appareil rattaché à la personne connectée (toutes les pages)       */
+	/* ------------------------------------------------------------------ */
+
+	// Un téléphone partagé déjà abonné passe au compte connecté (une fois par session et par
+	// compte) : les notifications de la personne précédente n'y arrivent plus.
+	if ( possible && Notification.permission === 'granted' && etrNotifs.utilisateur ) {
+		var cleSession = 'etr-push-compte';
+		var dejaFait   = false;
+		try {
+			dejaFait = window.sessionStorage.getItem( cleSession ) === String( etrNotifs.utilisateur );
+		} catch ( e ) {}
+		if ( ! dejaFait ) {
+			navigator.serviceWorker.ready.then( function ( reg ) {
+				return reg.pushManager.getSubscription();
+			} ).then( function ( abonnement ) {
+				if ( ! abonnement ) {
+					return null;
+				}
+				var json = abonnement.toJSON();
+				return fetch( etrNotifs.api + 'appareil', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': etrNotifs.nonce }, body: JSON.stringify( { endpoint: json.endpoint, keys: json.keys } ) } ).then( function ( r ) {
+					if ( r.ok ) {
+						try {
+							window.sessionStorage.setItem( cleSession, String( etrNotifs.utilisateur ) );
+						} catch ( e ) {}
+					}
+				} );
+			} ).catch( function () {} );
+		}
+	}
+
+	/* ------------------------------------------------------------------ */
 	/* Invitation (toutes les pages)                                      */
 	/* ------------------------------------------------------------------ */
 

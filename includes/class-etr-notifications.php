@@ -91,8 +91,8 @@ class ETR_Notifications {
 				if ( 'validee' === etr_get_statut( $id ) && $date_livraison === $livraison ) {
 					self::envoyer_rappel( $id, 'livraison', $livraison );
 				}
-				if ( $date_event === $evenement ) {
-					self::envoyer_rappel( $id, 'reprise', $evenement );
+				if ( $date_event === $evenement && ! ( class_exists( 'ETR_Operations' ) && ETR_Operations::reprise( $id ) ) ) {
+					self::envoyer_rappel( $id, 'reprise', $evenement ); // Pas de rappel si la reprise est déjà faite (avec écarts).
 				}
 			}
 		} finally {

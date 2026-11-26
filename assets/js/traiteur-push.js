@@ -81,6 +81,27 @@
 		} );
 	} ).catch( function () {} );
 
+	// Déconnexion : ce téléphone ne reçoit plus les notifications de ce compte.
+	var sortie = false;
+	document.addEventListener( 'click', function ( e ) {
+		var lien = e.target.closest( 'a[href*="action=logout"]' );
+		if ( ! lien || sortie ) {
+			return;
+		}
+		e.preventDefault();
+		sortie = true;
+		var fin = navigator.serviceWorker.getRegistration( C.portee ).then( function ( reg ) {
+			return reg ? reg.pushManager.getSubscription() : null;
+		} ).then( function ( abonnement ) {
+			return abonnement ? envoyer( 'retirer', abonnement ) : null;
+		} ).catch( function () {} );
+		Promise.race( [ fin, new Promise( function ( r ) {
+			setTimeout( r, 1500 );
+		} ) ] ).then( function () {
+			window.location.href = lien.href;
+		} );
+	} );
+
 	var fermer = zone.querySelector( '.etr-installer__fermer' );
 	if ( fermer ) {
 		fermer.addEventListener( 'click', function () {

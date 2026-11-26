@@ -285,13 +285,33 @@ class ETR_Logistique {
 	 * @return int
 	 */
 	public static function charge( $jour, $creneau, $exclure = 0 ) {
+		// Toutes les demandes actives (en attente comprises) : la tournée du jour ne voit que les
+		// étapes déjà prêtes (livraisons validées, reprises de demandes livrées).
+		$ids = get_posts(
+			array(
+				'post_type'     => 'etr_demande',
+				'post_status'   => 'publish',
+				'numberposts'   => -1,
+				'fields'        => 'ids',
+				'no_found_rows' => true,
+				'post__not_in'  => $exclure ? array( (int) $exclure ) : array(),
+				'meta_query'    => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+					array(
+						'key'     => '_etr_statut',
+						'value'   => array( 'en_attente', 'validee', 'livree' ),
+						'compare' => 'IN',
+					),
+				),
+			)
+		);
 		$n = 0;
-		foreach ( ETR_Operations::tournee( $jour ) as $type => $ids ) {
-			$etape = 'livraisons' === $type ? 'livraison' : 'reprise';
-			foreach ( $ids as $id ) {
-				if ( (int) $id !== (int) $exclure && get_post_meta( $id, '_etr_creneau_' . $etape, true ) === $creneau ) {
-					++$n;
-				}
+		foreach ( $ids as $id ) {
+			list( $livraison, $reprise ) = ETR_Operations::jours( $id );
+			if ( $livraison === $jour && get_post_meta( $id, '_etr_creneau_livraison', true ) === $creneau && ! ETR_Operations::livraison( $id ) ) {
+				++$n;
+			}
+			if ( $reprise === $jour && get_post_meta( $id, '_etr_creneau_reprise', true ) === $creneau && ! ETR_Operations::reprise( $id ) ) {
+				++$n;
 			}
 		}
 		return $n;

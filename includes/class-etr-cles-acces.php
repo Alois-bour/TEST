@@ -254,7 +254,7 @@ class ETR_Cles_Acces {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public static function api_options_connexion() {
-		if ( ETR_Comptes::est_bloque( 'cle|' . self::ip() ) ) {
+		if ( self::ip_bloquee() ) {
 			return self::erreur( __( 'Trop de tentatives. Réessayez dans 15 minutes.', 'espace-traiteur' ), 429 );
 		}
 		$defi = self::nouveau_defi( array( 'type' => 'connexion' ) );
@@ -279,13 +279,21 @@ class ETR_Cles_Acces {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public static function api_connexion( $requete ) {
-		$cle_echecs = 'cle|' . self::ip();
-		if ( ETR_Comptes::est_bloque( $cle_echecs ) ) {
+		// Blocage par compte visé (et adresse IP) : les échecs d'une personne ne bloquent pas toute
+		// l'équipe derrière la même connexion (Wi-Fi du dépôt, CDN) ; plafond large par IP en plus.
+		$poignee    = ETR_Push::d64( (string) $requete->get_param( 'userHandle' ) );
+		$compte     = preg_match( '/^etr-(\d+)$/', $poignee, $m ) ? (int) $m[1] : 0;
+		$cle_echecs = 'cle|' . $compte;
+		if ( self::ip_bloquee() || ETR_Comptes::est_bloque( $cle_echecs ) ) {
 			return self::erreur( __( 'Trop de tentatives. Réessayez dans 15 minutes.', 'espace-traiteur' ), 429 );
 		}
 		$resultat = self::verifier_connexion( $requete );
 		if ( is_wp_error( $resultat ) ) {
-			ETR_Comptes::compter_echec( $cle_echecs );
+			if ( 'etr_cle_expiree' !== $resultat->get_error_code() ) { // Une page restée ouverte n'est pas une tentative.
+				ETR_Comptes::compter_echec( $cle_echecs );
+				$cle_ip = 'etr_echecs_cle_ip_' . md5( self::ip() );
+				set_transient( $cle_ip, (int) get_transient( $cle_ip ) + 1, ETR_Comptes::DUREE_BLOCAGE );
+			}
 			return $resultat;
 		}
 		delete_transient( ETR_Comptes::cle_echecs( $cle_echecs ) ); // Réussite : compteur d'échecs remis à zéro.
@@ -304,7 +312,7 @@ class ETR_Cles_Acces {
 		$refus = __( 'Connexion par Face ID refusée. Connectez-vous avec votre mot de passe.', 'espace-traiteur' );
 		$defi  = self::prendre_defi( $requete->get_param( 'jeton' ), 'connexion' );
 		if ( ! $defi ) {
-			return self::erreur( __( 'Demande expirée : réessayez.', 'espace-traiteur' ) );
+			return new WP_Error( 'etr_cle_expiree', __( 'Demande expirée : réessayez.', 'espace-traiteur' ), array( 'status' => 400 ) );
 		}
 		$id        = (string) $requete->get_param( 'id' );
 		$poignee   = ETR_Push::d64( (string) $requete->get_param( 'userHandle' ) );
@@ -372,6 +380,15 @@ class ETR_Cles_Acces {
 	/* ------------------------------------------------------------------ */
 	/* Vérifications                                                      */
 	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Trop d'échecs depuis cette adresse IP, tous comptes confondus (plafond large).
+	 *
+	 * @return bool
+	 */
+	private static function ip_bloquee() {
+		return (int) get_transient( 'etr_echecs_cle_ip_' . md5( self::ip() ) ) >= 30;
+	}
 
 	/**
 	 * Erreur d'API.

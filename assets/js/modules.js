@@ -57,7 +57,7 @@
 			var b = document.createElement( 'button' );
 			b.type        = 'button';
 			b.className   = 'etr-btn etr-btn--discret';
-			b.textContent = minutes < 60 ? minutes + ' min' : ( minutes / 60 ) + ' h' + ( minutes % 60 ? ' ' + ( minutes % 60 ) : '' );
+			b.textContent = minutes < 60 ? minutes + ' min' : Math.floor( minutes / 60 ) + ' h' + ( minutes % 60 ? ' ' + ( minutes % 60 ) : '' );
 			b.addEventListener( 'click', function () {
 				choix.querySelectorAll( 'button' ).forEach( function ( x ) {
 					x.disabled = true;

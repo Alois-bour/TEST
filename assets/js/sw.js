@@ -108,9 +108,13 @@ function garderPage( requete, reponse ) {
 	if ( ! reponse.ok ) {
 		return Promise.resolve();
 	}
-	if ( reponse.headers.get( 'X-ETR-Page' ) !== 'app' ) {
+	const type = reponse.headers.get( 'X-ETR-Page' );
+	if ( 'connexion' === type ) {
 		// Écran de connexion (session finie, autre personne) : les pages gardées sont effacées.
 		return caches.delete( PAGES ).catch( () => {} );
+	}
+	if ( 'app' !== type || ( reponse.headers.get( 'Content-Type' ) || '' ).indexOf( 'text/html' ) === -1 ) {
+		return Promise.resolve(); // Export, PDF, photo, bon imprimable : jamais gardés sur le téléphone.
 	}
 	const copie = reponse.clone();
 	return caches.open( PAGES ).then( ( cache ) => cache.put( requete.url, copie ).then( () => cache.keys() ).then( ( cles ) => {

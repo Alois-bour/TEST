@@ -113,7 +113,8 @@
 		var envoi = serialiser( donnees );
 		envoi.chemin  = chemin;
 		envoi.libelle = ( infos && infos.libelle ) || 'Saisie';
-		envoi.demande = ( infos && infos.demande ) || 0;
+		envoi.demande = parseInt( ( infos && infos.demande ) || 0, 10 ) || 0;
+		envoi.par     = C.utilisateur || 0; // Rejouée seulement pour la même personne.
 		envoi.type    = ( infos && infos.type ) || '';
 		envoi.cree    = Date.now();
 		envoi.erreur  = '';
@@ -166,7 +167,7 @@
 		var envoyes = 0;
 		envoiEnCours = tous().then( function ( liste ) {
 			var aEnvoyer = liste.filter( function ( e ) {
-				return ! e.erreur;
+				return ! e.erreur && ( ! e.par || ! C.utilisateur || e.par === C.utilisateur );
 			} );
 			if ( ! aEnvoyer.length || navigator.onLine === false ) {
 				return null;
@@ -189,6 +190,13 @@
 									return transaction( 'readwrite', function ( m ) {
 										return m.delete( envoi.id );
 									} );
+								}
+								// Erreur passagère (serveur occupé ou en panne, délai dépassé) : la saisie reste
+								// en attente et la file s'arrête ; elle repartira au prochain essai.
+								if ( r.status >= 500 || r.status === 408 || r.status === 429 || ( r.status === 409 && json.code === 'etr_occupe' ) ) {
+									var passager = new Error( 'passager' );
+									passager.passager = true;
+									throw passager;
 								}
 								// Refus du serveur (commande déjà livrée par quelqu'un d'autre…) : gardé, signalé.
 								envoi.erreur = json.message || ( 'Refusé (erreur ' + r.status + ')' );
@@ -303,6 +311,23 @@
 							majIndicateur();
 						} );
 					} );
+					var reessayer = document.createElement( 'button' );
+					reessayer.type        = 'button';
+					reessayer.className   = 'etr-lien';
+					reessayer.textContent = 'Réessayer';
+					reessayer.addEventListener( 'click', function () {
+						envoi.erreur = '';
+						transaction( 'readwrite', function ( m ) {
+							return m.put( envoi );
+						} ).then( function () {
+							li.className = '';
+							li.querySelector( 'small' ).textContent = 'en attente';
+							reessayer.remove();
+							retirer.remove();
+							envoyer();
+						} );
+					} );
+					li.appendChild( reessayer );
 					li.appendChild( retirer );
 				}
 				ul.appendChild( li );
@@ -369,12 +394,54 @@
 		}
 	} );
 
-	// Déconnexion : les pages gardées pour le hors connexion sont effacées du téléphone.
+	// Déconnexion : pages gardées effacées, saisies en attente envoyées ou abandonnées (après
+	// confirmation), et ce téléphone ne reçoit plus les notifications de la personne qui part.
+	var deconnexionConfirmee = false;
 	document.addEventListener( 'click', function ( e ) {
 		var lien = e.target.closest( 'a[href*="action=logout"]' );
-		if ( lien && navigator.serviceWorker && navigator.serviceWorker.controller ) {
-			navigator.serviceWorker.controller.postMessage( { type: 'etr-vider' } );
+		if ( ! lien || deconnexionConfirmee ) {
+			return;
 		}
+		e.preventDefault();
+		var partir = function () {
+			deconnexionConfirmee = true;
+			if ( navigator.serviceWorker && navigator.serviceWorker.controller ) {
+				navigator.serviceWorker.controller.postMessage( { type: 'etr-vider' } );
+			}
+			var fin = Promise.resolve();
+			if ( navigator.serviceWorker && window.PushManager && C.apiNotifs ) {
+				fin = navigator.serviceWorker.ready.then( function ( reg ) {
+					return reg.pushManager.getSubscription();
+				} ).then( function ( abonnement ) {
+					if ( ! abonnement ) {
+						return null;
+					}
+					return fetch( C.apiNotifs + 'appareil', { method: 'DELETE', credentials: 'same-origin', keepalive: true, headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': C.nonce }, body: JSON.stringify( { endpoint: abonnement.endpoint } ) } ).catch( function () {} );
+				} ).catch( function () {} );
+			}
+			Promise.race( [ fin, new Promise( function ( r ) {
+				setTimeout( r, 1500 );
+			} ) ] ).then( function () {
+				window.location.href = lien.href;
+			} );
+		};
+		envoyer().then( function () {
+			return tous();
+		} ).then( function ( liste ) {
+			if ( ! liste.length ) {
+				return partir();
+			}
+			var question = liste.length + ( liste.length > 1 ? ' saisies ne sont pas encore envoyées' : ' saisie n’est pas encore envoyée' ) + ' (réseau). En vous déconnectant, elles seront perdues.';
+			var confirmer = window.etrConfirmer ? window.etrConfirmer( question, { valider: 'Se déconnecter quand même', danger: true } ) : Promise.resolve( window.confirm( question ) ); // eslint-disable-line no-alert
+			return confirmer.then( function ( ok ) {
+				if ( ! ok ) {
+					return null;
+				}
+				return transaction( 'readwrite', function ( m ) {
+					return m.clear();
+				} ).then( partir );
+			} );
+		} ).catch( partir );
 	} );
 
 	// Pages utiles sans réseau : gardées sur le téléphone à l'ouverture de la tournée.
@@ -404,7 +471,7 @@
 	function pourDemande( demande ) {
 		return tous().then( function ( liste ) {
 			return liste.filter( function ( e ) {
-				return e.demande === demande;
+				return parseInt( e.demande, 10 ) === parseInt( demande, 10 );
 			} );
 		} );
 	}
