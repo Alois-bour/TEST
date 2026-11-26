@@ -244,6 +244,18 @@ class ETR_Fiche {
 				$etapes[] = array( __( 'Devis', 'espace-traiteur' ), ! empty( $d['accepte'] ) ? __( 'accepté', 'espace-traiteur' ) : __( 'envoyé', 'espace-traiteur' ), ! empty( $d['accepte'] ) ? 'fait' : 'en-cours', ETR_Devis::prix( $montant ) );
 			}
 		}
+		if ( ETR_Modules::actif( 'contrat' ) && class_exists( 'ETR_Contrat' ) ) {
+			$etat     = ETR_Contrat::etat( $id );
+			$noms     = array(
+				'signe'      => array( __( 'signé', 'espace-traiteur' ), 'fait' ),
+				'a_signer'   => array( __( 'à signer', 'espace-traiteur' ), 'a-faire' ),
+				'a_resigner' => array( __( 'à signer de nouveau', 'espace-traiteur' ), 'a-faire' ),
+				'attente'    => array( __( 'après validation', 'espace-traiteur' ), 'plus-tard' ),
+			);
+			if ( isset( $noms[ $etat ] ) ) {
+				$etapes[] = array( __( 'Contrat', 'espace-traiteur' ), $noms[ $etat ][0], $noms[ $etat ][1], '' );
+			}
+		}
 		if ( ETR_Modules::actif( 'acompte' ) ) {
 			$a = ETR_Devis::acompte( $id );
 			if ( (float) $a['acompte'] > 0 ) {

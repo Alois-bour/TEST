@@ -22,6 +22,7 @@ class ETR_Traiteur_Plus {
 	const META_RATIO    = '_etr_par_invite';
 	const META_AVIS     = '_etr_avis';
 	const META_CLOTURE  = '_etr_cloturee_le';
+	const META_GOOGLE   = '_etr_avis_google';
 
 	/**
 	 * Hooks.
@@ -53,6 +54,7 @@ class ETR_Traiteur_Plus {
 		add_action( 'etr_traiteur_demande_fin', array( __CLASS__, 'formulaire_avis' ), 2 );
 		add_action( 'etr_gestion_fiche_echanges', array( __CLASS__, 'panneau_avis' ), 50 );
 		add_action( 'etr_gestion_statistiques', array( __CLASS__, 'statistiques_avis' ), 20 );
+		add_action( 'template_redirect', array( __CLASS__, 'vers_google' ), 4 );
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -70,6 +72,8 @@ class ETR_Traiteur_Plus {
 			'societe_invitation'  => 1,  // Le traiteur ajoute lui-même ses collaborateurs.
 			'societe_max'         => 5,  // Collaborateurs au plus par société.
 			'calendrier_mois'     => 3,  // Mois consultables.
+			'google_url'          => '', // Lien « laisser un avis » de la fiche Google.
+			'google_note'         => 5,  // Note à partir de laquelle on propose l'avis Google.
 		);
 	}
 
@@ -101,6 +105,11 @@ class ETR_Traiteur_Plus {
 							$propre[ $cle ] = min( $bornes[1], max( $bornes[0], absint( $saisie[ $cle ] ) ) );
 						}
 					}
+					if ( isset( $saisie['google_url'] ) ) {
+						$url                  = esc_url_raw( trim( (string) $saisie['google_url'] ), array( 'https' ) );
+						$propre['google_url'] = $url ? $url : '';
+						$propre['google_note'] = min( 5, max( 3, absint( isset( $saisie['google_note'] ) ? $saisie['google_note'] : 5 ) ) );
+					}
 					if ( isset( $saisie['societe_max'] ) ) {
 						$propre['societe_invitation'] = empty( $saisie['societe_invitation'] ) ? 0 : 1;
 					}
@@ -129,6 +138,17 @@ class ETR_Traiteur_Plus {
 		} elseif ( 'multi_comptes' === $cle ) {
 			echo '<p><input type="hidden" name="' . $nom( 'societe_invitation' ) . '" value="0"><label><input type="checkbox" name="' . $nom( 'societe_invitation' ) . '" value="1"' . checked( $p['societe_invitation'], 1, false ) . '> ' . esc_html__( 'Le traiteur ajoute lui-même ses collaborateurs (écran « Mon équipe »)', 'espace-traiteur' ) . '</label></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
 			echo '<p><label>' . esc_html__( 'Collaborateurs au plus par société', 'espace-traiteur' ) . ' <input type="number" min="1" max="50" class="small-text" name="' . $nom( 'societe_max' ) . '" value="' . esc_attr( (string) $p['societe_max'] ) . '"></label></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		} elseif ( 'avis_google' === $cle ) {
+			echo '<p><label>' . esc_html__( 'Lien « Laisser un avis » de votre fiche Google', 'espace-traiteur' ) . '<br><input type="url" class="regular-text" placeholder="https://g.page/r/…/review" name="' . $nom( 'google_url' ) . '" value="' . esc_attr( $p['google_url'] ) . '"></label></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
+			echo '<p class="description">' . esc_html__( 'Google Business Profile › « Demander des avis » › copier le lien.', 'espace-traiteur' ) . '</p>';
+			echo '<p><label>' . esc_html__( 'Proposer l’avis Google à partir de', 'espace-traiteur' ) . ' <select name="' . $nom( 'google_note' ) . '">'; // phpcs:ignore WordPress.Security.EscapeOutput
+			foreach ( array( 5, 4, 3 ) as $n ) {
+				echo '<option value="' . (int) $n . '"' . selected( (int) $p['google_note'], $n, false ) . '>' . esc_html( $n . '/5' ) . '</option>';
+			}
+			echo '</select></label></p>';
+			if ( ! ETR_Modules::actif( 'avis' ) ) {
+				echo '<p class="description">' . esc_html__( 'Activez aussi « Avis après l’événement ».', 'espace-traiteur' ) . '</p>';
+			}
 		} elseif ( 'avis' === $cle ) {
 			echo '<p><label>' . esc_html__( 'Demander l’avis', 'espace-traiteur' ) . ' <input type="number" min="0" max="30" class="small-text" name="' . $nom( 'avis_delai' ) . '" value="' . esc_attr( (string) $p['avis_delai'] ) . '"> ' . esc_html__( 'jour(s) après la clôture de la demande', 'espace-traiteur' ) . '</label></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		}
@@ -714,7 +734,12 @@ class ETR_Traiteur_Plus {
 		if ( is_array( $avis ) ) {
 			echo '<p class="etr-avis__etoiles" aria-label="' . esc_attr( $avis['note'] . '/5' ) . '">' . esc_html( str_repeat( '★', (int) $avis['note'] ) . str_repeat( '☆', 5 - (int) $avis['note'] ) ) . '</p>';
 			echo $avis['texte'] ? '<p>' . nl2br( esc_html( $avis['texte'] ) ) . '</p>' : '';
-			echo '<p class="etr-muted">' . esc_html__( 'Merci pour votre retour !', 'espace-traiteur' ) . '</p></section>';
+			echo '<p class="etr-muted">' . esc_html__( 'Merci pour votre retour !', 'espace-traiteur' ) . '</p>';
+			if ( self::proposer_google( $id ) ) {
+				echo '<div class="etr-avis-google"><p>' . esc_html__( 'Votre avis aide d’autres traiteurs à nous choisir. Accepteriez-vous de le partager aussi sur Google ? Cela prend une minute.', 'espace-traiteur' ) . '</p>';
+				echo '<a class="etr-btn" href="' . esc_url( self::url_google( $id ) ) . '" target="_blank" rel="noopener">' . esc_html__( 'Laisser un avis sur Google', 'espace-traiteur' ) . '</a></div>';
+			}
+			echo '</section>';
 			return;
 		}
 		echo '<form method="post">' . wp_nonce_field( 'etr_avis_' . $id, 'etr_nonce', true, false ) . '<input type="hidden" name="etr_action" value="donner_avis"><input type="hidden" name="demande_id" value="' . (int) $id . '">'; // phpcs:ignore WordPress.Security.EscapeOutput -- champ de sécurité WordPress.
@@ -739,7 +764,55 @@ class ETR_Traiteur_Plus {
 		}
 		echo '<section class="etr-panneau etr-avis"><h2 class="etr-panneau__titre">' . esc_html__( 'Avis du traiteur', 'espace-traiteur' ) . '</h2><p class="etr-avis__etoiles">' . esc_html( str_repeat( '★', (int) $avis['note'] ) . str_repeat( '☆', 5 - (int) $avis['note'] ) ) . '</p>';
 		echo $avis['texte'] ? '<p>' . nl2br( esc_html( $avis['texte'] ) ) . '</p>' : '';
-		echo '<p class="etr-muted">' . esc_html( wp_date( 'j F Y', (int) $avis['le'] ) ) . '</p></section>';
+		echo '<p class="etr-muted">' . esc_html( wp_date( 'j F Y', (int) $avis['le'] ) ) . '</p>';
+		if ( ETR_Modules::actif( 'avis_google' ) && (int) $avis['note'] >= (int) self::parametres()['google_note'] ) {
+			$clic = (int) get_post_meta( $id, self::META_GOOGLE, true );
+			/* translators: %s : date. */
+			echo '<p class="etr-muted">' . esc_html( $clic ? sprintf( __( 'Avis Google : le traiteur a suivi le lien le %s.', 'espace-traiteur' ), wp_date( 'j F Y', $clic ) ) : __( 'Avis Google : proposé, lien pas encore suivi.', 'espace-traiteur' ) ) . '</p>';
+		}
+		echo '</section>';
+	}
+
+	/**
+	 * Proposer l'avis Google ? (fonction active, lien réglé, bonne note.)
+	 *
+	 * @param int $id Demande.
+	 * @return bool
+	 */
+	public static function proposer_google( $id ) {
+		$p    = self::parametres();
+		$avis = get_post_meta( $id, self::META_AVIS, true );
+		return ETR_Modules::actif( 'avis_google' ) && ETR_Modules::actif( 'avis' ) && '' !== $p['google_url'] && is_array( $avis ) && (int) $avis['note'] >= (int) $p['google_note'];
+	}
+
+	/**
+	 * Lien vers l'avis Google, en passant par le site (le clic est noté pour le bureau).
+	 *
+	 * @param int $id Demande.
+	 * @return string
+	 */
+	public static function url_google( $id ) {
+		return wp_nonce_url( add_query_arg( 'etr_avis_google', (int) $id, etr_url() ), 'etr_avis_google_' . (int) $id );
+	}
+
+	/**
+	 * Clic vers l'avis Google : noté une fois, puis redirection vers la fiche Google.
+	 */
+	public static function vers_google() {
+		if ( ! isset( $_GET['etr_avis_google'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			return;
+		}
+		$id = absint( $_GET['etr_avis_google'] ); // phpcs:ignore WordPress.Security.NonceVerification
+		if ( ! is_user_logged_in() || ! etr_peut_voir_demande( $id ) || ! self::proposer_google( $id ) || ! wp_verify_nonce( isset( $_GET['_wpnonce'] ) ? sanitize_key( wp_unslash( $_GET['_wpnonce'] ) ) : '', 'etr_avis_google_' . $id ) ) {
+			wp_safe_redirect( etr_url() );
+			exit;
+		}
+		if ( ! get_post_meta( $id, self::META_GOOGLE, true ) ) {
+			update_post_meta( $id, self::META_GOOGLE, time() );
+			ETR_Historique::ajouter( $id, 'avis', __( 'Le traiteur a suivi le lien vers l’avis Google', 'espace-traiteur' ) );
+		}
+		wp_redirect( self::parametres()['google_url'] ); // phpcs:ignore WordPress.Security.SafeRedirect -- lien Google réglé par l'administrateur.
+		exit;
 	}
 
 	/**
@@ -765,7 +838,20 @@ class ETR_Traiteur_Plus {
 		rsort( $liste );
 		echo '<div class="etr-stats etr-stats--terrain"><section class="etr-stats__section"><div class="etr-stats__entete"><div><h2 class="etr-section-titre">' . esc_html__( 'Avis des traiteurs', 'espace-traiteur' ) . '</h2>';
 		/* translators: 1 : moyenne, 2 : nombre d'avis. */
-		echo '<p>' . esc_html( sprintf( _n( 'Note moyenne %1$s/5 sur %2$s avis.', 'Note moyenne %1$s/5 sur %2$s avis.', count( $notes ), 'espace-traiteur' ), number_format_i18n( array_sum( $notes ) / count( $notes ), 1 ), number_format_i18n( count( $notes ) ) ) ) . '</p></div></div><ul class="etr-liste-simple">';
+		echo '<p>' . esc_html( sprintf( _n( 'Note moyenne %1$s/5 sur %2$s avis.', 'Note moyenne %1$s/5 sur %2$s avis.', count( $notes ), 'espace-traiteur' ), number_format_i18n( array_sum( $notes ) / count( $notes ), 1 ), number_format_i18n( count( $notes ) ) ) ) . '</p>';
+		if ( ETR_Modules::actif( 'avis_google' ) ) {
+			$vers_google = count(
+				array_filter(
+					$ids,
+					function ( $id ) {
+						return (bool) get_post_meta( $id, self::META_GOOGLE, true );
+					}
+				)
+			);
+			/* translators: %s : nombre de traiteurs. */
+			echo '<p>' . esc_html( sprintf( _n( '%s traiteur a suivi le lien vers l’avis Google.', '%s traiteurs ont suivi le lien vers l’avis Google.', $vers_google, 'espace-traiteur' ), number_format_i18n( $vers_google ) ) ) . '</p>';
+		}
+		echo '</div></div><ul class="etr-liste-simple">';
 		foreach ( array_slice( $liste, 0, 5 ) as $l ) {
 			echo '<li><strong>' . esc_html( str_repeat( '★', (int) $l[2]['note'] ) ) . '</strong> ' . esc_html( ETR_Operations::traiteur( $l[1] ) . ' — ' . get_the_title( $l[1] ) . ( $l[2]['texte'] ? ' : « ' . wp_trim_words( $l[2]['texte'], 20 ) . ' »' : '' ) ) . '</li>';
 		}

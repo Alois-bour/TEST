@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Espace Traiteur
  * Description:       Espace privé pour les traiteurs : chaque traiteur se connecte à son espace et fait ses demandes de mobilier, vaisselle, linge et matériel, à partir des produits WooCommerce du site.
- * Version:           3.1.2
+ * Version:           3.2.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * License:           GPL-2.0-or-later
@@ -13,7 +13,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'ETR_VERSION', '3.1.2' );
+define( 'ETR_VERSION', '3.2.0' );
 define( 'ETR_FILE', __FILE__ );
 define( 'ETR_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ETR_URL', plugin_dir_url( __FILE__ ) );
@@ -55,6 +55,7 @@ require_once ETR_DIR . 'includes/class-etr-frontend.php';
 require_once ETR_DIR . 'includes/class-etr-statistiques.php';
 require_once ETR_DIR . 'includes/class-etr-gestion.php';
 require_once ETR_DIR . 'includes/class-etr-fiche.php';
+require_once ETR_DIR . 'includes/class-etr-contrat.php';
 require_once ETR_DIR . 'includes/class-etr-notifications.php';
 require_once ETR_DIR . 'includes/class-etr-historique.php';
 require_once ETR_DIR . 'includes/class-etr-bons.php';
@@ -92,6 +93,7 @@ add_action(
 		ETR_Stock_Plus::init();
 		ETR_Facture::init();
 		ETR_Stripe::init();
+		ETR_Contrat::init();
 		ETR_Admin::init();
 		ETR_Frontend::init();
 		ETR_Gestion::init();

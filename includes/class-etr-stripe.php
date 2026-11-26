@@ -322,7 +322,26 @@ class ETR_Stripe {
 	 * @param string $type acompte | solde | caution.
 	 * @return float
 	 */
-	public static function a_payer( $id, $type ) {
+	public static function a_payer( $id, $type, $filtre = true ) {
+		$montant = self::a_payer_brut( $id, $type );
+		/**
+		 * Le paiement en ligne est-il ouvert ? (Contrat de location à signer d'abord, par exemple.)
+		 *
+		 * @param bool   $peut Paiement possible.
+		 * @param int    $id   Demande.
+		 * @param string $type acompte | caution | solde.
+		 */
+		return $montant > 0 && $filtre && ! apply_filters( 'etr_stripe_peut_payer', true, $id, $type ) ? 0.0 : $montant;
+	}
+
+	/**
+	 * Montant dû, sans les conditions des autres fonctions.
+	 *
+	 * @param int    $id   Demande.
+	 * @param string $type acompte | caution | solde.
+	 * @return float
+	 */
+	private static function a_payer_brut( $id, $type ) {
 		$p = self::parametres();
 		$a = ETR_Devis::acompte( $id );
 		$s = self::paiements( $id );
@@ -391,6 +410,9 @@ class ETR_Stripe {
 			$html .= '<p class="etr-notice etr-notice--succes">' . esc_html__( 'Merci : votre paiement est enregistré.', 'espace-traiteur' ) . '</p>';
 		} elseif ( 'annule' === $retour ) {
 			$html .= '<p class="etr-notice etr-notice--info">' . esc_html__( 'Paiement annulé : rien n’a été débité.', 'espace-traiteur' ) . '</p>';
+		}
+		if ( ( self::a_payer( $id, 'acompte', false ) > 0 || self::a_payer( $id, 'caution', false ) > 0 ) && ! apply_filters( 'etr_stripe_peut_payer', true, $id, 'acompte' ) ) {
+			$html .= '<p class="etr-muted">' . esc_html__( 'Le paiement en ligne de l’acompte et de la caution s’ouvre dès que le contrat de location est signé.', 'espace-traiteur' ) . '</p>';
 		}
 		$acompte = self::a_payer( $id, 'acompte' );
 		if ( $acompte > 0 ) {

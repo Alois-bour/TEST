@@ -1439,3 +1439,25 @@ body.etr-plein-ecran { margin: 0; padding: 0; background: var(--etr-fond-carte, 
 .etr-espace [hidden] { display: none !important; }
 /* Date de livraison ou de reprise : rapport à l'événement (« la veille de l'événement ») */
 .etr-date-relative { color: var(--etr-olive, #4d5b3e); font-weight: 500; }
+
+/* Contrat de location : lecture et signature */
+.etr-contrat__texte { margin: 4px 0 16px; }
+.etr-contrat__texte > summary { cursor: pointer; font-weight: 500; color: var(--etr-encre); }
+.etr-contrat__corps { display: flex; flex-direction: column; gap: 10px; max-height: 360px; margin-top: 12px; padding: 14px 16px; overflow-y: auto; border: 1px solid var(--etr-trait); border-radius: 10px; background: var(--etr-voile, #faf9f6); font-size: 14px; line-height: 1.55; }
+.etr-contrat__corps p { margin: 0; }
+.etr-contrat__signer { display: flex; flex-direction: column; gap: 14px; }
+.etr-contrat__zone { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px 12px; }
+.etr-contrat__libelle { font-weight: 500; color: var(--etr-encre); }
+.etr-contrat__toile { grid-column: 1 / -1; width: 100%; height: 170px; border: 1.5px dashed var(--etr-trait); border-radius: 12px; background: #fff; touch-action: none; cursor: crosshair; }
+.etr-contrat__zone.est-signee .etr-contrat__toile { border-style: solid; border-color: var(--etr-olive, #4d5b3e); }
+.etr-contrat__zone.est-erreur .etr-contrat__toile { border-color: var(--etr-rouge, #a3342a); }
+.etr-contrat__aide { grid-column: 1 / -1; font-size: 13px; color: var(--etr-gris); }
+.etr-contrat__zone.est-erreur .etr-contrat__aide { color: var(--etr-rouge, #a3342a); font-weight: 500; }
+
+/* Avis Google proposé après une bonne note */
+.etr-avis-google { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-top: 14px; padding: 16px 18px; border-radius: 12px; background: var(--etr-olive-clair, #eef1e8); }
+.etr-avis-google p { margin: 0; }
+/* Barre d'onglets fixe en bas (téléphone) : un champ amené à l'écran ne se cache pas dessous. */
+@media (max-width: 900px) {
+	html:has(.etr-espace.etr-app:not(.etr-app--integre)) { scroll-padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+}
