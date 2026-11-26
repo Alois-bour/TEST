@@ -39,6 +39,9 @@ verifier( abs( $c2['km'] - 148.8 ) < 0.001 && $c2['camions'] === 2, 'deux camion
 echo "Tournée\n";
 $o = ETR_Logistique::ordre_court( array( 'lon' => 0, 'lat' => 0 ), array( 'c' => array( 'lon' => 0.3, 'lat' => 0 ), 'a' => array( 'lon' => 0.1, 'lat' => 0 ), 'b' => array( 'lon' => 0.2, 'lat' => 0 ) ) );
 verifier( array( 'a', 'b', 'c' ) === $o, 'ordre le plus court sur une ligne' );
+// Créneau suivant : départ du dernier arrêt précédent (à l'est), parcours ouvert.
+$o2 = ETR_Logistique::ordre_court( array( 'lon' => 0.5, 'lat' => 0 ), array( 'x' => array( 'lon' => 0.1, 'lat' => 0 ), 'y' => array( 'lon' => 0.4, 'lat' => 0 ) ) );
+verifier( array( 'y', 'x' ) === $o2, 'créneau suivant : ordre depuis le dernier arrêt, pas depuis le dépôt' );
 $d = ETR_Logistique::distance( array( 'lon' => 6.1236, 'lat' => 48.5639 ), array( 'lon' => 6.1844, 'lat' => 48.6921 ) );
 verifier( $d > 14 && $d < 15.5, 'Frolois → Nancy à vol d’oiseau ≈ 15 km' );
 

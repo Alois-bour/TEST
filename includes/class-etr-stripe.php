@@ -301,12 +301,14 @@ class ETR_Stripe {
 		$p = self::parametres();
 		$a = ETR_Devis::acompte( $id );
 		$s = self::paiements( $id );
+		$f = class_exists( 'ETR_Facture' ) && ETR_Modules::actif( 'facture' ) ? ETR_Facture::facture( $id ) : array();
 		if ( 'acompte' === $type ) {
-			return $p['acompte'] && ETR_Modules::actif( 'acompte' ) && $a['acompte'] > 0 && ! $a['acompte_recu'] ? (float) $a['acompte'] : 0.0;
+			// Une fois la facture établie, on règle le solde (acompte compris), plus l'acompte seul.
+			return $p['acompte'] && ETR_Modules::actif( 'acompte' ) && ! $f && $a['acompte'] > 0 && ! $a['acompte_recu'] ? (float) $a['acompte'] : 0.0;
 		}
 		if ( 'solde' === $type ) {
-			$f = class_exists( 'ETR_Facture' ) && ETR_Modules::actif( 'facture' ) ? ETR_Facture::facture( $id ) : array();
-			return $p['solde'] && $f && ! $f['payee'] && $f['reste'] > 0 ? (float) $f['reste'] : 0.0;
+			$reste = $f ? ETR_Facture::reglements( $id, $f )['reste'] : 0.0;
+			return $p['solde'] && $f && ! $f['payee'] && $reste > 0 ? (float) $reste : 0.0;
 		}
 		if ( 'caution' === $type ) {
 			$deja = isset( $s['caution']['statut'] ) && in_array( $s['caution']['statut'], array( 'bloquee', 'enregistree', 'debitee' ), true );
@@ -322,11 +324,12 @@ class ETR_Stripe {
 	 * @return string AAAA-MM-JJ, vide si déjà possible.
 	 */
 	public static function empreinte_a_partir_du( $id ) {
-		list( $livraison ) = ETR_Operations::jours( $id );
-		if ( ! $livraison ) {
+		// Stripe garde l'empreinte 7 jours : elle doit encore valoir le jour de la reprise.
+		list( , $reprise ) = ETR_Operations::jours( $id );
+		if ( ! $reprise ) {
 			return '';
 		}
-		$debut = gmdate( 'Y-m-d', strtotime( $livraison . ' -6 days' ) );
+		$debut = gmdate( 'Y-m-d', strtotime( $reprise . ' -6 days' ) );
 		return $debut > current_time( 'Y-m-d' ) ? $debut : '';
 	}
 
@@ -374,7 +377,7 @@ class ETR_Stripe {
 			$debut = 'empreinte' === $mode ? self::empreinte_a_partir_du( $id ) : '';
 			if ( $debut ) {
 				/* translators: 1 : montant, 2 : date. */
-				$html .= '<p class="etr-muted">' . esc_html( sprintf( __( 'Caution de %1$s : empreinte bancaire à déposer à partir du %2$s (elle ne reste valable que 7 jours).', 'espace-traiteur' ), ETR_Devis::prix( $caution ), etr_format_date( $debut ) ) ) . '</p>';
+				$html .= '<p class="etr-muted">' . esc_html( sprintf( __( 'Caution de %1$s : empreinte bancaire à déposer à partir du %2$s (elle ne reste valable que 7 jours et doit couvrir la reprise).', 'espace-traiteur' ), ETR_Devis::prix( $caution ), etr_format_date( $debut ) ) ) . '</p>';
 			} else {
 				$html .= 'empreinte' === $mode
 					/* translators: %s : montant. */
@@ -543,6 +546,57 @@ class ETR_Stripe {
 		if ( ! $id || 'etr_demande' !== get_post_type( $id ) || ! in_array( $type, array( 'acompte', 'solde', 'caution' ), true ) || ( isset( $s['metadata']['site'] ) && home_url() !== $s['metadata']['site'] ) ) {
 			return false;
 		}
+		// Retour du traiteur et webhook en même temps : un seul enregistre (verrou par session).
+		if ( ! self::verrou( 'etr_stripe_' . md5( (string) $s['id'] ) ) ) {
+			return true;
+		}
+		try {
+			return self::enregistrer_session_verrouillee( $s, $id, $type );
+		} finally {
+			self::deverrouiller( 'etr_stripe_' . md5( (string) $s['id'] ) );
+		}
+	}
+
+	/**
+	 * Verrou atomique (insertion unique, expiré après 60 s).
+	 *
+	 * @param string $nom Nom.
+	 * @return bool Obtenu.
+	 */
+	private static function verrou( $nom ) {
+		global $wpdb;
+		$pris = $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", $nom, (string) time() ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		if ( $pris ) {
+			return true;
+		}
+		$depuis = (int) $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $nom ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		if ( $depuis && time() - $depuis > 60 ) {
+			self::deverrouiller( $nom );
+			return (bool) $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", $nom, (string) time() ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		}
+		return false;
+	}
+
+	/**
+	 * Libère un verrou.
+	 *
+	 * @param string $nom Nom.
+	 */
+	private static function deverrouiller( $nom ) {
+		global $wpdb;
+		$wpdb->delete( $wpdb->options, array( 'option_name' => $nom ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	}
+
+	/**
+	 * Enregistrement d'une session, sous verrou.
+	 *
+	 * @param array  $s    Session Stripe.
+	 * @param int    $id   Demande.
+	 * @param string $type Type.
+	 * @return bool
+	 */
+	private static function enregistrer_session_verrouillee( $s, $id, $type ) {
+		wp_cache_delete( $id, 'post_meta' ); // Relire l'état réel (l'autre requête vient peut-être d'écrire).
 		$deja = self::paiements( $id );
 		if ( isset( $deja[ $type ]['session'], $deja[ $type ]['statut'] ) && $deja[ $type ]['session'] === $s['id'] && 'en_cours' !== $deja[ $type ]['statut'] ) {
 			return true; // Déjà enregistré (webhook et retour).
@@ -708,6 +762,10 @@ class ETR_Stripe {
 		echo '</ul>';
 		if ( isset( $s['caution']['statut'] ) && in_array( $s['caution']['statut'], array( 'bloquee', 'enregistree' ), true ) && ETR_Equipe::bureau() ) {
 			$suggere = class_exists( 'ETR_Devis' ) && ETR_Modules::actif( 'casse' ) ? ETR_Devis::releve( $id )['total'] : 0;
+			if ( class_exists( 'ETR_Facture' ) && ETR_Modules::actif( 'facture' ) && ETR_Facture::facture( $id ) ) {
+				// La casse est sur la facture : le montant débité en sera déduit (jamais payée deux fois).
+				echo '<p class="etr-muted">' . esc_html__( 'Le montant débité sur la caution est déduit du reste à payer de la facture.', 'espace-traiteur' ) . '</p>';
+			}
 			$url     = ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id ) );
 			$champs  = wp_nonce_field( 'etr_caution_' . $id, 'etr_nonce', true, false ) . '<input type="hidden" name="etr_gestion_action" value="caution"><input type="hidden" name="demande_id" value="' . (int) $id . '">';
 			echo '<form method="post" class="etr-stripe__debit" action="' . esc_url( $url ) . '" data-confirmer="' . esc_attr__( 'Débiter ce montant sur la carte du traiteur ?', 'espace-traiteur' ) . '">' . $champs . '<input type="hidden" name="quoi" value="debiter"><label>' . esc_html__( 'Débiter', 'espace-traiteur' ) . ' <input type="text" inputmode="decimal" name="montant" size="7" value="' . esc_attr( $suggere > 0 ? number_format( min( $suggere, (float) $s['caution']['montant'] ), 2, ',', '' ) : '' ) . '" required> €</label> <button type="submit" class="etr-btn etr-btn--discret">' . esc_html__( 'Débiter', 'espace-traiteur' ) . '</button></form>'; // phpcs:ignore WordPress.Security.EscapeOutput
@@ -754,12 +812,16 @@ class ETR_Stripe {
 		if ( empty( $c['statut'] ) || ! in_array( $c['statut'], array( 'bloquee', 'enregistree' ), true ) ) {
 			return new WP_Error( 'etr_caution', __( 'Pas de caution à débiter.', 'espace-traiteur' ) );
 		}
+		$f = class_exists( 'ETR_Facture' ) && ETR_Modules::actif( 'facture' ) ? ETR_Facture::facture( $id ) : array();
+		if ( $f && $f['payee'] ) {
+			return new WP_Error( 'etr_caution', __( 'La facture, casse et manquants compris, est déjà réglée : libérez la caution.', 'espace-traiteur' ) );
+		}
 		if ( $montant <= 0 || $montant > (float) $c['montant'] ) {
 			/* translators: %s : montant de la caution. */
 			return new WP_Error( 'etr_caution', sprintf( __( 'Montant à débiter entre 0,01 € et %s.', 'espace-traiteur' ), ETR_Devis::prix( $c['montant'] ) ) );
 		}
 		if ( 'bloquee' === $c['statut'] ) {
-			$r = self::api( 'POST', 'payment_intents/' . rawurlencode( $c['pi'] ) . '/capture', array( 'amount_to_capture' => self::centimes( $montant ) ), 'etr-debit-' . $c['pi'] );
+			$r = self::api( 'POST', 'payment_intents/' . rawurlencode( $c['pi'] ) . '/capture', array( 'amount_to_capture' => self::centimes( $montant ) ), 'etr-debit-' . $c['pi'] . '-' . wp_generate_uuid4() );
 			$ok = ! is_wp_error( $r ) && 'succeeded' === $r['status'];
 		} else {
 			$r  = self::api(
@@ -776,7 +838,7 @@ class ETR_Stripe {
 					'description'    => sprintf( __( 'Casse et manquants — demande n° %d', 'espace-traiteur' ), $id ),
 					'metadata'       => array( 'demande' => (string) $id, 'type' => 'caution' ),
 				),
-				'etr-debit-' . $id . '-' . self::centimes( $montant )
+				'etr-debit-' . $id . '-' . wp_generate_uuid4() // Nouvelle tentative après un refus : la carte est vraiment réessayée.
 			);
 			$ok = ! is_wp_error( $r ) && 'succeeded' === $r['status'];
 		}

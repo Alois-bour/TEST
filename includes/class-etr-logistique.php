@@ -415,13 +415,14 @@ class ETR_Logistique {
 	}
 
 	/**
-	 * Ordre court : plus proche voisin depuis le dépôt, puis améliorations 2-opt (retour au dépôt compris).
+	 * Ordre court : plus proche voisin depuis le point de départ, puis améliorations 2-opt.
 	 *
-	 * @param array $depart Dépôt { lon, lat }.
-	 * @param array $points clé => { lon, lat }.
+	 * @param array      $depart Point de départ { lon, lat } (dépôt, ou dernier arrêt du créneau précédent).
+	 * @param array      $points clé => { lon, lat }.
+	 * @param array|null $fin    Point d'arrivée (retour au dépôt) ; null : parcours ouvert (la suite part du dernier arrêt).
 	 * @return array Clés dans l'ordre.
 	 */
-	public static function ordre_court( $depart, $points ) {
+	public static function ordre_court( $depart, $points, $fin = null ) {
 		$restants = $points;
 		$ordre    = array();
 		$courant  = $depart;
@@ -437,10 +438,17 @@ class ETR_Logistique {
 			$courant = $restants[ $meilleur[0] ];
 			unset( $restants[ $meilleur[0] ] );
 		}
-		// 2-opt : inverse un morceau du parcours tant que cela raccourcit le tour.
-		$n          = count( $ordre );
-		$point      = function ( $i ) use ( $ordre, $points, $depart, $n ) {
-			return ( $i < 0 || $i >= $n ) ? $depart : $points[ $ordre[ $i ] ];
+		// 2-opt : inverse un morceau du parcours tant que cela le raccourcit. Avant le premier arrêt :
+		// le point de départ ; après le dernier : l'arrivée (ou rien, parcours ouvert).
+		$n     = count( $ordre );
+		$point = function ( $ordre, $i ) use ( $points, $depart, $fin, $n ) {
+			if ( $i < 0 ) {
+				return $depart;
+			}
+			return $i >= $n ? $fin : $points[ $ordre[ $i ] ];
+		};
+		$d = function ( $a, $b ) {
+			return null === $a || null === $b ? 0.0 : self::distance( $a, $b );
 		};
 		$ameliore   = true;
 		$iterations = 0;
@@ -448,13 +456,10 @@ class ETR_Logistique {
 			$ameliore = false;
 			for ( $i = 0; $i < $n - 1; $i++ ) {
 				for ( $j = $i + 1; $j < $n; $j++ ) {
-					$avant = self::distance( $point( $i - 1 ), $point( $i ) ) + self::distance( $point( $j ), $point( $j + 1 ) );
-					$apres = self::distance( $point( $i - 1 ), $point( $j ) ) + self::distance( $point( $i ), $point( $j + 1 ) );
+					$avant = $d( $point( $ordre, $i - 1 ), $point( $ordre, $i ) ) + $d( $point( $ordre, $j ), $point( $ordre, $j + 1 ) );
+					$apres = $d( $point( $ordre, $i - 1 ), $point( $ordre, $j ) ) + $d( $point( $ordre, $i ), $point( $ordre, $j + 1 ) );
 					if ( $apres + 1e-9 < $avant ) {
 						$ordre    = array_merge( array_slice( $ordre, 0, $i ), array_reverse( array_slice( $ordre, $i, $j - $i + 1 ) ), array_slice( $ordre, $j + 1 ) );
-						$point    = function ( $k ) use ( $ordre, $points, $depart, $n ) {
-							return ( $k < 0 || $k >= $n ) ? $depart : $points[ $ordre[ $k ] ];
-						};
 						$ameliore = true;
 					}
 				}
@@ -488,7 +493,9 @@ class ETR_Logistique {
 			ksort( $groupes );
 			$ordre   = array();
 			$courant = $depart;
-			foreach ( $groupes as $groupe ) {
+			$rangs   = array_keys( $groupes );
+			foreach ( $groupes as $rang => $groupe ) {
+				$dernier = end( $rangs ) === $rang; // Le dernier créneau revient au dépôt ; les autres continuent.
 				$points = array();
 				$sans   = array();
 				foreach ( $groupe as $id ) {
@@ -499,7 +506,7 @@ class ETR_Logistique {
 						$sans[] = $id;
 					}
 				}
-				$suite = $points ? self::ordre_court( $courant, $points ) : array();
+				$suite = $points ? self::ordre_court( $courant, $points, $dernier ? $depart : null ) : array();
 				if ( $suite ) {
 					$courant = $points[ end( $suite ) ];
 				}
