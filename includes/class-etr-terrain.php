@@ -149,21 +149,14 @@ class ETR_Terrain {
 	}
 
 	/**
-	 * Itinéraire de toute la tournée (Google Maps : départ de la position actuelle, étapes dans l'ordre).
+	 * Itinéraires de toute la tournée (Google Maps : départ de la position actuelle, étapes dans
+	 * l'ordre), par tronçons de 10 étapes au plus : afficher tous les tronçons.
 	 *
 	 * @param int[] $ids Demandes, dans l'ordre de passage.
-	 * @return string Adresse, ou '' sans lieu connu.
+	 * @return array[] { url, de, a } ; vide sans lieu connu.
 	 */
-	public static function url_itineraire_tournee( $ids ) {
-		$lieux = array();
-		foreach ( $ids as $id ) {
-			$lieu = trim( preg_replace( '/\s+/', ' ', (string) get_post_meta( $id, '_etr_lieu', true ) ) );
-			if ( '' !== $lieu ) {
-				$lieux[] = $lieu;
-			}
-		}
-		$parts = self::itineraires( $lieux );
-		return $parts ? $parts[0]['url'] : '';
+	public static function urls_itineraire_tournee( $ids ) {
+		return self::itineraires( self::lieux_tournee( $ids ) );
 	}
 
 	/**

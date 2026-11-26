@@ -279,27 +279,51 @@ class ETR_Cles_Acces {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public static function api_connexion( $requete ) {
-		// Blocage par compte visé (et adresse IP) : les échecs d'une personne ne bloquent pas toute
-		// l'équipe derrière la même connexion (Wi-Fi du dépôt, CDN) ; plafond large par IP en plus.
-		$poignee    = ETR_Push::d64( (string) $requete->get_param( 'userHandle' ) );
-		$compte     = preg_match( '/^etr-(\d+)$/', $poignee, $m ) ? (int) $m[1] : 0;
-		$cle_echecs = 'cle|' . $compte;
-		if ( self::ip_bloquee() || ETR_Comptes::est_bloque( $cle_echecs ) ) {
+		// Blocage par compte, seulement quand la clé présentée est bien une clé enregistrée de ce
+		// compte (son identifiant est secret) : un inconnu ne peut pas bloquer le Face ID d'une
+		// personne en envoyant son numéro. Les autres échecs comptent par adresse IP (plafond large),
+		// sans bloquer toute l'équipe derrière la même connexion (Wi-Fi du dépôt).
+		$compte     = self::compte_de_cle( $requete );
+		$cle_echecs = $compte ? 'cle|' . $compte : '';
+		if ( self::ip_bloquee() || ( $cle_echecs && ETR_Comptes::est_bloque( $cle_echecs ) ) ) {
 			return self::erreur( __( 'Trop de tentatives. Réessayez dans 15 minutes.', 'espace-traiteur' ), 429 );
 		}
 		$resultat = self::verifier_connexion( $requete );
 		if ( is_wp_error( $resultat ) ) {
 			if ( 'etr_cle_expiree' !== $resultat->get_error_code() ) { // Une page restée ouverte n'est pas une tentative.
-				ETR_Comptes::compter_echec( $cle_echecs );
+				if ( $cle_echecs ) {
+					ETR_Comptes::compter_echec( $cle_echecs );
+				}
 				$cle_ip = 'etr_echecs_cle_ip_' . md5( self::ip() );
 				set_transient( $cle_ip, (int) get_transient( $cle_ip ) + 1, ETR_Comptes::DUREE_BLOCAGE );
 			}
 			return $resultat;
 		}
-		delete_transient( ETR_Comptes::cle_echecs( $cle_echecs ) ); // Réussite : compteur d'échecs remis à zéro.
+		delete_transient( ETR_Comptes::cle_echecs( 'cle|' . $resultat->ID ) ); // Réussite : compteur d'échecs remis à zéro.
 		wp_set_auth_cookie( $resultat->ID, true, is_ssl() );
 		do_action( 'wp_login', $resultat->user_login, $resultat );
 		return rest_ensure_response( array( 'url' => ETR_Gestion::url() ) );
+	}
+
+	/**
+	 * Compte dont la clé présentée est une clé enregistrée (0 sinon), avant toute vérification.
+	 *
+	 * @param WP_REST_Request $requete Requête.
+	 * @return int
+	 */
+	private static function compte_de_cle( $requete ) {
+		$poignee = ETR_Push::d64( (string) $requete->get_param( 'userHandle' ) );
+		$user_id = preg_match( '/^etr-(\d+)$/', $poignee, $m ) ? (int) $m[1] : 0;
+		$id      = (string) $requete->get_param( 'id' );
+		if ( ! $user_id || '' === $id ) {
+			return 0;
+		}
+		foreach ( self::cles( $user_id ) as $cle ) {
+			if ( hash_equals( (string) $cle['id'], $id ) ) {
+				return $user_id;
+			}
+		}
+		return 0;
 	}
 
 	/**

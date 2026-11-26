@@ -86,6 +86,16 @@
 		return { champs: champs };
 	}
 
+	/**
+	 * Saisie de la personne connectée (les autres ne sont jamais rejouées pour elle).
+	 *
+	 * @param {Object} e Saisie gardée.
+	 * @return {boolean}
+	 */
+	function aMoi( e ) {
+		return ! e.par || ! C.utilisateur || parseInt( e.par, 10 ) === parseInt( C.utilisateur, 10 );
+	}
+
 	function reconstruire( envoi ) {
 		if ( ! envoi.champs ) {
 			return { corps: JSON.stringify( envoi.json ), json: true };
@@ -167,7 +177,7 @@
 		var envoyes = 0;
 		envoiEnCours = tous().then( function ( liste ) {
 			var aEnvoyer = liste.filter( function ( e ) {
-				return ! e.erreur && ( ! e.par || ! C.utilisateur || e.par === C.utilisateur );
+				return ! e.erreur && aMoi( e );
 			} );
 			if ( ! aEnvoyer.length || navigator.onLine === false ) {
 				return null;
@@ -396,15 +406,19 @@
 
 	// Déconnexion : pages gardées effacées, saisies en attente envoyées ou abandonnées (après
 	// confirmation), et ce téléphone ne reçoit plus les notifications de la personne qui part.
-	var deconnexionConfirmee = false;
+	var deconnexionEnCours = false;
 	document.addEventListener( 'click', function ( e ) {
 		var lien = e.target.closest( 'a[href*="action=logout"]' );
-		if ( ! lien || deconnexionConfirmee ) {
+		if ( ! lien || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey ) {
 			return;
 		}
 		e.preventDefault();
+		if ( deconnexionEnCours ) {
+			return; // Un seul déroulé, même si l'on touche plusieurs fois.
+		}
+		deconnexionEnCours = true;
+		lien.setAttribute( 'aria-busy', 'true' );
 		var partir = function () {
-			deconnexionConfirmee = true;
 			if ( navigator.serviceWorker && navigator.serviceWorker.controller ) {
 				navigator.serviceWorker.controller.postMessage( { type: 'etr-vider' } );
 			}
@@ -425,7 +439,10 @@
 				window.location.href = lien.href;
 			} );
 		};
-		envoyer().then( function () {
+		// L'envoi des saisies en attente a 8 s au plus ; ce qui reste est proposé à l'abandon.
+		Promise.race( [ envoyer().catch( function () {} ), new Promise( function ( r ) {
+			setTimeout( r, 8000 );
+		} ) ] ).then( function () {
 			return tous();
 		} ).then( function ( liste ) {
 			if ( ! liste.length ) {
@@ -435,6 +452,8 @@
 			var confirmer = window.etrConfirmer ? window.etrConfirmer( question, { valider: 'Se déconnecter quand même', danger: true } ) : Promise.resolve( window.confirm( question ) ); // eslint-disable-line no-alert
 			return confirmer.then( function ( ok ) {
 				if ( ! ok ) {
+					deconnexionEnCours = false;
+					lien.removeAttribute( 'aria-busy' );
 					return null;
 				}
 				return transaction( 'readwrite', function ( m ) {
@@ -471,7 +490,7 @@
 	function pourDemande( demande ) {
 		return tous().then( function ( liste ) {
 			return liste.filter( function ( e ) {
-				return parseInt( e.demande, 10 ) === parseInt( demande, 10 );
+				return aMoi( e ) && parseInt( e.demande, 10 ) === parseInt( demande, 10 );
 			} );
 		} );
 	}

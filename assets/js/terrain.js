@@ -86,6 +86,7 @@
 		if ( ! demande ) {
 			return direct();
 		}
+		// Seules les saisies de la personne connectée comptent (les autres ne partent jamais pour elle).
 		var enAttente = function () {
 			return window.etrHorsLigne.pourDemande( demande ).then( function ( liste ) {
 				return liste.filter( function ( e ) {
@@ -93,14 +94,19 @@
 				} ).length;
 			} );
 		};
-		return enAttente().then( function ( n ) {
+		// Un souci de lecture de la file ne bloque pas l'envoi ; un refus du serveur n'est jamais renvoyé.
+		return enAttente().catch( function () {
+			return 0;
+		} ).then( function ( n ) {
 			if ( ! n ) {
 				return direct();
 			}
-			return window.etrHorsLigne.envoyer().then( enAttente ).then( function ( reste ) {
+			return window.etrHorsLigne.envoyer().then( enAttente ).catch( function () {
+				return 1;
+			} ).then( function ( reste ) {
 				return reste ? attendre() : direct();
 			} );
-		} ).catch( direct );
+		} );
 	}
 
 	function message( zone, texte, type ) {

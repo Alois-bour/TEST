@@ -123,6 +123,16 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Corrections de la seconde revue (3.0.3)
+
+- **Terrain** : une saisie refusée par le serveur n'est plus envoyée une seconde fois ; une saisie laissée par une autre personne sur un téléphone partagé ne bloque plus les envois de la personne connectée ; déconnexion : un seul déroulé même si l'on touche plusieurs fois, 8 s d'attente au plus.
+- **Téléphone partagé** : les pages gardées sont effacées dès qu'une page arrive d'un autre compte (renvoi vers l'espace traiteur, accès refusé) ; les bons imprimables n'y touchent pas.
+- **Stripe** : le webhook ne demande un renvoi qu'en cas de panne passagère (un paiement SEPA en traitement est acquitté) ; débit de caution : une seule clé par demande, sans le montant ; après une coupure, seul le même montant peut être relancé ; un débit « en traitement » est relu, jamais recréé.
+- **Face ID** : envoyer le numéro d'une autre personne ne bloque plus son Face ID (blocage par compte seulement pour une clé enregistrée de ce compte).
+- **Stock** : après une reprise avec écarts, les manquants restent comptés « chez les traiteurs ».
+- **Notifications** : le nom de l'appareil et la date sont gardés au rattachement automatique.
+- **Itinéraires** : `ETR_Terrain::urls_itineraire_tournee()` renvoie tous les tronçons.
+
 ### Version 3.0.0 : couleurs, logistique, traiteur, stock, facturation, Stripe
 
 Tout s'active et se règle dans **Espace traiteur › Fonctions** (couleurs : **Réglages › Couleurs**). Les fonctions qui changent le parcours du traiteur, envoient des e-mails ou touchent à l'argent sont désactivées par défaut.

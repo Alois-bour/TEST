@@ -138,6 +138,9 @@ class ETR_Gestion {
 		}
 
 		self::page_trouvee();
+		// Personne de l'équipe : les pages autonomes (bons, étiquettes) ne touchent pas aux pages
+		// gardées sur le téléphone ; les vraies pages de l'application remplacent cet en-tête plus bas.
+		header( 'X-ETR-Page: document' );
 
 		$action = isset( $_REQUEST['etr_gestion_action'] ) ? sanitize_key( wp_unslash( $_REQUEST['etr_gestion_action'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification -- vérifié par action.
 		if ( $action && ! ETR_Equipe::bureau() ) {

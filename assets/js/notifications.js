@@ -37,7 +37,7 @@
 					return null;
 				}
 				var json = abonnement.toJSON();
-				return fetch( etrNotifs.api + 'appareil', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': etrNotifs.nonce }, body: JSON.stringify( { endpoint: json.endpoint, keys: json.keys } ) } ).then( function ( r ) {
+				return fetch( etrNotifs.api + 'appareil', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': etrNotifs.nonce }, body: JSON.stringify( { endpoint: json.endpoint, keys: json.keys, appareil: nomAppareil() } ) } ).then( function ( r ) {
 					if ( r.ok ) {
 						try {
 							window.sessionStorage.setItem( cleSession, String( etrNotifs.utilisateur ) );

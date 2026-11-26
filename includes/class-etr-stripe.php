@@ -239,6 +239,16 @@ class ETR_Stripe {
 	}
 
 	/**
+	 * Erreur passagère (pas de réponse, ou erreur 5xx de Stripe) ?
+	 *
+	 * @param mixed $r Réponse de self::api().
+	 * @return bool
+	 */
+	private static function passager( $r ) {
+		return is_wp_error( $r ) && 'etr_stripe_reseau' === $r->get_error_code();
+	}
+
+	/**
 	 * Centimes.
 	 *
 	 * @param float $euros Montant.
@@ -543,12 +553,21 @@ class ETR_Stripe {
 	}
 
 	/**
+	 * Dernier enregistrement de session manqué pour une raison passagère (Stripe injoignable,
+	 * enregistrement en cours ailleurs) : le webhook demande alors à Stripe de renvoyer l'événement.
+	 *
+	 * @var bool
+	 */
+	private static $a_reessayer = false;
+
+	/**
 	 * Session terminée (retour ou webhook) : paiement, empreinte ou carte enregistrés (une fois).
 	 *
 	 * @param array $s Session Stripe.
 	 * @return bool Enregistré (ou déjà enregistré).
 	 */
 	public static function enregistrer_session( $s ) {
+		self::$a_reessayer = false;
 		$id   = isset( $s['metadata']['demande'] ) ? absint( $s['metadata']['demande'] ) : 0;
 		$type = isset( $s['metadata']['type'] ) ? sanitize_key( $s['metadata']['type'] ) : '';
 		if ( ! $id || 'etr_demande' !== get_post_type( $id ) || ! in_array( $type, array( 'acompte', 'solde', 'caution' ), true ) || ( isset( $s['metadata']['site'] ) && home_url() !== $s['metadata']['site'] ) ) {
@@ -630,6 +649,7 @@ class ETR_Stripe {
 		if ( 'setup' === $s['mode'] ) {
 			$si = self::api( 'GET', 'setup_intents/' . rawurlencode( (string) $s['setup_intent'] ) );
 			if ( is_wp_error( $si ) || 'succeeded' !== $si['status'] ) {
+				self::$a_reessayer = self::passager( $si );
 				return false;
 			}
 			self::noter( $id, 'caution', array( 'session' => $s['id'], 'mode' => 'carte', 'client' => $si['customer'] ? $si['customer'] : $s['customer'], 'carte' => $si['payment_method'], 'montant' => (float) $acompte['caution'], 'statut' => 'enregistree', 'le' => time() ) );
@@ -643,8 +663,11 @@ class ETR_Stripe {
 
 		$pi = self::api( 'GET', 'payment_intents/' . rawurlencode( (string) $s['payment_intent'] ) );
 		if ( is_wp_error( $pi ) ) {
+			self::$a_reessayer = self::passager( $pi );
 			return false;
 		}
+		// Paiement encore en traitement (prélèvement SEPA…) : rien à enregistrer pour l'instant,
+		// Stripe enverra « checkout.session.async_payment_succeeded » une fois le paiement reçu.
 		$montant = $pi['amount'] / 100;
 		if ( 'caution' === $type ) {
 			if ( 'requires_capture' !== $pi['status'] ) {
@@ -746,8 +769,10 @@ class ETR_Stripe {
 		if ( in_array( $type, array( 'checkout.session.completed', 'checkout.session.async_payment_succeeded' ), true ) && isset( $evenement['data']['object'] ) ) {
 			$objet  = $evenement['data']['object'];
 			$du_site = isset( $objet['metadata']['site'], $objet['metadata']['demande'] ) && home_url() === $objet['metadata']['site'] && 'etr_demande' === get_post_type( absint( $objet['metadata']['demande'] ) );
-			if ( ! self::enregistrer_session( $objet ) && $du_site ) {
-				// Paiement de ce site pas encore enregistré (Stripe injoignable…) : Stripe renverra l'événement.
+			if ( ! self::enregistrer_session( $objet ) && $du_site && self::$a_reessayer ) {
+				// Panne passagère (Stripe injoignable) : Stripe renverra l'événement. Les autres cas
+				// (paiement en traitement, empreinte déjà utilisée…) sont acquittés : les renvois
+				// répétés finiraient par faire désactiver le webhook par Stripe.
 				return new WP_Error( 'etr_webhook', 'Enregistrement impossible pour le moment.', array( 'status' => 500 ) );
 			}
 		}
@@ -788,6 +813,10 @@ class ETR_Stripe {
 			echo '<li>' . esc_html( $texte ) . '</li>';
 		}
 		echo '</ul>';
+		if ( ! empty( $s['caution']['debit_attente']['montant'] ) && in_array( $s['caution']['statut'] ?? '', array( 'bloquee', 'enregistree' ), true ) ) {
+			/* translators: %s : montant. */
+			echo '<p class="etr-notice">' . esc_html( sprintf( __( 'Débit de %s sans réponse définitive de Stripe : relancez-le avec le même montant pour connaître le résultat.', 'espace-traiteur' ), ETR_Devis::prix( $s['caution']['debit_attente']['montant'] ) ) ) . '</p>';
+		}
 		if ( $doublons ) {
 			/* translators: %s : nombre. */
 			echo '<p class="etr-notice etr-notice--erreur">' . esc_html( sprintf( _n( '%s paiement en double : remboursez-le depuis le tableau de bord Stripe.', '%s paiements en double : remboursez-les depuis le tableau de bord Stripe.', $doublons, 'espace-traiteur' ), number_format_i18n( $doublons ) ) ) . '</p>';
@@ -884,11 +913,21 @@ class ETR_Stripe {
 			/* translators: %s : montant de la caution. */
 			return new WP_Error( 'etr_caution', sprintf( __( 'Montant à débiter entre 0,01 € et %s.', 'espace-traiteur' ), ETR_Devis::prix( $c['montant'] ) ) );
 		}
+		// Débit précédent sans réponse claire (coupure, paiement en traitement) : il a peut-être eu
+		// lieu chez Stripe. On ne refait que le même débit, avec la même clé, jamais un second.
+		$attente = ! empty( $c['debit_attente'] ) && is_array( $c['debit_attente'] ) ? $c['debit_attente'] : null;
+		if ( $attente && self::centimes( $attente['montant'] ) !== self::centimes( $montant ) ) {
+			/* translators: %s : montant. */
+			return new WP_Error( 'etr_caution', sprintf( __( 'Un débit de %s est peut-être déjà passé (Stripe n’a pas répondu). Réessayez avec ce même montant, ou vérifiez dans le tableau de bord Stripe.', 'espace-traiteur' ), ETR_Devis::prix( $attente['montant'] ) ) );
+		}
 		$essai = isset( $c['essai'] ) ? (int) $c['essai'] : 0;
-		$cle   = 'etr-debit-' . $id . '-' . self::centimes( $montant ) . '-' . $essai;
-		if ( 'bloquee' === $c['statut'] ) {
+		$cle   = 'etr-debit-' . $id . '-' . $essai; // Indépendante du montant.
+		self::noter( $id, 'caution', array( 'debit_attente' => array( 'montant' => $montant, 'pi' => $attente['pi'] ?? '' ) ) );
+		if ( $attente && ! empty( $attente['pi'] ) ) {
+			// Débit déjà créé chez Stripe (en traitement) : on lit simplement où il en est.
+			$r = self::api( 'GET', 'payment_intents/' . rawurlencode( $attente['pi'] ) );
+		} elseif ( 'bloquee' === $c['statut'] ) {
 			$r = self::api( 'POST', 'payment_intents/' . rawurlencode( $c['pi'] ) . '/capture', array( 'amount_to_capture' => self::centimes( $montant ) ), $cle );
-			$ok = ! is_wp_error( $r ) && 'succeeded' === $r['status'];
 		} else {
 			$r  = self::api(
 				'POST',
@@ -906,15 +945,22 @@ class ETR_Stripe {
 				),
 				$cle
 			);
-			$ok = ! is_wp_error( $r ) && 'succeeded' === $r['status'];
 		}
-		if ( ! $ok && ( ! is_wp_error( $r ) || 'etr_stripe_reseau' !== $r->get_error_code() ) ) {
-			// Refus définitif (carte refusée, authentification demandée) : la prochaine tentative est nouvelle.
-			self::noter( $id, 'caution', array( 'essai' => $essai + 1 ) );
+		$ok        = ! is_wp_error( $r ) && 'succeeded' === $r['status'];
+		$en_cours  = ! is_wp_error( $r ) && 'processing' === $r['status'];
+		if ( $en_cours ) {
+			self::noter( $id, 'caution', array( 'debit_attente' => array( 'montant' => $montant, 'pi' => (string) $r['id'] ) ) );
+			return new WP_Error( 'etr_caution', __( 'Le débit est en cours de traitement chez Stripe. Réessayez plus tard avec le même montant pour voir le résultat.', 'espace-traiteur' ) );
+		}
+		if ( ! $ok && self::passager( $r ) ) {
+			return $r; // Pas de réponse : même montant, même clé au prochain essai.
 		}
 		if ( ! $ok ) {
+			// Refus définitif (carte refusée, authentification demandée) : la prochaine tentative est nouvelle.
+			self::noter( $id, 'caution', array( 'essai' => $essai + 1, 'debit_attente' => null ) );
 			return is_wp_error( $r ) ? $r : new WP_Error( 'etr_caution', __( 'Le débit n’a pas abouti (carte refusée ou authentification demandée).', 'espace-traiteur' ) );
 		}
+		self::noter( $id, 'caution', array( 'debit_attente' => null ) );
 		self::noter( $id, 'caution', array( 'statut' => 'debitee', 'debite' => $montant, 'debite_le' => time() ) );
 		/* translators: %s : montant. */
 		ETR_Historique::ajouter( $id, 'paiement', sprintf( __( 'Caution débitée de %s (Stripe)', 'espace-traiteur' ), ETR_Devis::prix( $montant ) ) );
