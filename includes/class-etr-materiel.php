@@ -216,11 +216,65 @@ class ETR_Materiel {
 		echo '<form class="etr-panneau etr-dates-form" method="post" action="' . esc_url( ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id ) ) ) . '"><h2 class="etr-panneau__titre">' . esc_html__( 'Changer les dates', 'espace-traiteur' ) . '</h2>';
 		wp_nonce_field( 'etr_dates_' . $id, 'etr_nonce' );
 		echo '<input type="hidden" name="etr_gestion_action" value="dates"><input type="hidden" name="demande_id" value="' . (int) $id . '">';
+		$evenement = (string) get_post_meta( $id, '_etr_date_evenement', true );
 		foreach ( $etapes as $etape ) {
-			echo '<p class="etr-champ"><label for="etr-date-' . esc_attr( $etape ) . '">' . esc_html( $valeurs[ $etape ][0] ) . '</label><input type="date" id="etr-date-' . esc_attr( $etape ) . '" name="etr_dates[' . esc_attr( $etape ) . ']" value="' . esc_attr( $valeurs[ $etape ][1] ) . '"></p>';
+			echo '<p class="etr-champ"><label for="etr-date-' . esc_attr( $etape ) . '">' . esc_html( $valeurs[ $etape ][0] ) . '</label>';
+			$choix = etr_date_valide( $evenement ) ? self::dates_possibles( $etape, $evenement, $valeurs[ $etape ][1] ) : array();
+			if ( $choix ) {
+				// Seulement les dates cohérentes avec l'événement (le calendrier de l'iPhone ignore les limites).
+				echo '<select id="etr-date-' . esc_attr( $etape ) . '" name="etr_dates[' . esc_attr( $etape ) . ']">';
+				foreach ( $choix as $date => $libelle ) {
+					echo '<option value="' . esc_attr( $date ) . '"' . selected( $valeurs[ $etape ][1], $date, false ) . '>' . esc_html( $libelle ) . '</option>';
+				}
+				echo '</select>';
+			} else {
+				echo '<input type="date" id="etr-date-' . esc_attr( $etape ) . '" name="etr_dates[' . esc_attr( $etape ) . ']" value="' . esc_attr( $valeurs[ $etape ][1] ) . '">';
+			}
+			echo '</p>';
 		}
 		echo '<p class="etr-muted">' . esc_html__( 'Le stock est vérifié sur la nouvelle période ; le traiteur est prévenu.', 'espace-traiteur' ) . '</p>';
 		echo '<button type="submit" class="etr-btn etr-btn--discret">' . esc_html__( 'Enregistrer les dates', 'espace-traiteur' ) . '</button></form>';
+	}
+
+	/**
+	 * Dates possibles pour une étape : livraison de N jours avant l'événement au jour même,
+	 * reprise du jour même à N jours après (etr_ecarts_dates), jamais dans le passé.
+	 *
+	 * @param string $etape     livraison | reprise.
+	 * @param string $evenement Date de l'événement.
+	 * @param string $actuelle  Date actuelle (toujours proposée, même hors limites).
+	 * @return string[] Date => libellé.
+	 */
+	public static function dates_possibles( $etape, $evenement, $actuelle = '' ) {
+		$ecarts     = etr_ecarts_dates();
+		$aujourdhui = current_time( 'Y-m-d' );
+		$debut      = 'livraison' === $etape ? gmdate( 'Y-m-d', strtotime( $evenement . ' -' . $ecarts['avant'] . ' days' ) ) : $evenement;
+		$fin        = 'livraison' === $etape ? $evenement : gmdate( 'Y-m-d', strtotime( $evenement . ' +' . $ecarts['apres'] . ' days' ) );
+		$debut      = max( $debut, $aujourdhui );
+		$dates      = array();
+		for ( $d = $debut; $d <= $fin; $d = gmdate( 'Y-m-d', strtotime( $d . ' +1 day' ) ) ) {
+			$dates[] = $d;
+		}
+		if ( etr_date_valide( $actuelle ) && ! in_array( $actuelle, $dates, true ) ) {
+			$dates[] = $actuelle;
+			sort( $dates );
+		}
+		$choix = array();
+		foreach ( $dates as $d ) {
+			$n = (int) round( ( strtotime( $d ) - strtotime( $evenement ) ) / DAY_IN_SECONDS );
+			if ( 0 === $n ) {
+				$relatif = __( 'le jour de l’événement', 'espace-traiteur' );
+			} elseif ( -1 === $n ) {
+				$relatif = __( 'la veille', 'espace-traiteur' );
+			} elseif ( 1 === $n ) {
+				$relatif = __( 'le lendemain', 'espace-traiteur' );
+			} else {
+				/* translators: %s : nombre de jours. */
+				$relatif = $n < 0 ? sprintf( __( '%s jours avant', 'espace-traiteur' ), number_format_i18n( -$n ) ) : sprintf( __( '%s jours après', 'espace-traiteur' ), number_format_i18n( $n ) );
+			}
+			$choix[ $d ] = ucfirst( date_i18n( 'l j F', strtotime( $d ) ) ) . ' · ' . $relatif;
+		}
+		return $choix;
 	}
 
 	/**

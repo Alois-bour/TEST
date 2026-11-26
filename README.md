@@ -123,6 +123,12 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Dates de livraison et de reprise : seulement les dates possibles (3.1.2)
+
+- **Formulaire du traiteur** : la livraison et la reprise se choisissent dans une liste des seules dates cohérentes avec l'événement (« Samedi 5 décembre · la veille », « … · le jour de l'événement », « … · le lendemain »). Le calendrier de l'iPhone ignorait les limites et laissait choisir une livraison après l'événement. Sans date d'événement, la liste est désactivée ; si l'événement change, une date devenue impossible est retirée.
+- **Fiche, « Changer les dates » (bureau)** : même liste, construite côté serveur ; la date actuelle reste proposée même hors limites.
+- Le serveur refuse toujours une date incohérente envoyée autrement.
+
 ### Comptes traiteurs dans l'équipe (3.1.1)
 
 - **Application de l'équipe** : un compte traiteur qui essaie de s'y connecter voit pourquoi c'est refusé, un lien vers l'espace traiteur, et comment obtenir l'accès.
