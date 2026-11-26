@@ -86,6 +86,20 @@
 		return { champs: champs };
 	}
 
+	/**
+	 * Saisie de la personne connectée (les autres ne sont jamais rejouées pour elle).
+	 *
+	 * @param {Object} e Saisie gardée.
+	 * @return {boolean}
+	 */
+	function aMoi( e ) {
+		if ( ! C.utilisateur ) {
+			return true;
+		}
+		// Sans auteur (saisie d'avant la 3.0.3) : jamais envoyée d'office, voir sansAuteur().
+		return !! e.par && parseInt( e.par, 10 ) === parseInt( C.utilisateur, 10 );
+	}
+
 	function reconstruire( envoi ) {
 		if ( ! envoi.champs ) {
 			return { corps: JSON.stringify( envoi.json ), json: true };
@@ -113,7 +127,8 @@
 		var envoi = serialiser( donnees );
 		envoi.chemin  = chemin;
 		envoi.libelle = ( infos && infos.libelle ) || 'Saisie';
-		envoi.demande = ( infos && infos.demande ) || 0;
+		envoi.demande = parseInt( ( infos && infos.demande ) || 0, 10 ) || 0;
+		envoi.par     = C.utilisateur || 0; // Rejouée seulement pour la même personne.
 		envoi.type    = ( infos && infos.type ) || '';
 		envoi.cree    = Date.now();
 		envoi.erreur  = '';
@@ -166,7 +181,7 @@
 		var envoyes = 0;
 		envoiEnCours = tous().then( function ( liste ) {
 			var aEnvoyer = liste.filter( function ( e ) {
-				return ! e.erreur;
+				return ! e.erreur && aMoi( e );
 			} );
 			if ( ! aEnvoyer.length || navigator.onLine === false ) {
 				return null;
@@ -189,6 +204,13 @@
 									return transaction( 'readwrite', function ( m ) {
 										return m.delete( envoi.id );
 									} );
+								}
+								// Erreur passagère (serveur occupé ou en panne, délai dépassé) : la saisie reste
+								// en attente et la file s'arrête ; elle repartira au prochain essai.
+								if ( r.status >= 500 || r.status === 408 || r.status === 429 || ( r.status === 409 && json.code === 'etr_occupe' ) ) {
+									var passager = new Error( 'passager' );
+									passager.passager = true;
+									throw passager;
 								}
 								// Refus du serveur (commande déjà livrée par quelqu'un d'autre…) : gardé, signalé.
 								envoi.erreur = json.message || ( 'Refusé (erreur ' + r.status + ')' );
@@ -303,6 +325,24 @@
 							majIndicateur();
 						} );
 					} );
+					var reessayer = document.createElement( 'button' );
+					reessayer.type        = 'button';
+					reessayer.className   = 'etr-lien';
+					reessayer.textContent = 'Réessayer';
+					reessayer.addEventListener( 'click', function () {
+						envoi.erreur = '';
+						envoi.par    = C.utilisateur || envoi.par; // Reprise explicitement par la personne connectée.
+						transaction( 'readwrite', function ( m ) {
+							return m.put( envoi );
+						} ).then( function () {
+							li.className = '';
+							li.querySelector( 'small' ).textContent = 'en attente';
+							reessayer.remove();
+							retirer.remove();
+							envoyer();
+						} );
+					} );
+					li.appendChild( reessayer );
 					li.appendChild( retirer );
 				}
 				ul.appendChild( li );
@@ -363,18 +403,122 @@
 			envoyer();
 		}
 	} );
-	majIndicateur().then( function ( n ) {
+	// Saisies gardées avant la 3.0.3, sans auteur : on ne sait pas qui les a faites. Elles sont
+	// signalées et ne partent qu'avec « Réessayer » (la personne connectée les reprend à son nom).
+	function sansAuteur() {
+		if ( ! C.utilisateur ) {
+			return Promise.resolve();
+		}
+		return tous().then( function ( liste ) {
+			var orphelines = liste.filter( function ( e ) {
+				return ! e.par && ! e.erreur;
+			} );
+			if ( ! orphelines.length ) {
+				return null;
+			}
+			return transaction( 'readwrite', function ( m ) {
+				orphelines.forEach( function ( e ) {
+					e.erreur = 'Saisie gardée avant la mise à jour de l’application : vérifiez qu’elle est bien de vous, puis touchez « Réessayer ».';
+					m.put( e );
+				} );
+			} );
+		} ).catch( function () {} );
+	}
+
+	sansAuteur().then( majIndicateur ).then( function ( n ) {
 		if ( n ) {
 			envoyer();
 		}
 	} );
 
-	// Déconnexion : les pages gardées pour le hors connexion sont effacées du téléphone.
+	// Déconnexion : pages gardées effacées, saisies en attente envoyées ou abandonnées (après
+	// confirmation), et ce téléphone ne reçoit plus les notifications de la personne qui part.
+	var deconnexionEnCours = false;
 	document.addEventListener( 'click', function ( e ) {
 		var lien = e.target.closest( 'a[href*="action=logout"]' );
-		if ( lien && navigator.serviceWorker && navigator.serviceWorker.controller ) {
-			navigator.serviceWorker.controller.postMessage( { type: 'etr-vider' } );
+		if ( ! lien || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey ) {
+			return;
 		}
+		e.preventDefault();
+		if ( deconnexionEnCours ) {
+			return; // Un seul déroulé, même si l'on touche plusieurs fois.
+		}
+		deconnexionEnCours = true;
+		lien.setAttribute( 'aria-busy', 'true' );
+		var rester = function ( texte ) {
+			deconnexionEnCours = false;
+			lien.removeAttribute( 'aria-busy' );
+			if ( texte ) {
+				if ( window.etrToast ) {
+					window.etrToast( texte, 'erreur' );
+				} else {
+					window.alert( texte ); // eslint-disable-line no-alert
+				}
+			}
+		};
+		var SANS_RESEAU = 'Pas de réseau : la déconnexion n’a pas pu se faire. Vos saisies sont gardées sur le téléphone ; réessayez une fois le réseau revenu.';
+		// La déconnexion se fait d'abord sur le serveur ; les saisies abandonnées et les pages
+		// gardées ne sont effacées qu'une fois la déconnexion réussie (jamais sans réseau).
+		var partir = function ( aSupprimer ) {
+			if ( navigator.onLine === false ) {
+				return rester( SANS_RESEAU );
+			}
+			var fin = Promise.resolve();
+			if ( navigator.serviceWorker && window.PushManager && C.apiNotifs ) {
+				fin = navigator.serviceWorker.ready.then( function ( reg ) {
+					return reg.pushManager.getSubscription();
+				} ).then( function ( abonnement ) {
+					if ( ! abonnement ) {
+						return null;
+					}
+					return fetch( C.apiNotifs + 'appareil', { method: 'DELETE', credentials: 'same-origin', keepalive: true, headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': C.nonce }, body: JSON.stringify( { endpoint: abonnement.endpoint } ) } ).catch( function () {} );
+				} ).catch( function () {} );
+			}
+			return Promise.race( [ fin, new Promise( function ( r ) {
+				setTimeout( r, 1500 );
+			} ) ] ).then( function () {
+				return fetch( lien.href, { credentials: 'same-origin', cache: 'no-store' } );
+			} ).then( function ( reponse ) {
+				return transaction( 'readwrite', function ( m ) {
+					( aSupprimer || [] ).forEach( function ( envoi ) {
+						m.delete( envoi.id );
+					} );
+				} ).catch( function () {} ).then( function () {
+					if ( navigator.serviceWorker && navigator.serviceWorker.controller ) {
+						navigator.serviceWorker.controller.postMessage( { type: 'etr-vider' } );
+					}
+					window.location.href = ( reponse && reponse.url ) || C.gestion || '/';
+				} );
+			}, function () {
+				rester( SANS_RESEAU );
+			} );
+		};
+		if ( navigator.onLine === false ) {
+			rester( SANS_RESEAU );
+			return;
+		}
+		// L'envoi des saisies en attente a 8 s au plus ; ce qui reste est proposé à l'abandon.
+		Promise.race( [ envoyer().catch( function () {} ), new Promise( function ( r ) {
+			setTimeout( r, 8000 );
+		} ) ] ).then( function () {
+			return tous();
+		} ).then( function ( toutes ) {
+			// Seules les saisies de la personne qui part : celles d'un collègue restent pour lui.
+			var liste = toutes.filter( aMoi );
+			if ( ! liste.length ) {
+				return partir( [] );
+			}
+			var question = liste.length + ( liste.length > 1 ? ' saisies ne sont pas encore envoyées' : ' saisie n’est pas encore envoyée' ) + ' (réseau). En vous déconnectant, elles seront perdues.';
+			var confirmer = window.etrConfirmer ? window.etrConfirmer( question, { valider: 'Se déconnecter quand même', danger: true } ) : Promise.resolve( window.confirm( question ) ); // eslint-disable-line no-alert
+			return confirmer.then( function ( ok ) {
+				if ( ! ok ) {
+					return rester( '' );
+				}
+				return partir( liste );
+			} );
+		} ).catch( function () {
+			return partir( [] );
+		} );
 	} );
 
 	// Pages utiles sans réseau : gardées sur le téléphone à l'ouverture de la tournée.
@@ -404,7 +548,7 @@
 	function pourDemande( demande ) {
 		return tous().then( function ( liste ) {
 			return liste.filter( function ( e ) {
-				return e.demande === demande;
+				return aMoi( e ) && parseInt( e.demande, 10 ) === parseInt( demande, 10 );
 			} );
 		} );
 	}

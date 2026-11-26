@@ -122,9 +122,17 @@ class ETR_Terrain {
 			echo '<div class="etr-vide"><p>' . esc_html__( 'Aucune livraison ni reprise ce jour-là.', 'espace-traiteur' ) . '</p></div>';
 			return;
 		}
-		$itineraire = self::url_itineraire_tournee( array_merge( $tournee['livraisons'], $tournee['reprises'] ) );
-		if ( $itineraire ) {
-			echo '<p class="etr-tournee__route"><a class="etr-btn" href="' . esc_url( $itineraire ) . '" target="_blank" rel="noopener">' . self::icone( 'lieu' ) . '<span>' . esc_html__( 'Itinéraire de la tournée', 'espace-traiteur' ) . '</span></a><small>' . esc_html__( 'Toutes les étapes, dans l’ordre (Google Maps).', 'espace-traiteur' ) . '</small></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		$itineraires = self::itineraires( self::lieux_tournee( array_merge( $tournee['livraisons'], $tournee['reprises'] ) ) );
+		if ( $itineraires ) {
+			echo '<p class="etr-tournee__route">';
+			foreach ( $itineraires as $part ) {
+				$libelle = 1 === count( $itineraires )
+					? __( 'Itinéraire de la tournée', 'espace-traiteur' )
+					/* translators: 1 : première étape, 2 : dernière étape. */
+					: sprintf( __( 'Itinéraire, étapes %1$d à %2$d', 'espace-traiteur' ), $part['de'], $part['a'] );
+				echo '<a class="etr-btn" href="' . esc_url( $part['url'] ) . '" target="_blank" rel="noopener">' . self::icone( 'lieu' ) . '<span>' . esc_html( $libelle ) . '</span></a> '; // phpcs:ignore WordPress.Security.EscapeOutput
+			}
+			echo '<small>' . esc_html( count( $itineraires ) > 1 ? __( 'Google Maps limite un itinéraire à 10 étapes : ouvrez les tronçons l’un après l’autre.', 'espace-traiteur' ) : __( 'Toutes les étapes, dans l’ordre (Google Maps).', 'espace-traiteur' ) ) . '</small></p>';
 		}
 		do_action( 'etr_tournee_haut', $jour, $tournee, $bureau ); // Volume du jour, optimisation de l'ordre.
 		$livreurs = $bureau ? ETR_Operations::livreurs() : array();
@@ -141,12 +149,51 @@ class ETR_Terrain {
 	}
 
 	/**
-	 * Itinéraire de toute la tournée (Google Maps : départ de la position actuelle, étapes dans l'ordre).
+	 * Itinéraires de toute la tournée (Google Maps : départ de la position actuelle, étapes dans
+	 * l'ordre), par tronçons de 10 étapes au plus : afficher tous les tronçons.
 	 *
 	 * @param int[] $ids Demandes, dans l'ordre de passage.
-	 * @return string Adresse, ou '' sans lieu connu.
+	 * @return array[] { url, de, a } ; vide sans lieu connu.
 	 */
-	public static function url_itineraire_tournee( $ids ) {
+	public static function urls_itineraire_tournee( $ids ) {
+		return self::itineraires( self::lieux_tournee( $ids ) );
+	}
+
+	/**
+	 * Itinéraires de la tournée par tronçons de 10 étapes au plus (limite de Google Maps) :
+	 * le tronçon suivant part de la dernière étape du précédent.
+	 *
+	 * @param string[] $lieux Lieux, dans l'ordre.
+	 * @return array[] { url, de, a } (numéros d'étapes).
+	 */
+	public static function itineraires( $lieux ) {
+		$parts = array();
+		$total = count( $lieux );
+		for ( $debut = 0; $debut < $total; $debut += 9 ) {
+			$troncon     = array_slice( $lieux, $debut, 10 );
+			$destination = array_pop( $troncon );
+			$url         = 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' . rawurlencode( $destination );
+			if ( $debut > 0 ) {
+				$url    .= '&origin=' . rawurlencode( array_shift( $troncon ) ); // Départ : dernière étape du tronçon précédent.
+			}
+			if ( $troncon ) {
+				$url .= '&waypoints=' . implode( '%7C', array_map( 'rawurlencode', $troncon ) );
+			}
+			$parts[] = array( 'url' => $url, 'de' => $debut + 1, 'a' => min( $total, $debut + 10 ) );
+			if ( $debut + 10 >= $total ) {
+				break;
+			}
+		}
+		return $parts;
+	}
+
+	/**
+	 * Lieux des étapes, dans l'ordre.
+	 *
+	 * @param int[] $ids Demandes.
+	 * @return string[]
+	 */
+	public static function lieux_tournee( $ids ) {
 		$lieux = array();
 		foreach ( $ids as $id ) {
 			$lieu = trim( preg_replace( '/\s+/', ' ', (string) get_post_meta( $id, '_etr_lieu', true ) ) );
@@ -154,15 +201,7 @@ class ETR_Terrain {
 				$lieux[] = $lieu;
 			}
 		}
-		if ( ! $lieux ) {
-			return '';
-		}
-		$destination = array_pop( $lieux );
-		$url         = 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' . rawurlencode( $destination );
-		if ( $lieux ) {
-			$url .= '&waypoints=' . implode( '%7C', array_map( 'rawurlencode', array_slice( $lieux, 0, 9 ) ) );
-		}
-		return $url;
+		return $lieux;
 	}
 
 	/**

@@ -72,11 +72,40 @@
 		if ( navigator.onLine === false ) {
 			return attendre();
 		}
-		return api( chemin, donnees, multipart ).catch( function ( erreur ) {
-			if ( erreur.reseau ) {
-				return attendre();
+		var direct = function () {
+			return api( chemin, donnees, multipart ).catch( function ( erreur ) {
+				if ( erreur.reseau ) {
+					return attendre();
+				}
+				throw erreur;
+			} );
+		};
+		// Des saisies plus anciennes de la même demande attendent encore : elles partent d'abord ;
+		// s'il en reste, celle-ci les suit dans la file (jamais une ancienne valeur après une récente).
+		var demande = infos && infos.demande;
+		if ( ! demande ) {
+			return direct();
+		}
+		// Seules les saisies de la personne connectée comptent (les autres ne partent jamais pour elle).
+		var enAttente = function () {
+			return window.etrHorsLigne.pourDemande( demande ).then( function ( liste ) {
+				return liste.filter( function ( e ) {
+					return ! e.erreur;
+				} ).length;
+			} );
+		};
+		// Un souci de lecture de la file ne bloque pas l'envoi ; un refus du serveur n'est jamais renvoyé.
+		return enAttente().catch( function () {
+			return 0;
+		} ).then( function ( n ) {
+			if ( ! n ) {
+				return direct();
 			}
-			throw erreur;
+			return window.etrHorsLigne.envoyer().then( enAttente ).catch( function () {
+				return 1;
+			} ).then( function ( reste ) {
+				return reste ? attendre() : direct();
+			} );
 		} );
 	}
 

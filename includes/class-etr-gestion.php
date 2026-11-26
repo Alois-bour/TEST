@@ -126,6 +126,7 @@ class ETR_Gestion {
 		// (une app installée sur iPhone a ses propres cookies), voir ETR_Equipe_Acces.
 		if ( ETR_Equipe_Acces::preparer() ) {
 			self::page_trouvee();
+			header( 'X-ETR-Page: connexion' ); // Le service worker efface alors les pages gardées.
 			return;
 		}
 		if ( ETR_Access::traiteur_seulement( get_current_user_id() ) ) {
@@ -137,7 +138,9 @@ class ETR_Gestion {
 		}
 
 		self::page_trouvee();
-		header( 'X-ETR-Page: app' ); // Page gardable pour le hors connexion (service worker).
+		// Personne de l'équipe : les pages autonomes (bons, étiquettes) ne touchent pas aux pages
+		// gardées sur le téléphone ; les vraies pages de l'application remplacent cet en-tête plus bas.
+		header( 'X-ETR-Page: document' );
 
 		$action = isset( $_REQUEST['etr_gestion_action'] ) ? sanitize_key( wp_unslash( $_REQUEST['etr_gestion_action'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification -- vérifié par action.
 		if ( $action && ! ETR_Equipe::bureau() ) {
@@ -188,6 +191,10 @@ class ETR_Gestion {
 			}
 			ETR_Bons::afficher( $id, isset( $_GET['type'] ) ? sanitize_key( wp_unslash( $_GET['type'] ) ) : '', self::url_demande( $id ) ); // phpcs:ignore WordPress.Security.NonceVerification
 		}
+
+		// Seulement les vraies pages de l'application (pas les exports, PDF, photos, étiquettes,
+		// qui partent plus haut) : gardables pour le hors connexion par le service worker.
+		header( 'X-ETR-Page: app' );
 	}
 
 	/**
@@ -624,6 +631,8 @@ class ETR_Gestion {
 					'maxPhotos' => ETR_Operations::MAX_PHOTOS,
 					'hote'      => (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ),
 					'gestion'   => self::url(),
+					'utilisateur' => get_current_user_id(), // Saisies hors connexion rejouées pour la même personne.
+					'apiNotifs' => ETR_Push::disponible() ? esc_url_raw( rest_url( ETR_Push::API . '/notifications/' ) ) : '',
 				)
 			);
 		}
@@ -636,6 +645,7 @@ class ETR_Gestion {
 					'cle'   => ETR_Push::cle_publique(),
 					'api'   => esc_url_raw( rest_url( ETR_Push::API . '/notifications/' ) ),
 					'nonce' => wp_create_nonce( 'wp_rest' ),
+					'utilisateur' => get_current_user_id(),
 				)
 			);
 		}

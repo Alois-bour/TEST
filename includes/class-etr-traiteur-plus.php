@@ -447,11 +447,13 @@ class ETR_Traiteur_Plus {
 			return;
 		}
 		$p        = self::parametres();
-		$articles = array_filter(
-			etr_catalogue(),
-			function ( $a ) {
-				return null !== etr_stock_total( $a['id'] );
-			}
+		$articles = array_values(
+			array_filter(
+				etr_catalogue(),
+				function ( $a ) {
+					return null !== etr_stock_total( $a['id'] );
+				}
+			)
 		);
 		// phpcs:disable WordPress.Security.NonceVerification -- lecture seule.
 		$choisi = isset( $_GET['article'] ) ? absint( $_GET['article'] ) : 0;
@@ -469,7 +471,7 @@ class ETR_Traiteur_Plus {
 			echo '<option value="' . (int) $a['id'] . '"' . selected( $choisi, $a['id'], false ) . '>' . esc_html( $a['titre'] ) . '</option>';
 		}
 		echo '</select><noscript><button type="submit" class="etr-btn">' . esc_html__( 'Voir', 'espace-traiteur' ) . '</button></noscript></form>';
-		if ( ! $choisi || ! isset( $articles[ array_search( $choisi, array_column( $articles, 'id' ), true ) ] ) ) {
+		if ( ! $choisi || ! in_array( $choisi, array_map( 'intval', array_column( $articles, 'id' ) ), true ) ) {
 			echo '<p class="etr-muted">' . esc_html__( 'Seuls les articles en quantité limitée sont listés ; les autres sont toujours disponibles.', 'espace-traiteur' ) . '</p>';
 			return;
 		}

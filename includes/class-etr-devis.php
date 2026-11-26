@@ -306,6 +306,11 @@ class ETR_Devis {
 				$valeur = number_format( (float) $valeur, 2, ',', '' ); // Sans séparateur de milliers : relu tel quel.
 			}
 			echo '<p class="etr-champ"><label for="etr-acompte-' . esc_attr( $cle ) . '">' . esc_html( $champ[0] ) . '</label><input type="' . esc_attr( $champ[1] ) . '" id="etr-acompte-' . esc_attr( $cle ) . '" name="etr_acompte[' . esc_attr( $cle ) . ']" value="' . esc_attr( (string) $valeur ) . '"' . ( 'text' === $champ[1] ? ' inputmode="decimal"' : '' ) . '></p>';
+			if ( 'date' === $champ[1] ) {
+				// Valeur affichée : une date que la personne n'a pas touchée garde la valeur du moment de
+				// l'enregistrement (Stripe a pu l'écrire entre-temps) ; une date changée est respectée.
+				echo '<input type="hidden" name="etr_acompte_vu[' . esc_attr( $cle ) . ']" value="' . esc_attr( (string) $valeur ) . '">';
+			}
 		}
 		echo '<button type="submit" class="etr-btn etr-btn--discret">' . esc_html__( 'Enregistrer', 'espace-traiteur' ) . '</button></form>';
 	}
@@ -449,6 +454,16 @@ class ETR_Devis {
 				$date           = isset( $saisie[ $cle ] ) ? sanitize_text_field( $saisie[ $cle ] ) : '';
 				$propre[ $cle ] = etr_date_valide( $date ) ? $date : '';
 			}
+			// Dates écrites en ligne (Stripe) pendant que la fiche était ouverte : une date que la
+			// personne n'a pas touchée prend la valeur actuelle ; une date changée (y compris effacée,
+			// après un remboursement) est respectée.
+			$vu   = isset( $_POST['etr_acompte_vu'] ) && is_array( $_POST['etr_acompte_vu'] ) ? wp_unslash( $_POST['etr_acompte_vu'] ) : null; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- comparé seulement.
+			$base = self::acompte( $id );
+			foreach ( array( 'acompte_recu', 'caution_recue', 'caution_rendue' ) as $cle ) {
+				if ( is_array( $vu ) && isset( $vu[ $cle ] ) && sanitize_text_field( $vu[ $cle ] ) === $propre[ $cle ] ) {
+					$propre[ $cle ] = $base[ $cle ];
+				}
+			}
 			$avant = self::textes_acompte( $id );
 			update_post_meta( $id, self::META_ACOMPTE, $propre );
 			$apres = self::textes_acompte( $id );
@@ -481,7 +496,7 @@ class ETR_Devis {
 			} elseif ( self::acceptable( $id ) ) {
 				$cgv   = (string) get_option( 'etr_cgv_url' );
 				$html .= '<form method="post" class="etr-devis-accepter" action="' . esc_url( etr_url( array( 'etr_vue' => 'demande', 'id' => $id ) ) ) . '">' . wp_nonce_field( 'etr_accepter_devis_' . $id, 'etr_nonce', true, false );
-				$html .= '<input type="hidden" name="etr_action" value="accepter_devis"><input type="hidden" name="demande_id" value="' . (int) $id . '">';
+				$html .= '<input type="hidden" name="etr_action" value="accepter_devis"><input type="hidden" name="demande_id" value="' . (int) $id . '"><input type="hidden" name="devis_envoye" value="' . (int) $devis['envoye'] . '">';
 				$html .= '<p class="etr-champ"><label for="etr-devis-nom">' . esc_html__( 'Votre nom', 'espace-traiteur' ) . '</label><input type="text" id="etr-devis-nom" name="etr_nom" required maxlength="100" value="' . esc_attr( etr_nom( wp_get_current_user() ) ) . '" autocomplete="name"></p>';
 				$html .= '<p class="etr-case"><label><input type="checkbox" name="etr_cgv" value="1" required> ' . ( $cgv ? sprintf( /* translators: %s : lien. */ esc_html__( 'J’ai lu et j’accepte les %s.', 'espace-traiteur' ), '<a href="' . esc_url( $cgv ) . '" target="_blank" rel="noopener">' . esc_html__( 'conditions générales', 'espace-traiteur' ) . '</a>' ) : esc_html__( 'J’accepte ce devis et les conditions de location.', 'espace-traiteur' ) ) . '</label></p>';
 				/* translators: %s : date. */
@@ -520,6 +535,13 @@ class ETR_Devis {
 			wp_die( esc_html__( 'Demande introuvable.', 'espace-traiteur' ), '', array( 'response' => 404 ) );
 		}
 		$nom = isset( $_POST['etr_nom'] ) ? mb_substr( trim( sanitize_text_field( wp_unslash( $_POST['etr_nom'] ) ) ), 0, 100 ) : '';
+		// Seulement la version affichée au traiteur (un devis renvoyé entre-temps doit être relu).
+		$version = isset( $_POST['devis_envoye'] ) ? absint( $_POST['devis_envoye'] ) : 0;
+		$devis   = self::devis( $id );
+		if ( $devis && (int) $devis['envoye'] !== $version ) {
+			wp_safe_redirect( etr_url( array( 'etr_vue' => 'demande', 'id' => $id, 'etr_msg' => 'devis_change' ) ) );
+			exit;
+		}
 		if ( self::acceptable( $id ) && '' !== $nom && ! empty( $_POST['etr_cgv'] ) ) {
 			self::accepter( $id, $nom );
 		}
@@ -556,6 +578,9 @@ class ETR_Devis {
 			return;
 		}
 		$type    = sanitize_key( wp_unslash( $_GET['etr_document'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
+		if ( ! in_array( $type, array( 'devis', 'releve' ), true ) ) {
+			return; // Autres documents (facture) : servis par leur module.
+		}
 		$id      = absint( $_GET['id'] ); // phpcs:ignore WordPress.Security.NonceVerification
 		$user_id = get_current_user_id();
 		$equipe  = ETR_Equipe::acces() && ETR_Equipe::bureau() && ETR_Gestion::demande_visible( $id );

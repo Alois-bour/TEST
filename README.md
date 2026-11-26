@@ -123,6 +123,36 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Corrections de la quatrième revue (3.0.5)
+
+- **Stripe** : si le retour du traiteur enregistre déjà la session, le webhook demande à Stripe de renvoyer l'événement (rien n'est perdu si ce retour échoue) ; un paiement en ligne après un règlement noté à la main (facture payée, acompte reçu) est signalé en double, la date n'est pas changée ; la caution ne peut pas être libérée tant qu'un débit attend la réponse de Stripe.
+- **Déconnexion de l'application** : faite d'abord sur le serveur ; sans réseau, rien n'est effacé (message) ; les saisies abandonnées et les pages gardées ne sont supprimées qu'une fois la déconnexion réussie.
+- **Acompte et caution** : une date que la personne n'a pas touchée garde la valeur écrite entre-temps (Stripe) ; une date changée ou effacée volontairement est respectée.
+- **Face ID** : une demande expirée (jeton invalide) ne fait plus reculer le compteur par adresse IP.
+- **Créneaux** : une demande « livrée » (même à la main) ne compte plus dans la charge de son jour de livraison ; métadonnées lues en une requête.
+- **Espace traiteur** : le retrait des notifications à la déconnexion vaut sur toutes les pages.
+- **Appareils** : le nom enregistré est gardé au rattachement automatique.
+
+### Corrections de la troisième revue (3.0.4)
+
+- **Téléphone partagé** : à la déconnexion, seules les saisies de la personne qui part sont comptées et supprimées ; celles d'un collègue restent. Les saisies gardées avant la 3.0.3 (sans auteur) ne partent plus d'office : elles sont signalées et ne partent qu'avec « Réessayer ».
+- **Stripe** : un second paiement n'est signalé « à rembourser » qu'une fois réussi (un SEPA en cours n'est pas compté) ; un acompte payé depuis un vieil onglet après le règlement de la facture est signalé en double ; démarrer le paiement du solde ferme la page d'acompte restée ouverte.
+- **Caution** : une nouvelle caution repart de zéro (débit en attente, essais), la libération efface le débit en attente ; clé d'idempotence propre au site et à la caution.
+- **Facture** : sans la fonction « casse », le débit de caution est déduit de la facture ; avec, la part non déduite est indiquée « hors facture » sur la fiche.
+- **Compteur de factures** : un changement du prochain numéro impossible pendant une numérotation est signalé dans les réglages.
+- **Face ID** : essais par adresse IP comptés de façon atomique, avant la vérification, par quart d'heure fixe.
+- **Espace traiteur** : Cmd/Ctrl-clic sur « Se déconnecter » laissé au navigateur.
+
+### Corrections de la seconde revue (3.0.3)
+
+- **Terrain** : une saisie refusée par le serveur n'est plus envoyée une seconde fois ; une saisie laissée par une autre personne sur un téléphone partagé ne bloque plus les envois de la personne connectée ; déconnexion : un seul déroulé même si l'on touche plusieurs fois, 8 s d'attente au plus.
+- **Téléphone partagé** : les pages gardées sont effacées dès qu'une page arrive d'un autre compte (renvoi vers l'espace traiteur, accès refusé) ; les bons imprimables n'y touchent pas.
+- **Stripe** : le webhook ne demande un renvoi qu'en cas de panne passagère (un paiement SEPA en traitement est acquitté) ; débit de caution : une seule clé par demande, sans le montant ; après une coupure, seul le même montant peut être relancé ; un débit « en traitement » est relu, jamais recréé.
+- **Face ID** : envoyer le numéro d'une autre personne ne bloque plus son Face ID (blocage par compte seulement pour une clé enregistrée de ce compte).
+- **Stock** : après une reprise avec écarts, les manquants restent comptés « chez les traiteurs ».
+- **Notifications** : le nom de l'appareil et la date sont gardés au rattachement automatique.
+- **Itinéraires** : `ETR_Terrain::urls_itineraire_tournee()` renvoie tous les tronçons.
+
 ### Version 3.0.0 : couleurs, logistique, traiteur, stock, facturation, Stripe
 
 Tout s'active et se règle dans **Espace traiteur › Fonctions** (couleurs : **Réglages › Couleurs**). Les fonctions qui changent le parcours du traiteur, envoient des e-mails ou touchent à l'argent sont désactivées par défaut.

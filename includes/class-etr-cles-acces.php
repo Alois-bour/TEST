@@ -24,6 +24,7 @@ class ETR_Cles_Acces {
 
 	const META      = 'etr_cles_acces';
 	const MAX_CLES  = 10;
+	const MAX_IP    = 30; // Essais de connexion par adresse IP et par quart d'heure.
 	const DUREE     = 300;
 	const ROUTE     = '/cles/';
 	const ES256     = -7;
@@ -254,7 +255,7 @@ class ETR_Cles_Acces {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public static function api_options_connexion() {
-		if ( ETR_Comptes::est_bloque( 'cle|' . self::ip() ) ) {
+		if ( self::ip_bloquee() ) {
 			return self::erreur( __( 'Trop de tentatives. Réessayez dans 15 minutes.', 'espace-traiteur' ), 429 );
 		}
 		$defi = self::nouveau_defi( array( 'type' => 'connexion' ) );
@@ -279,19 +280,53 @@ class ETR_Cles_Acces {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public static function api_connexion( $requete ) {
-		$cle_echecs = 'cle|' . self::ip();
-		if ( ETR_Comptes::est_bloque( $cle_echecs ) ) {
+		// Blocage par compte, seulement quand la clé présentée est bien une clé enregistrée de ce
+		// compte (son identifiant est secret) : un inconnu ne peut pas bloquer le Face ID d'une
+		// personne en envoyant son numéro. Les autres échecs comptent par adresse IP (plafond large),
+		// sans bloquer toute l'équipe derrière la même connexion (Wi-Fi du dépôt).
+		$compte     = self::compte_de_cle( $requete );
+		$cle_echecs = $compte ? 'cle|' . $compte : '';
+		// Chaque essai est compté avant la vérification, de façon atomique : des requêtes envoyées
+		// en même temps ne passent pas toutes sous le plafond (retiré ensuite en cas de réussite).
+		if ( self::compter_ip( 1 ) > self::MAX_IP || ( $cle_echecs && ETR_Comptes::est_bloque( $cle_echecs ) ) ) {
 			return self::erreur( __( 'Trop de tentatives. Réessayez dans 15 minutes.', 'espace-traiteur' ), 429 );
 		}
 		$resultat = self::verifier_connexion( $requete );
 		if ( is_wp_error( $resultat ) ) {
-			ETR_Comptes::compter_echec( $cle_echecs );
+			if ( 'etr_cle_expiree' !== $resultat->get_error_code() ) { // Une page restée ouverte n'est pas une tentative.
+				if ( $cle_echecs ) {
+					ETR_Comptes::compter_echec( $cle_echecs );
+				}
+			}
+			// Demande expirée : pas de recul du compteur (un jeton bidon ne doit pas le faire baisser).
 			return $resultat;
 		}
-		delete_transient( ETR_Comptes::cle_echecs( $cle_echecs ) ); // Réussite : compteur d'échecs remis à zéro.
+		self::compter_ip( -1 ); // Réussite : ne compte pas dans le plafond de l'adresse IP.
+		delete_transient( ETR_Comptes::cle_echecs( 'cle|' . $resultat->ID ) ); // Réussite : compteur d'échecs remis à zéro.
 		wp_set_auth_cookie( $resultat->ID, true, is_ssl() );
 		do_action( 'wp_login', $resultat->user_login, $resultat );
 		return rest_ensure_response( array( 'url' => ETR_Gestion::url() ) );
+	}
+
+	/**
+	 * Compte dont la clé présentée est une clé enregistrée (0 sinon), avant toute vérification.
+	 *
+	 * @param WP_REST_Request $requete Requête.
+	 * @return int
+	 */
+	private static function compte_de_cle( $requete ) {
+		$poignee = ETR_Push::d64( (string) $requete->get_param( 'userHandle' ) );
+		$user_id = preg_match( '/^etr-(\d+)$/', $poignee, $m ) ? (int) $m[1] : 0;
+		$id      = (string) $requete->get_param( 'id' );
+		if ( ! $user_id || '' === $id ) {
+			return 0;
+		}
+		foreach ( self::cles( $user_id ) as $cle ) {
+			if ( hash_equals( (string) $cle['id'], $id ) ) {
+				return $user_id;
+			}
+		}
+		return 0;
 	}
 
 	/**
@@ -304,7 +339,7 @@ class ETR_Cles_Acces {
 		$refus = __( 'Connexion par Face ID refusée. Connectez-vous avec votre mot de passe.', 'espace-traiteur' );
 		$defi  = self::prendre_defi( $requete->get_param( 'jeton' ), 'connexion' );
 		if ( ! $defi ) {
-			return self::erreur( __( 'Demande expirée : réessayez.', 'espace-traiteur' ) );
+			return new WP_Error( 'etr_cle_expiree', __( 'Demande expirée : réessayez.', 'espace-traiteur' ), array( 'status' => 400 ) );
 		}
 		$id        = (string) $requete->get_param( 'id' );
 		$poignee   = ETR_Push::d64( (string) $requete->get_param( 'userHandle' ) );
@@ -372,6 +407,46 @@ class ETR_Cles_Acces {
 	/* ------------------------------------------------------------------ */
 	/* Vérifications                                                      */
 	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Trop d'échecs depuis cette adresse IP, tous comptes confondus (plafond large).
+	 *
+	 * @return bool
+	 */
+	private static function ip_bloquee() {
+		global $wpdb;
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", self::nom_ip() ) ) >= self::MAX_IP; // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	}
+
+	/**
+	 * Compteur de l'adresse IP pour la fenêtre de 15 minutes en cours (fenêtre fixe : un essai
+	 * de plus ne prolonge pas le blocage).
+	 *
+	 * @return string
+	 */
+	private static function nom_ip() {
+		return 'etr_echecs_cle_ip_' . md5( self::ip() ) . '_' . (int) floor( time() / ETR_Comptes::DUREE_BLOCAGE );
+	}
+
+	/**
+	 * Avance (ou recule) le compteur de l'adresse IP, de façon atomique (SQL).
+	 *
+	 * @param int $pas +1 ou -1.
+	 * @return int Nouvelle valeur.
+	 */
+	private static function compter_ip( $pas ) {
+		global $wpdb;
+		static $fenetre = null; // Le recul (réussite) vise la fenêtre de l'essai, pas la suivante.
+		$nom     = $pas < 0 && $fenetre ? $fenetre : self::nom_ip();
+		$fenetre = $nom;
+		if ( $pas > 0 && $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, '1', 'no')", $nom ) ) ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			// Nouvelle fenêtre : les compteurs des fenêtres passées sont supprimés.
+			$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s AND option_name NOT LIKE %s", $wpdb->esc_like( 'etr_echecs_cle_ip_' ) . '%', '%' . $wpdb->esc_like( '_' . (int) floor( time() / ETR_Comptes::DUREE_BLOCAGE ) ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			return 1;
+		}
+		$wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->options} SET option_value = option_value + %d WHERE option_name = %s" . ( $pas < 0 ? ' AND option_value > 0' : '' ), (int) $pas, $nom ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $nom ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	}
 
 	/**
 	 * Erreur d'API.

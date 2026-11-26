@@ -105,11 +105,15 @@ self.addEventListener( 'fetch', ( evenement ) => {
  * @return {Promise}
  */
 function garderPage( requete, reponse ) {
-	if ( ! reponse.ok ) {
+	const type = reponse.headers.get( 'X-ETR-Page' );
+	const html = ( reponse.headers.get( 'Content-Type' ) || '' ).indexOf( 'text/html' ) !== -1;
+	if ( 'document' === type || ! html || reponse.status >= 500 ) {
+		// Bon imprimable, export, PDF, photo, panne du serveur : rien n'est gardé ni effacé.
 		return Promise.resolve();
 	}
-	if ( reponse.headers.get( 'X-ETR-Page' ) !== 'app' ) {
-		// Écran de connexion (session finie, autre personne) : les pages gardées sont effacées.
+	if ( 'app' !== type || ! reponse.ok ) {
+		// Écran de connexion, renvoi vers l'espace traiteur, accès refusé… : la personne a
+		// changé ou n'a plus accès, les pages gardées sont effacées.
 		return caches.delete( PAGES ).catch( () => {} );
 	}
 	const copie = reponse.clone();

@@ -21,6 +21,7 @@ class ETR_Facture {
 	const OPTION   = 'etr_facturation';
 	const META     = '_etr_facture';
 	const VERROU   = 'etr_facture_verrou';
+	const COMPTEUR = 'etr_facture_compteur';
 
 	/**
 	 * Hooks.
@@ -102,13 +103,9 @@ class ETR_Facture {
 					$p['prix']    = isset( $s['prix'] ) && 'ht' === $s['prix'] ? 'ht' : 'ttc';
 					$p['delai']   = isset( $s['delai'] ) ? min( 120, absint( $s['delai'] ) ) : 30;
 					$p['cloture'] = empty( $s['cloture'] ) ? 0 : 1;
-					// Le compteur ne recule jamais (numérotation sans trou ni doublon).
-					if ( isset( $s['prochain'] ) && absint( $s['prochain'] ) > (int) $p['prochain'] ) {
-						$p['prochain'] = absint( $s['prochain'] );
-					}
-					// Année du compteur : écrite par la numérotation (pas par le formulaire), à garder.
-					if ( isset( $s['annee'] ) && preg_match( '/^\d{4}$/', (string) $s['annee'] ) ) {
-						$p['annee'] = (int) $s['annee'];
+					// Compteur : option à part (numérotation sans trou ni doublon), seulement avancé ici.
+					if ( isset( $s['prochain'] ) && absint( $s['prochain'] ) > 0 ) {
+						self::avancer_compteur( absint( $s['prochain'] ) );
 					}
 					return $p;
 				},
@@ -141,7 +138,9 @@ class ETR_Facture {
 		echo '<label>' . esc_html__( 'Les prix (catalogue, remise, livraison) sont', 'espace-traiteur' ) . ' <select name="' . $nom( 'prix' ) . '"><option value="ttc"' . selected( $p['prix'], 'ttc', false ) . '>TTC</option><option value="ht"' . selected( $p['prix'], 'ht', false ) . '>HT</option></select></label></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<p><label>' . esc_html__( 'Préfixe', 'espace-traiteur' ) . ' <input type="text" class="small-text" name="' . $nom( 'prefixe' ) . '" value="' . esc_attr( $p['prefixe'] ) . '"></label> &nbsp; '; // phpcs:ignore WordPress.Security.EscapeOutput
 		/* translators: %s : exemple de numéro. */
-		echo '<label>' . esc_html__( 'Prochain numéro', 'espace-traiteur' ) . ' <input type="number" min="' . (int) $p['prochain'] . '" class="small-text" name="' . $nom( 'prochain' ) . '" value="' . (int) $p['prochain'] . '"></label> <span class="description">' . esc_html( sprintf( __( 'Exemple : %s. Le compteur ne peut qu’avancer et repart à 1 chaque année.', 'espace-traiteur' ), self::format_numero( $p['prefixe'], (int) wp_date( 'Y' ), (int) $p['prochain'] ) ) ) . '</span></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
+		$c        = self::compteur();
+		$prochain = ( $c['annee'] === (int) wp_date( 'Y' ) || 0 === $c['annee'] ) ? $c['prochain'] : 1;
+		echo '<label>' . esc_html__( 'Prochain numéro', 'espace-traiteur' ) . ' <input type="number" min="' . (int) $prochain . '" class="small-text" name="' . $nom( 'prochain' ) . '" value="' . (int) $prochain . '"></label> <span class="description">' . esc_html( sprintf( __( 'Exemple : %s. Le compteur ne peut qu’avancer et repart à 1 chaque année.', 'espace-traiteur' ), self::format_numero( $p['prefixe'], (int) wp_date( 'Y' ), (int) $prochain ) ) ) . '</span></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<p><label>' . esc_html__( 'Délai de paiement', 'espace-traiteur' ) . ' <input type="number" min="0" max="120" class="small-text" name="' . $nom( 'delai' ) . '" value="' . (int) $p['delai'] . '"> ' . esc_html__( 'jours', 'espace-traiteur' ) . '</label></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		$texte( 'iban', __( 'IBAN (affiché pour le virement, facultatif)', 'espace-traiteur' ) );
 		echo '<p><label>' . esc_html__( 'Mentions légales en pied de facture', 'espace-traiteur' ) . '<br><textarea class="large-text" rows="3" name="' . $nom( 'mentions' ) . '">' . esc_textarea( $p['mentions'] ) . '</textarea></label></p>'; // phpcs:ignore WordPress.Security.EscapeOutput
@@ -166,17 +165,15 @@ class ETR_Facture {
 	}
 
 	/**
-	 * Prend le numéro suivant (verrou : deux factures ne peuvent pas avoir le même numéro).
+	 * Verrou de la facturation (insertion atomique, expiré après 30 s).
 	 *
-	 * @return string|WP_Error
+	 * @return bool Obtenu.
 	 */
-	private static function numero_suivant() {
+	private static function verrouiller() {
 		global $wpdb;
 		for ( $essai = 0; $essai < 20; $essai++ ) {
-			// Insertion atomique : seule une requête à la fois obtient le verrou (expiré après 30 s).
-			$pris = $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", self::VERROU, (string) time() ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			if ( $pris ) {
-				break;
+			if ( $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", self::VERROU, (string) time() ) ) ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				return true;
 			}
 			$depuis = (int) $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", self::VERROU ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			if ( $depuis && time() - $depuis > 30 ) {
@@ -184,18 +181,85 @@ class ETR_Facture {
 			}
 			usleep( 150000 );
 		}
-		if ( empty( $pris ) ) {
-			return new WP_Error( 'etr_facture_verrou', __( 'Numérotation occupée, réessayez.', 'espace-traiteur' ) );
-		}
-		wp_cache_delete( self::OPTION, 'options' );
-		$p     = self::parametres();
-		$annee = (int) wp_date( 'Y' );
-		$n     = (string) $annee === (string) $p['annee'] ? (int) $p['prochain'] : ( '' === (string) $p['annee'] ? (int) $p['prochain'] : 1 );
-		$p['annee']    = $annee;
-		$p['prochain'] = $n + 1;
-		update_option( self::OPTION, $p );
+		return false;
+	}
+
+	/**
+	 * Libère le verrou de la facturation.
+	 */
+	private static function deverrouiller() {
+		global $wpdb;
 		$wpdb->delete( $wpdb->options, array( 'option_name' => self::VERROU ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-		return self::format_numero( $p['prefixe'], $annee, $n );
+	}
+
+	/**
+	 * Compteur { annee, prochain }, lu directement en base (jamais un cache : deux requêtes
+	 * qui se suivent sous le verrou doivent voir la même valeur). Option à part, non chargée
+	 * automatiquement et sans filtre de réglages.
+	 *
+	 * @return array
+	 */
+	public static function compteur() {
+		global $wpdb;
+		$brut = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", self::COMPTEUR ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$c    = null === $brut ? null : maybe_unserialize( $brut );
+		if ( ! is_array( $c ) ) {
+			$p = self::parametres(); // Compteur des versions précédentes (dans les réglages).
+			$c = array( 'annee' => (int) $p['annee'], 'prochain' => max( 1, (int) $p['prochain'] ) );
+		}
+		return array( 'annee' => (int) $c['annee'], 'prochain' => max( 1, (int) $c['prochain'] ) );
+	}
+
+	/**
+	 * Écrit le compteur (directement en base).
+	 *
+	 * @param array $c { annee, prochain }.
+	 */
+	private static function ecrire_compteur( $c ) {
+		global $wpdb;
+		$valeur = maybe_serialize( array( 'annee' => (int) $c['annee'], 'prochain' => (int) $c['prochain'] ) );
+		$existe = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name = %s", self::COMPTEUR ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		if ( (int) $existe ) {
+			$wpdb->update( $wpdb->options, array( 'option_value' => $valeur ), array( 'option_name' => self::COMPTEUR ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		} else {
+			$wpdb->insert( $wpdb->options, array( 'option_name' => self::COMPTEUR, 'option_value' => $valeur, 'autoload' => 'no' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		}
+		wp_cache_delete( self::COMPTEUR, 'options' );
+	}
+
+	/**
+	 * Avance le compteur à la main (réglages) : jamais en arrière dans l'année en cours.
+	 *
+	 * @param int $prochain Prochain numéro souhaité.
+	 */
+	public static function avancer_compteur( $prochain ) {
+		if ( ! self::verrouiller() ) {
+			// Facture en cours de numérotation : rien n'est perdu sans le dire.
+			if ( function_exists( 'add_settings_error' ) ) {
+				add_settings_error( self::OPTION, 'etr_compteur_occupe', __( 'Le prochain numéro de facture n’a pas pu être changé (une facture était en cours de numérotation). Enregistrez de nouveau.', 'espace-traiteur' ) );
+			}
+			return;
+		}
+		$c     = self::compteur();
+		$annee = (int) wp_date( 'Y' );
+		$base  = $c['annee'] === $annee || 0 === $c['annee'] ? $c['prochain'] : 1;
+		if ( $prochain > $base ) {
+			self::ecrire_compteur( array( 'annee' => $annee, 'prochain' => $prochain ) );
+		}
+		self::deverrouiller();
+	}
+
+	/**
+	 * Prend le numéro suivant (à appeler sous le verrou) : repart à 1 chaque année.
+	 *
+	 * @return string
+	 */
+	private static function prendre_numero() {
+		$c     = self::compteur();
+		$annee = (int) wp_date( 'Y' );
+		$n     = ( $c['annee'] === $annee || 0 === $c['annee'] ) ? $c['prochain'] : 1;
+		self::ecrire_compteur( array( 'annee' => $annee, 'prochain' => $n + 1 ) );
+		return self::format_numero( self::parametres()['prefixe'], $annee, $n );
 	}
 
 	/**
@@ -254,9 +318,11 @@ class ETR_Facture {
 			$lignes[] = array( 'libelle' => __( 'Livraison et reprise', 'espace-traiteur' ), 'qte' => 1, 'pu' => self::ht( (float) $chiffrage['livraison'], $p ), 'total' => self::ht( (float) $chiffrage['livraison'], $p ) );
 			$somme   += (float) $chiffrage['livraison'];
 		}
+		$casse = 0.0; // Casse et manquants facturés (convention des prix).
 		if ( class_exists( 'ETR_Devis' ) && ETR_Modules::actif( 'casse' ) ) {
 			foreach ( ETR_Devis::releve( $id )['lignes'] as $l ) {
 				if ( null !== $l['total'] ) {
+					$casse   += (float) $l['total'];
 					/* translators: %s : article. */
 					$lignes[] = array( 'libelle' => sprintf( __( 'Casse et manquants : %s', 'espace-traiteur' ), $l['titre'] ), 'qte' => $l['manquants'] + $l['casses'], 'pu' => self::ht( (float) $l['unitaire'], $p ), 'total' => self::ht( (float) $l['total'], $p ) );
 					$somme   += (float) $l['total'];
@@ -285,6 +351,7 @@ class ETR_Facture {
 			'ttc'     => $ttc,
 			'acompte' => $acompte,
 			'reste'   => round( $ttc - $acompte, 2 ),
+			'casse'   => round( 'ttc' === $p['prix'] ? $casse : $casse * ( 1 + $p['tva'] / 100 ), 2 ), // TTC.
 		);
 	}
 
@@ -298,7 +365,7 @@ class ETR_Facture {
 	 */
 	public static function reglements( $id, $f = null ) {
 		$f       = null === $f ? self::facture( $id ) : $f;
-		$ttc     = $f ? (float) $f['ttc'] : 0.0;
+		$ttc     = isset( $f['ttc'] ) ? (float) $f['ttc'] : 0.0;
 		$acompte = 0.0;
 		$a       = class_exists( 'ETR_Devis' ) ? ETR_Devis::acompte( $id ) : array();
 		if ( ! empty( $a['acompte'] ) && ! empty( $a['acompte_recu'] ) ) {
@@ -310,11 +377,16 @@ class ETR_Facture {
 			$caution = (float) $s['caution']['debite']; // Casse et manquants déjà prélevés sur la caution.
 		}
 		$acompte = min( $ttc, $acompte );
-		$caution = min( $ttc - $acompte, $caution );
+		$debite  = $caution;
+		// Avec la casse sur la facture, la caution débitée ne la réduit que de cette casse (le reste
+		// du débit est hors facture). Sans la fonction « casse », tout le débit est déduit.
+		$plafond = ETR_Modules::actif( 'casse' ) && isset( $f['casse'] ) ? (float) $f['casse'] : $ttc;
+		$caution = min( $ttc - $acompte, $plafond, $caution );
 		return array(
-			'acompte' => round( $acompte, 2 ),
-			'caution' => round( $caution, 2 ),
-			'reste'   => round( max( 0, $ttc - $acompte - $caution ), 2 ),
+			'acompte'      => round( $acompte, 2 ),
+			'caution'      => round( $caution, 2 ),
+			'reste'        => round( max( 0, $ttc - $acompte - $caution ), 2 ),
+			'hors_facture' => round( max( 0, $debite - $caution ), 2 ), // Débité sur la caution, non déduit.
 		);
 	}
 
@@ -328,10 +400,42 @@ class ETR_Facture {
 		if ( self::facture( $id ) ) {
 			return self::facture( $id );
 		}
-		$numero = self::numero_suivant();
-		if ( is_wp_error( $numero ) ) {
-			return $numero;
+		if ( ! self::etablissable( $id ) ) {
+			return new WP_Error( 'etr_facture_reprise', __( 'La facture s’établit une fois le matériel repris (casse et manquants connus).', 'espace-traiteur' ) );
 		}
+		if ( ! self::verrouiller() ) {
+			return new WP_Error( 'etr_facture_verrou', __( 'Numérotation occupée, réessayez.', 'espace-traiteur' ) );
+		}
+		try {
+			wp_cache_delete( $id, 'post_meta' );
+			if ( self::facture( $id ) ) {
+				return self::facture( $id ); // Établie entre-temps par une autre requête.
+			}
+			$numero = self::prendre_numero();
+			return self::enregistrer( $id, $numero );
+		} finally {
+			self::deverrouiller();
+		}
+	}
+
+	/**
+	 * La facture peut-elle être établie ? Après la reprise (casse et manquants connus) ou la clôture.
+	 *
+	 * @param int $id Demande.
+	 * @return bool
+	 */
+	public static function etablissable( $id ) {
+		return 'cloturee' === etr_get_statut( $id ) || ( 'livree' === etr_get_statut( $id ) && ETR_Operations::reprise( $id ) );
+	}
+
+	/**
+	 * Enregistre la facture numérotée.
+	 *
+	 * @param int    $id     Demande.
+	 * @param string $numero Numéro.
+	 * @return array
+	 */
+	private static function enregistrer( $id, $numero ) {
 		$p      = self::parametres();
 		// Client : la société (compte principal) du traiteur qui a fait la demande.
 		$auteur = (int) get_post_field( 'post_author', $id );
@@ -452,8 +556,8 @@ class ETR_Facture {
 		$url  = ETR_Gestion::url( array( 'vue' => 'demande', 'id' => $id ) );
 		echo '<section class="etr-panneau etr-facture"><h2 class="etr-panneau__titre">' . esc_html__( 'Facture', 'espace-traiteur' ) . '</h2>';
 		if ( ! $f ) {
-			if ( ! in_array( etr_get_statut( $id ), array( 'livree', 'cloturee' ), true ) ) {
-				echo '<p class="etr-muted">' . esc_html__( 'Possible une fois le matériel livré.', 'espace-traiteur' ) . '</p></section>';
+			if ( ! self::etablissable( $id ) ) {
+				echo '<p class="etr-muted">' . esc_html__( 'Possible une fois le matériel repris (casse et manquants connus).', 'espace-traiteur' ) . '</p></section>';
 				return;
 			}
 			$c = self::contenu( $id );
@@ -469,6 +573,11 @@ class ETR_Facture {
 		/* translators: 1 : numéro, 2 : date, 3 : TTC. */
 		echo '<p><strong>' . esc_html( $f['numero'] ) . '</strong> · ' . esc_html( sprintf( __( 'du %1$s · %2$s TTC', 'espace-traiteur' ), wp_date( 'j F Y', (int) $f['le'] ), ETR_Devis::prix( $f['ttc'] ) ) ) . '</p>';
 		echo $f['payee'] ? '<p class="etr-pastille-etat etr-pastille-etat--ok">' . esc_html( sprintf( /* translators: %s : date. */ __( 'Payée le %s', 'espace-traiteur' ), etr_format_date( $f['payee'] ) ) ) . '</p>' : '<p class="etr-pastille-etat etr-pastille-etat--cours">' . esc_html( sprintf( /* translators: 1 : montant, 2 : date. */ __( 'Reste %1$s à payer avant le %2$s', 'espace-traiteur' ), ETR_Devis::prix( self::reglements( $id, $f )['reste'] ), etr_format_date( $f['echeance'] ) ) ) . '</p>';
+		$hors = self::reglements( $id, $f )['hors_facture'];
+		if ( $hors > 0 ) {
+			/* translators: %s : montant. */
+			echo '<p class="etr-muted">' . esc_html( sprintf( __( '%s débités sur la caution au-delà de la casse facturée : hors facture (non déduits).', 'espace-traiteur' ), ETR_Devis::prix( $hors ) ) ) . '</p>';
+		}
 		echo '<p><a class="etr-lien" target="_blank" href="' . esc_url( self::url_pdf( $id ) ) . '">' . esc_html__( 'Voir la facture (PDF)', 'espace-traiteur' ) . '</a></p>';
 		echo '<form method="post" class="etr-facture__payee" action="' . esc_url( $url ) . '">' . wp_nonce_field( 'etr_facture_' . $id, 'etr_nonce', true, false ) . '<input type="hidden" name="etr_gestion_action" value="facture"><input type="hidden" name="quoi" value="payee"><input type="hidden" name="demande_id" value="' . (int) $id . '"><label>' . esc_html__( 'Payée le', 'espace-traiteur' ) . ' <input type="date" name="payee" value="' . esc_attr( $f['payee'] ) . '"></label> <button type="submit" class="etr-btn etr-btn--discret">' . esc_html__( 'Enregistrer', 'espace-traiteur' ) . '</button></form>'; // phpcs:ignore WordPress.Security.EscapeOutput
 		echo '<form method="post" action="' . esc_url( $url ) . '">' . wp_nonce_field( 'etr_facture_' . $id, 'etr_nonce', true, false ) . '<input type="hidden" name="etr_gestion_action" value="facture"><input type="hidden" name="quoi" value="envoyer"><input type="hidden" name="demande_id" value="' . (int) $id . '"><button type="submit" class="etr-btn etr-btn--discret">' . esc_html__( 'Renvoyer au traiteur', 'espace-traiteur' ) . '</button></form></section>'; // phpcs:ignore WordPress.Security.EscapeOutput
@@ -494,7 +603,7 @@ class ETR_Facture {
 		}
 		$quoi = isset( $_POST['quoi'] ) ? sanitize_key( wp_unslash( $_POST['quoi'] ) ) : '';
 		$msg  = 'fait';
-		if ( 'etablir' === $quoi && in_array( etr_get_statut( $id ), array( 'livree', 'cloturee' ), true ) ) {
+		if ( 'etablir' === $quoi && self::etablissable( $id ) ) {
 			$f   = self::etablir( $id );
 			$msg = is_wp_error( $f ) ? 'mail_echec' : ( self::envoyer( $id ) ? 'facture_envoyee' : 'mail_echec' );
 		} elseif ( 'envoyer' === $quoi ) {
