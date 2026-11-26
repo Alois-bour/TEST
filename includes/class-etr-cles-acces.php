@@ -297,9 +297,8 @@ class ETR_Cles_Acces {
 				if ( $cle_echecs ) {
 					ETR_Comptes::compter_echec( $cle_echecs );
 				}
-			} else {
-				self::compter_ip( -1 ); // Demande expirée : pas une tentative.
 			}
+			// Demande expirée : pas de recul du compteur (un jeton bidon ne doit pas le faire baisser).
 			return $resultat;
 		}
 		self::compter_ip( -1 ); // Réussite : ne compte pas dans le plafond de l'adresse IP.
@@ -437,7 +436,9 @@ class ETR_Cles_Acces {
 	 */
 	private static function compter_ip( $pas ) {
 		global $wpdb;
-		$nom = self::nom_ip();
+		static $fenetre = null; // Le recul (réussite) vise la fenêtre de l'essai, pas la suivante.
+		$nom     = $pas < 0 && $fenetre ? $fenetre : self::nom_ip();
+		$fenetre = $nom;
 		if ( $pas > 0 && $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, '1', 'no')", $nom ) ) ) { // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			// Nouvelle fenêtre : les compteurs des fenêtres passées sont supprimés.
 			$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s AND option_name NOT LIKE %s", $wpdb->esc_like( 'etr_echecs_cle_ip_' ) . '%', '%' . $wpdb->esc_like( '_' . (int) floor( time() / ETR_Comptes::DUREE_BLOCAGE ) ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery

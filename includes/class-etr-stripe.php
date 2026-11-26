@@ -591,7 +591,10 @@ class ETR_Stripe {
 		}
 		// Retour du traiteur et webhook en même temps : un seul enregistre (verrou par session).
 		if ( ! self::verrou( 'etr_stripe_' . md5( (string) $s['id'] ) ) ) {
-			return true;
+			// Enregistrement en cours ailleurs (retour du traiteur) : s'il échoue, rien ne serait
+			// enregistré ; le webhook demande donc à Stripe de renvoyer l'événement (rejoué sans risque).
+			self::$a_reessayer = true;
+			return false;
 		}
 		try {
 			return self::enregistrer_session_verrouillee( $s, $id, $type );
@@ -645,10 +648,11 @@ class ETR_Stripe {
 			return true; // Déjà enregistré (webhook et retour).
 		}
 		$deja_paye = in_array( $type, array( 'acompte', 'solde' ), true ) && isset( $deja[ $type ]['statut'] ) && 'paye' === $deja[ $type ]['statut'] && $deja[ $type ]['session'] !== $s['id'];
-		if ( 'acompte' === $type && ! $deja_paye && class_exists( 'ETR_Facture' ) ) {
-			// Acompte payé depuis un vieil onglet après le règlement de la facture (acompte compris).
-			$f         = ETR_Facture::facture( $id );
-			$deja_paye = $f && ! empty( $f['payee'] );
+		if ( in_array( $type, array( 'acompte', 'solde' ), true ) && ! $deja_paye ) {
+			// Déjà réglé autrement (virement noté par le bureau) : facture payée (acompte compris),
+			// ou acompte noté reçu à la main.
+			$f         = class_exists( 'ETR_Facture' ) ? ETR_Facture::facture( $id ) : array();
+			$deja_paye = ( $f && ! empty( $f['payee'] ) ) || ( 'acompte' === $type && '' !== (string) ETR_Devis::acompte( $id )['acompte_recu'] );
 		}
 		if ( $deja_paye ) {
 			// Deuxième paiement (ancien onglet) : signalé au bureau pour remboursement, rien n'est
@@ -873,6 +877,11 @@ class ETR_Stripe {
 		$c = self::paiements( $id )['caution'] ?? array();
 		if ( empty( $c['statut'] ) || ! in_array( $c['statut'], array( 'bloquee', 'enregistree' ), true ) ) {
 			return true;
+		}
+		if ( ! empty( $c['debit_attente']['montant'] ) ) {
+			// Un débit sans réponse définitive a peut-être eu lieu : il est d'abord relancé (même
+			// montant, même clé) pour connaître le résultat, jamais oublié.
+			return new WP_Error( 'etr_caution', sprintf( /* translators: %s : montant. */ __( 'Un débit de %s attend encore la réponse de Stripe : relancez-le d’abord avec le même montant (ou vérifiez dans Stripe), puis libérez la caution.', 'espace-traiteur' ), ETR_Devis::prix( $c['debit_attente']['montant'] ) ) );
 		}
 		$r = 'bloquee' === $c['statut']
 			? self::api( 'POST', 'payment_intents/' . rawurlencode( $c['pi'] ) . '/cancel', array(), 'etr-liberer-' . $c['pi'] )

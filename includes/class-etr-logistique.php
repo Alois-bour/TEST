@@ -304,10 +304,12 @@ class ETR_Logistique {
 				),
 			)
 		);
+		update_meta_cache( 'post', $ids ); // Une seule requête pour toutes les métadonnées.
 		$n = 0;
 		foreach ( $ids as $id ) {
 			list( $livraison, $reprise ) = ETR_Operations::jours( $id );
-			if ( $livraison === $jour && get_post_meta( $id, '_etr_creneau_livraison', true ) === $creneau && ! ETR_Operations::livraison( $id ) ) {
+			// Livraison encore à faire : demande pas encore « livrée » (même passée à la main dans l'admin).
+			if ( $livraison === $jour && get_post_meta( $id, '_etr_creneau_livraison', true ) === $creneau && in_array( etr_get_statut( $id ), array( 'en_attente', 'validee' ), true ) && ! ETR_Operations::livraison( $id ) ) {
 				++$n;
 			}
 			if ( $reprise === $jour && get_post_meta( $id, '_etr_creneau_reprise', true ) === $creneau && ! ETR_Operations::reprise( $id ) ) {

@@ -207,12 +207,13 @@ class ETR_Push {
 			return new WP_Error( 'etr_push_cles', __( 'Clés de l’appareil invalides.', 'espace-traiteur' ), array( 'status' => 400 ) );
 		}
 
-		// Appareil déjà rattaché à ce compte (rattachement automatique) : nom et date gardés.
+		// Appareil déjà rattaché à ce compte (rattachement automatique à chaque session) : le nom
+		// et la date déjà enregistrés sont gardés.
 		$nom    = sanitize_text_field( $nom );
 		$depuis = time();
 		foreach ( self::appareils( $user_id ) as $connu ) {
 			if ( isset( $connu['endpoint'] ) && $connu['endpoint'] === $endpoint ) {
-				$nom    = '' !== $nom ? $nom : (string) ( $connu['nom'] ?? '' );
+				$nom    = '' !== (string) ( $connu['nom'] ?? '' ) ? (string) $connu['nom'] : $nom;
 				$depuis = (int) ( $connu['depuis'] ?? $depuis );
 			}
 		}

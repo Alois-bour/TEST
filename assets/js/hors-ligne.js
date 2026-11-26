@@ -445,9 +445,23 @@
 		}
 		deconnexionEnCours = true;
 		lien.setAttribute( 'aria-busy', 'true' );
-		var partir = function () {
-			if ( navigator.serviceWorker && navigator.serviceWorker.controller ) {
-				navigator.serviceWorker.controller.postMessage( { type: 'etr-vider' } );
+		var rester = function ( texte ) {
+			deconnexionEnCours = false;
+			lien.removeAttribute( 'aria-busy' );
+			if ( texte ) {
+				if ( window.etrToast ) {
+					window.etrToast( texte, 'erreur' );
+				} else {
+					window.alert( texte ); // eslint-disable-line no-alert
+				}
+			}
+		};
+		var SANS_RESEAU = 'Pas de réseau : la déconnexion n’a pas pu se faire. Vos saisies sont gardées sur le téléphone ; réessayez une fois le réseau revenu.';
+		// La déconnexion se fait d'abord sur le serveur ; les saisies abandonnées et les pages
+		// gardées ne sont effacées qu'une fois la déconnexion réussie (jamais sans réseau).
+		var partir = function ( aSupprimer ) {
+			if ( navigator.onLine === false ) {
+				return rester( SANS_RESEAU );
 			}
 			var fin = Promise.resolve();
 			if ( navigator.serviceWorker && window.PushManager && C.apiNotifs ) {
@@ -460,12 +474,29 @@
 					return fetch( C.apiNotifs + 'appareil', { method: 'DELETE', credentials: 'same-origin', keepalive: true, headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': C.nonce }, body: JSON.stringify( { endpoint: abonnement.endpoint } ) } ).catch( function () {} );
 				} ).catch( function () {} );
 			}
-			Promise.race( [ fin, new Promise( function ( r ) {
+			return Promise.race( [ fin, new Promise( function ( r ) {
 				setTimeout( r, 1500 );
 			} ) ] ).then( function () {
-				window.location.href = lien.href;
+				return fetch( lien.href, { credentials: 'same-origin', cache: 'no-store' } );
+			} ).then( function ( reponse ) {
+				return transaction( 'readwrite', function ( m ) {
+					( aSupprimer || [] ).forEach( function ( envoi ) {
+						m.delete( envoi.id );
+					} );
+				} ).catch( function () {} ).then( function () {
+					if ( navigator.serviceWorker && navigator.serviceWorker.controller ) {
+						navigator.serviceWorker.controller.postMessage( { type: 'etr-vider' } );
+					}
+					window.location.href = ( reponse && reponse.url ) || C.gestion || '/';
+				} );
+			}, function () {
+				rester( SANS_RESEAU );
 			} );
 		};
+		if ( navigator.onLine === false ) {
+			rester( SANS_RESEAU );
+			return;
+		}
 		// L'envoi des saisies en attente a 8 s au plus ; ce qui reste est proposé à l'abandon.
 		Promise.race( [ envoyer().catch( function () {} ), new Promise( function ( r ) {
 			setTimeout( r, 8000 );
@@ -475,23 +506,19 @@
 			// Seules les saisies de la personne qui part : celles d'un collègue restent pour lui.
 			var liste = toutes.filter( aMoi );
 			if ( ! liste.length ) {
-				return partir();
+				return partir( [] );
 			}
 			var question = liste.length + ( liste.length > 1 ? ' saisies ne sont pas encore envoyées' : ' saisie n’est pas encore envoyée' ) + ' (réseau). En vous déconnectant, elles seront perdues.';
 			var confirmer = window.etrConfirmer ? window.etrConfirmer( question, { valider: 'Se déconnecter quand même', danger: true } ) : Promise.resolve( window.confirm( question ) ); // eslint-disable-line no-alert
 			return confirmer.then( function ( ok ) {
 				if ( ! ok ) {
-					deconnexionEnCours = false;
-					lien.removeAttribute( 'aria-busy' );
-					return null;
+					return rester( '' );
 				}
-				return transaction( 'readwrite', function ( m ) {
-					liste.forEach( function ( e ) {
-						m.delete( e.id );
-					} );
-				} ).then( partir );
+				return partir( liste );
 			} );
-		} ).catch( partir );
+		} ).catch( function () {
+			return partir( [] );
+		} );
 	} );
 
 	// Pages utiles sans réseau : gardées sur le téléphone à l'ouverture de la tournée.

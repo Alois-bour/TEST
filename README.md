@@ -123,6 +123,16 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
 - **Livraison hors connexion** : confirmation sur place, puis retour à la tournée, où l'étape apparaît « Livrée sur le téléphone · envoi en attente ».
 - **Sécurité** : seules les vraies pages de l'application sont gardées, jamais l'écran de connexion ; elles sont effacées à la déconnexion, ou dès que l'écran de connexion s'affiche (session terminée, autre personne). Le jeton de sécurité est renouvelé avant chaque envoi différé.
 
+### Corrections de la quatrième revue (3.0.5)
+
+- **Stripe** : si le retour du traiteur enregistre déjà la session, le webhook demande à Stripe de renvoyer l'événement (rien n'est perdu si ce retour échoue) ; un paiement en ligne après un règlement noté à la main (facture payée, acompte reçu) est signalé en double, la date n'est pas changée ; la caution ne peut pas être libérée tant qu'un débit attend la réponse de Stripe.
+- **Déconnexion de l'application** : faite d'abord sur le serveur ; sans réseau, rien n'est effacé (message) ; les saisies abandonnées et les pages gardées ne sont supprimées qu'une fois la déconnexion réussie.
+- **Acompte et caution** : une date que la personne n'a pas touchée garde la valeur écrite entre-temps (Stripe) ; une date changée ou effacée volontairement est respectée.
+- **Face ID** : une demande expirée (jeton invalide) ne fait plus reculer le compteur par adresse IP.
+- **Créneaux** : une demande « livrée » (même à la main) ne compte plus dans la charge de son jour de livraison ; métadonnées lues en une requête.
+- **Espace traiteur** : le retrait des notifications à la déconnexion vaut sur toutes les pages.
+- **Appareils** : le nom enregistré est gardé au rattachement automatique.
+
 ### Corrections de la troisième revue (3.0.4)
 
 - **Téléphone partagé** : à la déconnexion, seules les saisies de la personne qui part sont comptées et supprimées ; celles d'un collègue restent. Les saisies gardées avant la 3.0.3 (sans auteur) ne partent plus d'office : elles sont signalées et ne partent qu'avec « Réessayer ».

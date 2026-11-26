@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Espace Traiteur
  * Description:       Espace privé pour les traiteurs : chaque traiteur se connecte à son espace et fait ses demandes de mobilier, vaisselle, linge et matériel, à partir des produits WooCommerce du site.
- * Version:           3.0.4
+ * Version:           3.0.5
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * License:           GPL-2.0-or-later
@@ -13,7 +13,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'ETR_VERSION', '3.0.4' );
+define( 'ETR_VERSION', '3.0.5' );
 define( 'ETR_FILE', __FILE__ );
 define( 'ETR_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ETR_URL', plugin_dir_url( __FILE__ ) );

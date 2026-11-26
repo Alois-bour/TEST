@@ -7,7 +7,35 @@
 	'use strict';
 	var C    = window.etrTraiteurPush;
 	var zone = document.getElementById( 'etr-push-traiteur' );
-	if ( ! C || ! zone || ! ( 'serviceWorker' in navigator ) || ! ( 'PushManager' in window ) || ! ( 'Notification' in window ) ) {
+	if ( ! C || ! ( 'serviceWorker' in navigator ) || ! ( 'PushManager' in window ) ) {
+		return;
+	}
+
+	// Déconnexion (sur toutes les pages, encart ou non) : ce téléphone ne reçoit plus les notifications de ce compte.
+	var sortie = false;
+	document.addEventListener( 'click', function ( e ) {
+		var lien = e.target.closest( 'a[href*="action=logout"]' );
+		if ( ! lien || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey ) {
+			return;
+		}
+		e.preventDefault();
+		if ( sortie ) {
+			return;
+		}
+		sortie = true;
+		var fin = navigator.serviceWorker.getRegistration( C.portee ).then( function ( reg ) {
+			return reg ? reg.pushManager.getSubscription() : null;
+		} ).then( function ( abonnement ) {
+			return abonnement ? envoyer( 'retirer', abonnement ) : null;
+		} ).catch( function () {} );
+		Promise.race( [ fin, new Promise( function ( r ) {
+			setTimeout( r, 1500 );
+		} ) ] ).then( function () {
+			window.location.href = lien.href;
+		} );
+	} );
+
+	if ( ! zone || ! ( 'Notification' in window ) ) {
 		return;
 	}
 	var bouton  = zone.querySelector( '[data-push-activer]' );
@@ -80,30 +108,6 @@
 			} );
 		} );
 	} ).catch( function () {} );
-
-	// Déconnexion : ce téléphone ne reçoit plus les notifications de ce compte.
-	var sortie = false;
-	document.addEventListener( 'click', function ( e ) {
-		var lien = e.target.closest( 'a[href*="action=logout"]' );
-		if ( ! lien || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey ) {
-			return;
-		}
-		e.preventDefault();
-		if ( sortie ) {
-			return;
-		}
-		sortie = true;
-		var fin = navigator.serviceWorker.getRegistration( C.portee ).then( function ( reg ) {
-			return reg ? reg.pushManager.getSubscription() : null;
-		} ).then( function ( abonnement ) {
-			return abonnement ? envoyer( 'retirer', abonnement ) : null;
-		} ).catch( function () {} );
-		Promise.race( [ fin, new Promise( function ( r ) {
-			setTimeout( r, 1500 );
-		} ) ] ).then( function () {
-			window.location.href = lien.href;
-		} );
-	} );
 
 	var fermer = zone.querySelector( '.etr-installer__fermer' );
 	if ( fermer ) {
