@@ -129,6 +129,13 @@ Dans un château, une cave ou une salle sans 4G, le terrain continue de travaill
   - à gauche, le **Prix** : matériel, remise, livraison et reprise, total de la location, plus la casse et la facture une fois établie, avec la source du chiffre (estimation, devis envoyé, devis accepté, facture) ;
   - à droite, les **Règlements** : acompte, caution (garantie, hors reste à payer), prélèvements sur la caution, puis **Reste à payer** ou « Facture réglée » ;
   - dessous, la frise « Où en est-on ».
+- **Fixer le prix**, un seul formulaire « Prix de la location » qui se lit comme un calcul :
+  - matériel (prix du catalogue) ;
+  - remise en % (montant déduit affiché) ;
+  - livraison et reprise ;
+  - **total recalculé pendant la saisie**.
+
+  Sous la livraison, le **prix conseillé** s'affiche en une ligne avec un bouton « Prendre 140 € » ; le détail est replié dans « Voir le calcul », qui contient aussi « Actualiser l'estimation ». Un seul bouton enregistre : **« Enregistrer le prix »**, avec « Pas encore enregistré » tant qu'une modification attend.
 - La suite de l'onglet est rangée en **parties numérotées**, dans l'ordre du travail. Les numéros suivent les fonctions activées.
   1. Fixer le prix
   2. Devis et contrat

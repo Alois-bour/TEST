@@ -1421,7 +1421,7 @@ class ETR_Gestion {
 			'reprise_ecarts' => __( 'Reprise enregistrée avec des écarts : le bureau est prévenu.', 'espace-traiteur' ),
 			'incident'   => __( 'Incident envoyé : le bureau est prévenu.', 'espace-traiteur' ),
 			'enregistre' => __( 'Message enregistré. Le statut n’a pas changé : aucun e-mail n’a été envoyé.', 'espace-traiteur' ),
-			'tarif'      => __( 'Remise et frais de livraison enregistrés.', 'espace-traiteur' ),
+			'tarif'      => __( 'Prix enregistré.', 'espace-traiteur' ),
 			'cree'       => __( 'Traiteur ajouté. Il a reçu un e-mail pour choisir son mot de passe.', 'espace-traiteur' ),
 			'cree_sans_invitation' => __( 'Traiteur ajouté, sans invitation. Cliquez sur « Envoyer l’invitation » dans la liste quand vous êtes prêt.', 'espace-traiteur' ),
 			'invite'     => __( 'Invitation envoyée.', 'espace-traiteur' ),
@@ -2084,7 +2084,7 @@ class ETR_Gestion {
 		if ( isset( $onglets['argent'] ) ) {
 			ETR_Fiche::ouvrir( 'argent', $actif );
 			ETR_Fiche::resume_argent( $id );
-			ETR_Fiche::titre_finances( 1, __( 'Fixer le prix', 'espace-traiteur' ), __( 'Remise et frais de livraison (l’estimation aide à chiffrer la livraison).', 'espace-traiteur' ) );
+			ETR_Fiche::titre_finances( 1, __( 'Fixer le prix', 'espace-traiteur' ), __( 'Le matériel suit le catalogue : ajoutez la remise et la livraison, vérifiez le total, puis enregistrez.', 'espace-traiteur' ) );
 			self::panneau_tarif( $id );
 			/** Finances (prix, devis, acompte, paiements en ligne, facture…). */
 			do_action( 'etr_gestion_fiche_argent', $id );
@@ -2231,17 +2231,27 @@ class ETR_Gestion {
 	 */
 	private static function panneau_tarif( $id ) {
 		$tarif = etr_tarif( $id );
-		echo '<form class="etr-panneau etr-tarif" method="post" action="' . esc_url( self::url_demande( $id ) ) . '" data-feuille="' . esc_attr__( 'Remise et livraison', 'espace-traiteur' ) . '">';
+		$ch    = etr_chiffrage( $id );
+		$euros = function ( $m ) {
+			return number_format_i18n( $m, 2 ) . "\xc2\xa0€";
+		};
+		$liv   = null === $tarif['livraison'] ? __( 'à chiffrer', 'espace-traiteur' ) : ( $tarif['livraison'] ? '+ ' . $euros( $tarif['livraison'] ) : __( 'offertes', 'espace-traiteur' ) );
+		echo '<form class="etr-panneau etr-tarif" method="post" action="' . esc_url( self::url_demande( $id ) ) . '" data-feuille="' . esc_attr__( 'Prix de la location', 'espace-traiteur' ) . '" data-tarif data-sous-total="' . esc_attr( (string) $ch['sous_total'] ) . '">';
 		wp_nonce_field( 'etr_gestion_tarif_' . $id, 'etr_nonce' );
 		echo '<input type="hidden" name="etr_gestion_action" value="tarif"><input type="hidden" name="demande_id" value="' . (int) $id . '">';
-		echo '<h2 class="etr-panneau__titre">' . esc_html__( 'Tarification', 'espace-traiteur' ) . '</h2>';
-		echo '<div class="etr-tarif__champs">';
-		echo '<p class="etr-champ"><label for="etr-remise">' . esc_html__( 'Remise', 'espace-traiteur' ) . '</label><span class="etr-saisie-unite"><input type="text" inputmode="decimal" id="etr-remise" name="etr_remise_pct" value="' . esc_attr( $tarif['remise_pct'] ? str_replace( '.', ',', (string) $tarif['remise_pct'] ) : '' ) . '" placeholder="0"><span aria-hidden="true">%</span></span></p>';
-		echo '<p class="etr-champ"><label for="etr-livraison">' . esc_html__( 'Livraison et reprise', 'espace-traiteur' ) . '</label><span class="etr-saisie-unite"><input type="text" inputmode="decimal" id="etr-livraison" name="etr_frais_livraison" value="' . esc_attr( null === $tarif['livraison'] ? '' : str_replace( '.', ',', (string) $tarif['livraison'] ) ) . '" placeholder="—"><span aria-hidden="true">€</span></span></p>';
+		echo '<h2 class="etr-panneau__titre">' . esc_html__( 'Prix de la location', 'espace-traiteur' ) . '</h2>';
+		echo '<div class="etr-tarif__calcul">';
+		// Matériel : prix du catalogue, non modifiable ici.
+		echo '<div class="etr-tarif__ligne"><span class="etr-tarif__libelle">' . esc_html__( 'Matériel', 'espace-traiteur' ) . '<small>' . esc_html( $ch['sans_prix'] ? sprintf( /* translators: %s : nombre d'articles. */ _n( 'prix du catalogue · %s article sans prix', 'prix du catalogue · %s articles sans prix', $ch['sans_prix'], 'espace-traiteur' ), number_format_i18n( $ch['sans_prix'] ) ) : __( 'prix du catalogue', 'espace-traiteur' ) ) . '</small></span><output class="etr-tarif__montant">' . esc_html( $euros( $ch['sous_total'] ) ) . '</output></div>';
+		// Remise.
+		echo '<div class="etr-tarif__ligne"><label class="etr-tarif__libelle" for="etr-remise">' . esc_html__( 'Remise', 'espace-traiteur' ) . '<small>' . esc_html__( 'sur le matériel, en %', 'espace-traiteur' ) . '</small></label><span class="etr-saisie-unite etr-tarif__saisie"><input type="text" inputmode="decimal" id="etr-remise" name="etr_remise_pct" value="' . esc_attr( $tarif['remise_pct'] ? str_replace( '.', ',', (string) $tarif['remise_pct'] ) : '' ) . '" placeholder="0"><span aria-hidden="true">%</span></span><output class="etr-tarif__montant" data-tarif-remise>' . esc_html( $ch['remise'] ? '− ' . $euros( $ch['remise'] ) : '—' ) . '</output></div>';
+		// Livraison et reprise, avec le prix conseillé juste dessous.
+		echo '<div class="etr-tarif__ligne"><label class="etr-tarif__libelle" for="etr-livraison">' . esc_html__( 'Livraison et reprise', 'espace-traiteur' ) . '<small>' . esc_html__( 'vide = à chiffrer, 0 = offertes', 'espace-traiteur' ) . '</small></label><span class="etr-saisie-unite etr-tarif__saisie"><input type="text" inputmode="decimal" id="etr-livraison" name="etr_frais_livraison" value="' . esc_attr( null === $tarif['livraison'] ? '' : str_replace( '.', ',', (string) $tarif['livraison'] ) ) . '" placeholder="—"><span aria-hidden="true">€</span></span><output class="etr-tarif__montant" data-tarif-livraison>' . esc_html( $liv ) . '</output></div>';
+		do_action( 'etr_gestion_tarif_estimation', $id ); // Prix conseillé de la livraison (bureau seulement).
+		echo '<div class="etr-tarif__ligne etr-tarif__ligne--total"><span class="etr-tarif__libelle">' . esc_html__( 'Total de la location', 'espace-traiteur' ) . '</span><output class="etr-tarif__montant" data-tarif-total>' . esc_html( $euros( $ch['total'] ) ) . '</output></div>';
 		echo '</div>';
-		do_action( 'etr_gestion_tarif_estimation', $id ); // Estimation du prix de la livraison (bureau seulement).
-		echo '<p class="etr-muted">' . esc_html__( 'Pris en compte dans le prix final indicatif, visible aussi par le traiteur si les prix sont affichés. Livraison vide = non chiffrée, 0 = offerte.', 'espace-traiteur' ) . '</p>';
-		echo '<button type="submit" class="etr-btn">' . esc_html__( 'Mettre à jour le prix', 'espace-traiteur' ) . '</button>';
+		echo '<div class="etr-tarif__pied"><button type="submit" class="etr-btn">' . esc_html__( 'Enregistrer le prix', 'espace-traiteur' ) . '</button><span class="etr-tarif__etat" data-tarif-etat aria-live="polite"></span></div>';
+		echo '<p class="etr-muted etr-tarif__aide">' . esc_html__( 'Le traiteur voit ce prix dans son espace (si les prix sont affichés) et sur le devis.', 'espace-traiteur' ) . '</p>';
 		echo '</form>';
 	}
 

@@ -1539,3 +1539,33 @@ html:active-view-transition-type(onglet)::view-transition-new(etr-contenu) { ani
 	.etr-compte__grille { grid-template-columns: 1fr; gap: 12px; }
 	.etr-compte__bloc { padding: 12px 14px; }
 }
+
+/* Prix de la location : calcul ligne par ligne (3.3.1) */
+.etr-tarif__calcul { display: flex; flex-direction: column; }
+.etr-tarif__ligne { display: grid; grid-template-columns: minmax(0, 1fr) 140px 120px; align-items: center; gap: 8px 16px; padding: 12px 0; border-bottom: 1px solid var(--etr-trait-doux); }
+.etr-tarif__ligne > .etr-tarif__libelle:first-child + .etr-tarif__montant { grid-column: 3; }
+.etr-app .etr-tarif__libelle { display: flex; flex-direction: column; gap: 2px; margin: 0; font-weight: 500; color: var(--etr-encre); }
+.etr-tarif__libelle small { font-weight: 400; font-size: 13px; color: var(--etr-gris); }
+.etr-tarif__montant { text-align: right; white-space: nowrap; font-variant-numeric: lining-nums tabular-nums; color: var(--etr-encre); }
+.etr-app .etr-tarif__ligne--total { border-top: 2px solid var(--etr-encre); border-bottom: 0; margin-top: 4px; }
+.etr-tarif__ligne--total .etr-tarif__libelle { font-weight: 600; }
+.etr-tarif__ligne--total .etr-tarif__montant { font: 400 26px/1 var(--etr-serif); }
+.etr-tarif__pied { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.etr-tarif__etat { font-size: 14px; font-weight: 500; color: var(--etr-ambre); }
+.etr-tarif.est-modifie .etr-tarif__pied .etr-btn { box-shadow: 0 0 0 3px var(--etr-ambre-clair); }
+.etr-app .etr-tarif__aide { margin: 0; font-size: 13px; }
+/* Prix conseillé de la livraison, juste sous le champ */
+.etr-app .etr-estimation--conseil { margin: 0 0 4px; padding: 10px 12px; border-style: solid; border-color: var(--etr-trait-doux); background: var(--etr-voile); }
+.etr-estimation__conseil { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 0; }
+.etr-estimation__conseil > span { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.etr-estimation__conseil small { flex-basis: 100%; font-size: 13px; color: var(--etr-gris); }
+.etr-estimation__plus { margin-top: 8px; }
+.etr-estimation__plus summary { cursor: pointer; font-size: 13px; color: var(--etr-olive); }
+.etr-estimation__plus[open] summary { margin-bottom: 8px; }
+.etr-app .etr-estimation__actualiser { padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--etr-olive); text-decoration: underline; cursor: pointer; }
+.etr-estimation__actions small { font-size: 12.5px; }
+@media (max-width: 640px) {
+	.etr-tarif__ligne { grid-template-columns: minmax(0, 1fr) auto; }
+	.etr-tarif__ligne .etr-tarif__saisie { grid-column: 1 / -1; grid-row: 2; }
+	.etr-tarif__ligne > .etr-tarif__montant { grid-column: 2; grid-row: 1; }
+}
